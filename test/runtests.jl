@@ -607,11 +607,6 @@ function run_light_tests()
     end
 
     @testset "greb_data_dir resolution order" begin
-        # Never exercises the DataDep branch: that would download 353 MB. The
-        # branch itself is a single `allow_download || return nothing` guard;
-        # what is worth testing is that the three local sources take priority
-        # over it in the right order, so a download can only ever be a last
-        # resort.
         tmp_a, tmp_b = mktempdir(), mktempdir()
         saved = get(ENV, "GREB_DATA", nothing)
         try
@@ -631,8 +626,13 @@ function run_light_tests()
             @test_throws ErrorException greb_data_dir()
             delete!(ENV, "GREB_DATA")
 
-            # an empty explicit path falls through rather than erroring
-            @test greb_data_dir("") == greb_data_dir()
+            # An empty explicit path falls through rather than erroring, so it
+            # resolves identically to passing nothing. `allow_download = false`
+            # on both sides keeps this true whether or not a local dataset
+            # exists: with one they agree on its path, without one they agree
+            # on `nothing`.
+            @test greb_data_dir(""; allow_download = false) ==
+                  greb_data_dir(; allow_download = false)
         finally
             saved === nothing ? delete!(ENV, "GREB_DATA") : (ENV["GREB_DATA"] = saved)
             rm(tmp_a; recursive = true, force = true)
