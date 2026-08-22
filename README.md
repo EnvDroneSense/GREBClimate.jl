@@ -255,7 +255,8 @@ one session (e.g. for parameter sweeps), and pass the one you want into
 
 A bare `ClimateFields()` is all zeros. Stepping the model on a zero
 climatology runs to completion but yields a physically meaningless world
-(global-mean Ts ≈ 233 K / −40 °C), so `greb_model!` **refuses** it rather than
+(global-mean Ts pinned at the 40 K stability floor / −233 °C), so
+`greb_model!` **refuses** it rather than
 returning plausible-looking nonsense:
 
 ```julia

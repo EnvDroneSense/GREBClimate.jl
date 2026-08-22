@@ -92,7 +92,7 @@ function forcing(it, year, cfg::PhysicsConfig, fields::ClimateFields, icmn_ctrl;
 
     # - Legacy experiments ───────────
     if cfg.experiment == :constant_topo
-        CO2 = 550.0f0  # 550 ppm CO₂ steady state
+        CO2 = 680.0f0  # 2x340 ppm
 
     elseif cfg.experiment == :a1b_scenario
         CO2_1950 = 310.0f0;
@@ -236,7 +236,7 @@ function forcing(it, year, cfg::PhysicsConfig, fields::ClimateFields, icmn_ctrl;
         end
 
         # - Forced boundary condition experiments (handled in scenario loop) ─────
-    elseif cfg.experiment == :elnino || cfg.experiment == :lanina || cfg.experiment == :rcp85
+    elseif cfg.experiment == :elnino || cfg.experiment == :lanina
         CO2 = 340.0f0
     end
 

@@ -135,10 +135,8 @@ function init_model!(cfg::PhysicsConfig, fields::ClimateFields)
     # ── Control CO₂ level ───────────────────────────────────────
     CO2_ctrl = cfg.co2_concentration
 
-    if cfg.experiment == :a1b_scenario
-        CO2_ctrl = 298.0f0  # A1B scenario baseline
-    elseif cfg.experiment in (:rcp26, :rcp45, :rcp60, :rcp85, :custom_co2,
-                              :ssp119, :ssp126, :ssp245, :ssp460, :ssp585, :historical_co2)
+    if cfg.experiment in (:a1b_scenario, :rcp26, :rcp45, :rcp60, :rcp85, :custom_co2,
+                          :ssp119, :ssp126, :ssp245, :ssp460, :ssp585, :historical_co2)
         CO2_ctrl = 280.0f0  # IPCC scenarios baseline
     end
 

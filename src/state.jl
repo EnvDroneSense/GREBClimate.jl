@@ -163,7 +163,6 @@ begin
         lwmm::Matrix{Float32}         # Longwave radiation accumulator
         qlatmm::Matrix{Float32}       # Latent heat accumulator
         qsensmm::Matrix{Float32}      # Sensible heat accumulator
-        count::Int                    # Number of accumulations
     end
 
     function MonthlyAccumulator()
@@ -181,7 +180,6 @@ begin
             zeros(Float32, xdim, ydim),  # lwmm
             zeros(Float32, xdim, ydim),  # qlatmm
             zeros(Float32, xdim, ydim),  # qsensmm
-            0
         )
     end
 
@@ -199,7 +197,6 @@ begin
         fill!(acc.lwmm, 0.0f0)
         fill!(acc.qlatmm, 0.0f0)
         fill!(acc.qsensmm, 0.0f0)
-        acc.count = 0
     end
 
     function accumulate!(acc::MonthlyAccumulator, Ts, Ta, To, q, albedo, ice, precip, evap, qcrcl, sw, lw, qlat, qsens)
@@ -225,7 +222,6 @@ begin
                 qsensmm[i, j] += qsens[i, j]
             end
         end
-        acc.count += 1
     end
 end;
 
@@ -241,7 +237,8 @@ shared as global state.
 `load_greb_jld2!` sets `loaded = true` once real climatology is in place.
 [`greb_model!`](@ref) refuses to run unloaded fields unless explicitly
 told to via `allow_uninitialized=true` - an all-zero climatology produces
-a physically meaningless (~-40 °C) world rather than an error, so the
+a physically meaningless world pinned at the 40 K floor (~-233 °C) rather
+than an error, so the
 flag exists to keep that path opt-in.
 """
 mutable struct ClimateFields
@@ -340,29 +337,22 @@ end;
     ModelState
 
 Per-run mutable state that isn't climatology: the runtime solar-forcing
-multiplier (`SWradiation!` reads it) and the annual-mean diagnostic
-accumulators (`diagnostics!` reads/writes them). One instance per
-`greb_model!` run.
+multiplier (`SWradiation!` reads it) and the surface-temperature accumulator
+behind the annual progress line (`diagnostics!` reads/writes it). One instance
+per `greb_model!` run.
+
+This is scratch space for the printed summary, not an output path - `Tsmn` is
+averaged, printed and zeroed within a single `diagnostics!` call, so it never
+holds a readable annual mean once the call returns. Model output is the
+`Vector{MonthlyRecord}` that [`greb_model!`](@ref) returns.
 """
 mutable struct ModelState
     sw_solar_forcing::Float32   # runtime solar multiplier used by SWradiation!
-
-    # Annual-mean accumulators (xdim, ydim)
-    Tsmn::Matrix{Float32}    # surface temperature
-    Tamn::Matrix{Float32}    # air temperature
-    Tomn::Matrix{Float32}    # deep ocean temperature
-    qmn::Matrix{Float32}     # humidity
-    amn::Matrix{Float32}     # albedo
-    swmn::Matrix{Float32}    # shortwave radiation
-    lwmn::Matrix{Float32}    # longwave radiation
-    qlatmn::Matrix{Float32}  # latent heat flux
-    qsensmn::Matrix{Float32} # sensible heat flux
-    ftmn::Matrix{Float32}    # temperature flux correction
-    fqmn::Matrix{Float32}    # humidity flux correction
+    Tsmn::Matrix{Float32}       # surface-temperature accumulator for the progress line
 end
 
 function ModelState()
-    ModelState(1.0f0, (zeros(Float32, xdim, ydim) for _ in 1:11)...)
+    ModelState(1.0f0, zeros(Float32, xdim, ydim))
 end
 
 """

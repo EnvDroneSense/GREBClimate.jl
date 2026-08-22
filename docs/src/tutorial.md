@@ -30,7 +30,8 @@ sweeps) in the same session.
     The returned `fields` must be passed to [`greb_model!`](@ref) explicitly
     (step 3). A bare [`ClimateFields`](@ref) is all zeros, and stepping the
     model on a zero climatology runs to completion while producing a
-    physically meaningless ≈233 K (−40 °C) world. `greb_model!` therefore
+    physically meaningless world pinned at the 40 K stability floor
+    (−233 °C). `greb_model!` therefore
     refuses unloaded fields; see [Data-free runs](@ref) below.
 
 ## 2. Configure the experiment

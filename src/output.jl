@@ -8,46 +8,19 @@ year. `tend` is the `NamedTuple` [`tendencies!`](@ref) returns.
 """
 function diagnostics!(it, year, CO2, surf::SurfaceState, tend, fields::ClimateFields, state::ModelState, timestate)
     # Accumulate
-    Tsmn = state.Tsmn; Tamn = state.Tamn; Tomn = state.Tomn; qmn = state.qmn
-    amn = state.amn; swmn = state.swmn; lwmn = state.lwmn
-    qlatmn = state.qlatmn; qsensmn = state.qsensmn
-    ftmn = state.ftmn; fqmn = state.fqmn
-    Ts = surf.Ts; Ta = surf.Ta; To = surf.To; q = surf.q
-    albedo = tend.albedo; SW = tend.SW; LW_surf = tend.LW_surf
-    Q_lat = tend.Q_lat; Q_sens = tend.Q_sens
-    TF_correct = fields.TF_correct; qF_correct = fields.qF_correct
-    ityr = timestate.ityr
+    Tsmn = state.Tsmn
+    Ts = surf.Ts
 
     @turbo for j in 1:ydim
         for i in 1:xdim
             Tsmn[i, j] += Ts[i, j]
-            Tamn[i, j] += Ta[i, j]
-            Tomn[i, j] += To[i, j]
-            qmn[i, j] += q[i, j]
-            amn[i, j] += albedo[i, j]
-            swmn[i, j] += SW[i, j]
-            lwmn[i, j] += LW_surf[i, j]
-            qlatmn[i, j] += Q_lat[i, j]
-            qsensmn[i, j] += Q_sens[i, j]
-            ftmn[i, j] += TF_correct[i, j, ityr]
-            fqmn[i, j] += qF_correct[i, j, ityr]
         end
     end
 
     if timestate.ityr == nstep_yr
         # Compute annual means
         n = nstep_yr
-        state.Tsmn ./= n;
-        state.Tamn ./= n;
-        state.Tomn ./= n
-        state.qmn ./= n;
-        state.amn ./= n
-        state.swmn ./= n;
-        state.lwmn ./= n
-        state.qlatmn ./= n;
-        state.qsensmn ./= n
-        state.ftmn ./= n;
-        state.fqmn ./= n
+        state.Tsmn ./= n
 
         # Global mean and sample points (°C)
         global_mean = sum(state.Tsmn[i, j] * dxlat_grid[j] for i in 1:xdim, j in 1:ydim) /
@@ -60,17 +33,7 @@ function diagnostics!(it, year, CO2, surf::SurfaceState, tend, fields::ClimateFi
             "  ", round(point2, digits=2))
 
         # Reset accumulators
-        fill!(state.Tsmn, 0.0f0);
-        fill!(state.Tamn, 0.0f0);
-        fill!(state.Tomn, 0.0f0)
-        fill!(state.qmn, 0.0f0);
-        fill!(state.amn, 0.0f0)
-        fill!(state.swmn, 0.0f0);
-        fill!(state.lwmn, 0.0f0)
-        fill!(state.qlatmn, 0.0f0);
-        fill!(state.qsensmn, 0.0f0)
-        fill!(state.ftmn, 0.0f0);
-        fill!(state.fqmn, 0.0f0)
+        fill!(state.Tsmn, 0.0f0)
     end
     return nothing
 end
