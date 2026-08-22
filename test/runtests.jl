@@ -626,6 +626,14 @@ function run_light_tests()
             @test_throws ErrorException greb_data_dir()
             delete!(ENV, "GREB_DATA")
 
+            cached = GREBClimate._cached_datadep_path()
+            if cached === nothing
+                @test_skip "no DataDeps cache on this machine"
+            else
+                @test isdir(cached)
+                @test greb_data_dir(; allow_download = false) !== nothing
+            end
+
             # An empty explicit path falls through rather than erroring, so it
             # resolves identically to passing nothing. `allow_download = false`
             # on both sides keeps this true whether or not a local dataset

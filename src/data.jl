@@ -62,11 +62,12 @@ Return the directory holding the JLD2 input dataset, resolving in this order:
 1. `path`, if given and non-empty.
 2. `ENV["GREB_DATA"]`, if set.
 3. `greb_input_data/` next to the package, if it exists.
-4. The `$DATA_DEP_NAME` DataDep - downloading it on first use, after asking.
+4. An already-downloaded `$DATA_DEP_NAME` DataDep, if its cache is present.
+5. The `$DATA_DEP_NAME` DataDep - downloading it on first use, after asking.
 
-Pass `allow_download = false` to stop after step 3 and return `nothing` when no
-local dataset is found. Test suites and benchmarks use this so that running them
-can never pull 353 MB over the network as a side effect.
+Pass `allow_download = false` to stop after step 4 and return `nothing` when no
+dataset is available locally. Test suites and benchmarks use this so that running
+them can never pull 353 MB over the network as a side effect.
 
 The result is a plain path, suitable for [`load_greb_jld2!`](@ref) and
 `greb_model!`'s `jld2_dir`:
@@ -93,11 +94,37 @@ function greb_data_dir(path::Union{Nothing,AbstractString} = nothing;
     local_dir = normpath(joinpath(@__DIR__, "..", "greb_input_data"))
     isdir(local_dir) && return local_dir
 
+    # An already-unpacked DataDep is just a directory on disk - usable even when
+    # downloading is forbidden.
+    cached = _cached_datadep_path()
+    cached === nothing || return cached
+
     allow_download || return nothing
 
     # Resolved lazily: this is the only branch that can trigger a download, and
     # it must never run at precompile time
     return @datadep_str DATA_DEP_NAME
+end
+
+"""
+    _cached_datadep_path() -> String or nothing
+
+Path to the already-downloaded dataset cache, or `nothing` if it is absent.
+
+DataDeps offers no public "is this already here?" query - `datadep"..."` and
+`resolve` both *fetch* when the data is missing, which is the opposite of what is
+wanted here. `try_determine_load_path` is the internal function that answers it
+without touching the network. It is wrapped in a `try` so that if a future
+DataDeps release renames or removes it, this degrades to "not cached" (and the
+normal download path still works) rather than erroring.
+"""
+function _cached_datadep_path()
+    try
+        path = DataDeps.try_determine_load_path(DATA_DEP_NAME, @__FILE__)
+        return (path !== nothing && isdir(path)) ? String(path) : nothing
+    catch
+        return nothing
+    end
 end
 
 """
