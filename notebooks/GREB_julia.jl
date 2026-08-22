@@ -139,7 +139,7 @@ Returns `(CO2, sw_solar_forcing)` for the current year/time step based on experi
 |:---------|:------------|:------------|
 | **CO₂ scaling** | `:co2_double`, `:co2_quadruple`, `:co2_10x`, `:co2_half`, `:co2_zero` | Fixed CO₂ multipliers |
 | **Solar** | `:solar_plus27`, `:solar_cycle_11yr` | Solar constant +27 W/m² or 11-year cycle |
-| **Time‑varying CO₂** | `:co2_sine_wave`, `:co2_step`, `:a1b_scenario`, `:a1b_enhanced` | CO₂ as function of year |
+| **Time‑varying CO₂** | `:co2_sine_wave`, `:co2_step`, `:a1b_scenario` | CO₂ as function of year |
 | **Paleoclimate** | `:paleo_231kyr`, `:paleo_solar_modern_co2`, `:modern_solar_paleo_co2` | Paleo solar + CO₂ combinations |
 | **Orbital** | `:obliquity`, `:eccentricity`, `:earth_sun_distance` | Solar forcing loaded externally |
 | **Regional CO₂** | `:regional_co2_nh/sh/tropics/extratropics/ocean/land_ice/winter/summer` | Spatial masks via `co2_part` |

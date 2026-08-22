@@ -131,19 +131,6 @@ function forcing(it, year, cfg::PhysicsConfig, fields::ClimateFields, icmn_ctrl;
         CO2 = 340.0f0
         sw_solar_forcing = (1365.0f0 + 1.0f0 * sin(2f0*Float32(π) * year / 11.0f0)) / 1365.0f0
 
-    # - Enhanced A1B scenario ──────────────────────────────────────────────
-    elseif cfg.experiment == :a1b_enhanced
-        CO2_1950 = 310.0f0;
-        CO2_2000 = 370.0f0;
-        CO2_2050 = 520.0f0
-        if year <= 2000
-            CO2 = CO2_1950 + 60.0f0 / 50.0f0 * (year - 1950)
-        elseif year <= 2050
-            CO2 = CO2_2000 + 150.0f0 / 50.0f0 * (year - 2000)
-        elseif year <= 2100
-            CO2 = CO2_2050 + 180.0f0 / 50.0f0 * (year - 2050)
-        end
-
     # ── Time-varying CO₂ experiments ────────────
     elseif cfg.experiment == :co2_sine_wave
         CO2 = 340.0f0 + 170.0f0 + 170.0f0 * cos(2f0*Float32(π) * (year - 13.0f0) / 30.0f0)

@@ -217,7 +217,7 @@ branch in source for exact behavior:
 
 | Category | Symbols |
 |:---------|:--------|
-| CO₂ variants | `:a1b_scenario`, `:a1b_enhanced`, `:co2_10x`, `:co2_half`, `:co2_zero`, `:co2_sine_wave`, `:co2_step` |
+| CO₂ variants | `:a1b_scenario`, `:co2_10x`, `:co2_half`, `:co2_zero`, `:co2_sine_wave`, `:co2_step` |
 | Orbital/paleo | `:solar_cycle_11yr`, `:paleo_solar_modern_co2`, `:modern_solar_paleo_co2`, `:obliquity`, `:eccentricity`, `:earth_sun_distance` |
 | Other | `:sst_plus1` |
 | Regional CO₂ (static mask) | `:regional_co2_nh`, `:regional_co2_sh`, `:regional_co2_tropics`, `:regional_co2_extratropics` |

@@ -936,7 +936,7 @@ function run_heavy_tests()
     @testset "greb_model! reaches every :experiment symbol forcing()/init_model! dispatch on" begin
         direct_dispatch_symbols = (
             :a1b_scenario, :co2_10x, :co2_half, :co2_zero, :solar_cycle_11yr,
-            :a1b_enhanced, :co2_sine_wave, :co2_step, :modern_solar_paleo_co2,
+            :co2_sine_wave, :co2_step, :modern_solar_paleo_co2,
             :earth_sun_distance, :regional_co2_nh, :regional_co2_sh,
             :regional_co2_tropics, :regional_co2_extratropics,
             :regional_co2_ocean, :regional_co2_land_ice, :regional_co2_winter,
