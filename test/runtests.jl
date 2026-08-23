@@ -70,6 +70,65 @@ function run_light_tests()
         @test cfg_drsp_off.log_clouds_drsp == true  # untouched switches stay at default
     end
 
+    @testset "create_experiment_config covers every experiment the model dispatches on" begin
+        # Every symbol forcing()/greb_model! dispatch on must be reachable
+        # through the public factory, not only by hand-building a PhysicsConfig.
+        all_experiments = (
+            :full_model, :constant_topo, :a1b_scenario,
+            :co2_double, :co2_quadruple, :co2_10x, :co2_half, :co2_zero,
+            :co2_sine_wave, :co2_step, :solar_plus27, :solar_cycle_11yr,
+            :paleo_231kyr, :paleo_solar_modern_co2, :modern_solar_paleo_co2,
+            :obliquity, :eccentricity, :earth_sun_distance,
+            :elnino, :lanina, :rcp26, :rcp45, :rcp60, :rcp85,
+            :ssp119, :ssp126, :ssp245, :ssp460, :ssp585,
+            :historical_co2, :custom_co2, :sst_plus1,
+            :regional_co2_nh, :regional_co2_sh, :regional_co2_tropics,
+            :regional_co2_extratropics, :regional_co2_ocean,
+            :regional_co2_land_ice, :regional_co2_winter, :regional_co2_summer,
+            :decon_mean_climate, :decon_2xco2,
+        )
+        @test length(all_experiments) == 42
+        for exp in all_experiments
+            cfg = create_experiment_config(exp)
+            @test cfg.experiment === exp
+        end
+        @test_throws ErrorException create_experiment_config(:no_such_experiment)
+
+        # Newly reachable experiments must match a hand-built config exactly -
+        # the factory adds convenience, not physics. co2_concentration in
+        # particular seeds the CONTROL run's CO2 (init_model!), so setting it
+        # for a scenario-varying experiment would move the baseline.
+        for exp in (:co2_10x, :co2_half, :co2_zero, :co2_sine_wave, :co2_step,
+                    :a1b_scenario, :solar_cycle_11yr, :sst_plus1,
+                    :regional_co2_nh, :regional_co2_ocean, :regional_co2_winter,
+                    :paleo_solar_modern_co2, :modern_solar_paleo_co2)
+            factory = create_experiment_config(exp)
+            manual = PhysicsConfig(experiment = exp)
+            for f in fieldnames(PhysicsConfig)
+                @test getfield(factory, f) == getfield(manual, f)
+            end
+        end
+
+        # Orbital / distance experiments plumb their parameter through.
+        @test create_experiment_config(:obliquity; orbital_index = 3).orbital_index == 3
+        @test create_experiment_config(:eccentricity; orbital_index = 7).orbital_index == 7
+        @test create_experiment_config(:earth_sun_distance;
+                  earth_sun_distance_pct = 1.5).earth_sun_distance_pct == 1.5f0
+
+        # Unchanged presets stay unchanged.
+        @test create_experiment_config(:co2_double).co2_concentration == 680.0f0
+        @test create_experiment_config(:co2_quadruple).co2_concentration == 1360.0f0
+        @test create_experiment_config(:paleo_231kyr).co2_concentration == 200.0f0
+        @test create_experiment_config(:constant_topo).log_topo_drsp == false
+        @test create_experiment_config(:elnino).log_tsurf_ext == true
+        @test create_experiment_config(:rcp85).log_omega_ext == true
+
+        # A log_* keyword aimed at a branch that ignores it now warns instead
+        # of vanishing silently.
+        @test_logs (:warn,) create_experiment_config(:co2_double; log_ice = false)
+        @test create_experiment_config(:co2_double; log_ice = false).log_ice == true
+    end
+
     @testset "set_hydrology_parameters! matches HYDRO_PARAMS for every log_rain value" begin
         for log_rain in (-1, 0, 1, 2, 3)
             cfg = create_experiment_config(:full_model)
@@ -130,6 +189,62 @@ function run_light_tests()
         @test MonthlyRecord <: NamedTuple
         @test :Ts in fieldnames(MonthlyRecord)
         @test :precip in fieldnames(MonthlyRecord)
+    end
+
+    @testset "state constructors: every field gets the right shape and eltype" begin
+        X, Y, N = GREBClimate.xdim, GREBClimate.ydim, GREBClimate.nstep_yr
+
+        # ClimateFields: 2D grid fields, the (ydim, nstep_yr) solar table,
+        # the Bool flag, and everything else 3D.
+        cf = ClimateFields()
+        cf_2d = (:z_topo, :glacier, :z_ocean, :cap_surf, :wz_air, :wz_vapor,
+                 :rain_limit, :co2_part)
+        @test length(fieldnames(ClimateFields)) == 39
+        for f in fieldnames(ClimateFields)
+            v = getfield(cf, f)
+            if f === :loaded
+                @test v === false
+            elseif f === :sw_solar
+                @test size(v) == (Y, N) && eltype(v) === Float32
+            elseif f in cf_2d
+                @test size(v) == (X, Y) && eltype(v) === Float32
+            else
+                @test size(v) == (X, Y, N) && eltype(v) === Float32
+            end
+        end
+        # co2_part is the one field that is not zero-initialised.
+        @test all(isone, cf.co2_part)
+        for f in fieldnames(ClimateFields)
+            f in (:loaded, :co2_part) && continue
+            @test all(iszero, getfield(cf, f))
+        end
+
+        # CirculationWorkspace: four length-xdim vectors, the rest (xdim, ydim).
+        cw = CirculationWorkspace()
+        cw_vec = (:T1h, :dTxh, :term_north, :term_south)
+        @test length(fieldnames(CirculationWorkspace)) == 42
+        for f in fieldnames(CirculationWorkspace)
+            v = getfield(cw, f)
+            @test eltype(v) === Float32
+            @test size(v) == (f in cw_vec ? (X,) : (X, Y))
+            @test all(iszero, v)
+        end
+
+        # MonthlyAccumulator: 13 accumulators, all (xdim, ydim). There is no
+        # `count` field - output! divides by cjday_mon[mon] * ndt_days.
+        ma = MonthlyAccumulator()
+        @test length(fieldnames(MonthlyAccumulator)) == 13
+        for f in fieldnames(MonthlyAccumulator)
+            v = getfield(ma, f)
+            @test size(v) == (X, Y) && eltype(v) === Float32 && all(iszero, v)
+        end
+
+        # The keyword form is the point of the change: field-to-value
+        # association by name, not by ordinal position.
+        @test ClimateFields(loaded = true).loaded === true
+        @test all(isone, ClimateFields(loaded = true).co2_part)
+        @test size(MonthlyAccumulator(Tmm = zeros(Float32, 2, 2)).Tmm) == (2, 2)
+        @test size(CirculationWorkspace(T1h = zeros(Float32, 3)).T1h) == (3,)
     end
 
     @testset "build_monthly_climatology/apply_scenario_anomalies" begin
@@ -915,7 +1030,7 @@ function run_heavy_tests()
         end
     end
 
-    @testset "forcing() regional-CO2 ice mask uses the annual mean, not January (§8.1)" begin
+    @testset "apply_dynamic_co2_mask! uses the annual-mean ice cover, not January (§8.1)" begin
         fields = ClimateFields()  # z_topo defaults to 0 everywhere -> land branch never fires
         cfg = PhysicsConfig(experiment = :regional_co2_ocean)
 
@@ -928,10 +1043,29 @@ function run_heavy_tests()
         icmn_ctrl[2, 1, 1] = 0.0
         icmn_ctrl[2, 1, 2:12] .= 1.0
 
-        forcing(1, 1970, cfg, fields, icmn_ctrl)
+        GREBClimate.apply_dynamic_co2_mask!(cfg, fields, icmn_ctrl)
 
         @test fields.co2_part[1, 1] == 1.0  # January said "ice"; annual mean says no
         @test fields.co2_part[2, 1] == 0.5  # January said "no ice"; annual mean says yes
+
+        # forcing() no longer mutates the mask - it is pure for these two now.
+        fresh = ClimateFields()
+        forcing(1, 1970, cfg, fresh, icmn_ctrl)
+        @test all(isone, fresh.co2_part)
+        @test forcing(1, 1970, cfg, fresh, icmn_ctrl).CO2 == 680.0f0
+
+        # The land/ice variant inverts the ocean mask and exempts ice cells.
+        f_li = ClimateFields()
+        cfg_li = PhysicsConfig(experiment = :regional_co2_land_ice)
+        GREBClimate.apply_dynamic_co2_mask!(cfg_li, f_li, icmn_ctrl)
+        @test f_li.co2_part[1, 1] == 0.5  # ocean cell, not annual-mean ice
+        @test f_li.co2_part[2, 1] == 1.0  # annual-mean ice -> exempted back to 1.0
+
+        # Every other experiment is a no-op.
+        f_noop = ClimateFields()
+        GREBClimate.apply_dynamic_co2_mask!(PhysicsConfig(experiment = :full_model),
+                                            f_noop, icmn_ctrl)
+        @test all(isone, f_noop.co2_part)
     end
 
     @testset "greb_model! reaches every :experiment symbol forcing()/init_model! dispatch on" begin
@@ -954,6 +1088,18 @@ function run_heavy_tests()
             @test isfinite(result.CO2)
             @test isfinite(result.sw_solar_forcing)
         end
+
+        run_mask(sym) = begin
+            f = ClimateFields()
+            f.z_topo[1:48, :] .= 100.0f0   # left half land, right half ocean
+            redirect_stdout(devnull) do
+                greb_model!(RunSpec(ctrl = 1, scnr = 1), PhysicsConfig(experiment = sym);
+                            jld2_dir = "", fields = f, allow_uninitialized = true)
+            end
+            f.co2_part
+        end
+        @test all(==(0.5f0), run_mask(:regional_co2_ocean))
+        @test all(isone, run_mask(:regional_co2_land_ice))
 
         cfg = PhysicsConfig(experiment = :sst_plus1)
         result = redirect_stdout(devnull) do

@@ -149,6 +149,53 @@ function init_model!(cfg::PhysicsConfig, fields::ClimateFields)
 end
 
 """
+    apply_dynamic_co2_mask!(cfg::PhysicsConfig, fields::ClimateFields, icmn_ctrl)
+
+Sets `fields.co2_part` for the two regional-CO₂ experiments whose mask depends
+on the control run's ice climatology (`:regional_co2_ocean`,
+`:regional_co2_land_ice`). A no-op for every other experiment - the static
+regional masks are set by [`init_model!`](@ref).
+"""
+function apply_dynamic_co2_mask!(cfg::PhysicsConfig, fields::ClimateFields, icmn_ctrl)
+    exp = cfg.experiment
+    (exp === :regional_co2_ocean || exp === :regional_co2_land_ice) || return nothing
+
+    co2_part = fields.co2_part
+    z_topo = fields.z_topo
+    co2_part .= 1.0f0
+
+    # Annual-mean ice cover (§8.1: the annual mean, not month 1)
+    icmn_ctrl1 = dropdims(sum(icmn_ctrl, dims=3), dims=3) ./ size(icmn_ctrl, 3)
+
+    if exp === :regional_co2_ocean
+        # 2×CO₂ ocean only: halve CO₂ over land, and over annual-mean ice.
+        for j in 1:ydim, i in 1:xdim
+            if z_topo[i, j] > 0.0f0
+                co2_part[i, j] = 0.5f0
+            end
+        end
+        for j in 1:ydim, i in 1:xdim
+            if icmn_ctrl1[i, j] >= 0.5f0
+                co2_part[i, j] = 0.5f0
+            end
+        end
+    else
+        # 2×CO₂ land/ice only: halve CO₂ over ocean, then exempt annual-mean ice.
+        for j in 1:ydim, i in 1:xdim
+            if z_topo[i, j] <= 0.0f0
+                co2_part[i, j] = 0.5f0
+            end
+        end
+        for j in 1:ydim, i in 1:xdim
+            if icmn_ctrl1[i, j] >= 0.5f0
+                co2_part[i, j] = 1.0f0
+            end
+        end
+    end
+    return nothing
+end
+
+"""
     qflux_correction!(CO2_ctrl, Ts, Ta, q, To, fields, state, timestate, cfg, ws, time_flux; ws_a=ws, ws_q=ws)
 
 Runs `time_flux` years of `tendencies!` to derive the ocean/atmosphere flux
@@ -346,6 +393,8 @@ function greb_model!(run::RunSpec, cfg::PhysicsConfig;
 
     # ── Build ice climatology from control output ───────────────
     ice_forcing = compute_annual_ice_climatology(ctrl_output)
+
+    apply_dynamic_co2_mask!(cfg, fields, ice_forcing)
 
     # ── 4. Scenario run ─────────────────────────────────────────
     println("SCENARIO: ", cfg.experiment, "  time = ", time_scnr, " yr")
