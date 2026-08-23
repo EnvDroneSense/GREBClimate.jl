@@ -21,7 +21,7 @@ begin
     const jday_mon_cumsum = cumsum(cjday_mon)
 
     # - Physical Constants & Numerical Limits ────────────
-    const min_T_K = 273.15f0 - 40.0f0   # -40°C, minimum allowed surface/air temperature [K]
+    const min_T_K = 40.0f0              # numerical-stability floor [K]
     const max_humidity_change = 0.020f0 # Maximum humidity increment [kg/kg]
     const min_humidity_change = 0.9f0   # Fraction of humidity that can be removed
 end;
@@ -44,11 +44,10 @@ begin
     const ρ_ocean = 999.1f0        # density of water at T=15°C [kg/m³]
     const ρ_land = 2600.0f0        # density of solid rock [kg/m³]
     const ρ_air = 1.2f0            # density of air at 20°C at sea
-    const grav = 9.80665f0         # gravitational acceleration [m/s²]
+    const grav = 9.81f0            # gravitational acceleration [m/s²]
     const cp_ocean = 4186.0f0      # specific heat of water at T=15°C [J/kg/K]
     const cp_land = cp_ocean / 4.5f0 # specific heat of dry land [J/kg/K]
     const cp_air = 1005.0f0        # specific heat of air [J/kg/K]
-    const ε = 1.0f0                # emissivity for IR
 end;
 
 begin

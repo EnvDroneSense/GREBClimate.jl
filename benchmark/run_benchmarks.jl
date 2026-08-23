@@ -51,7 +51,13 @@ plus the mean/min/max. Returns the vector of timings in seconds.
 """
 function time_1yr(jld2_dir::AbstractString; cfg=create_experiment_config(:full_model), reps::Int=3)
     if !isdir(jld2_dir)
-        @warn "JLD2 data directory not found: $jld2_dir - see DATA_README.md"
+        @warn """
+              JLD2 data directory not found: $jld2_dir
+
+              Benchmarks never download data (resolved with allow_download=false).
+              Fetch it once via `julia --project=. examples/run_greb.jl`, or point
+              at an existing copy with GREB_DATA or a positional argument.
+              """
         return Float64[]
     end
 
@@ -93,7 +99,13 @@ what `tendencies!`'s parallel path is actually racing against.
 """
 function time_stages(jld2_dir::AbstractString; cfg=create_experiment_config(:full_model), reps::Int=2000)
     if !isdir(jld2_dir)
-        @warn "JLD2 data directory not found: $jld2_dir - see DATA_README.md"
+        @warn """
+              JLD2 data directory not found: $jld2_dir
+
+              Benchmarks never download data (resolved with allow_download=false).
+              Fetch it once via `julia --project=. examples/run_greb.jl`, or point
+              at an existing copy with GREB_DATA or a positional argument.
+              """
         return nothing
     end
 
@@ -208,7 +220,13 @@ regardless of the physics code's own allocation behavior.
 """
 function check_allocations(jld2_dir::AbstractString)
     if !isdir(jld2_dir)
-        @warn "JLD2 data directory not found: $jld2_dir - see DATA_README.md"
+        @warn """
+              JLD2 data directory not found: $jld2_dir
+
+              Benchmarks never download data (resolved with allow_download=false).
+              Fetch it once via `julia --project=. examples/run_greb.jl`, or point
+              at an existing copy with GREB_DATA or a positional argument.
+              """
         return nothing
     end
 

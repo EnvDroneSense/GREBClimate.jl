@@ -74,9 +74,9 @@ end
     forcing(it, year, cfg::PhysicsConfig, fields::ClimateFields, icmn_ctrl; nstep_yr=nstep_yr)
 
 Returns `(CO2, sw_solar_forcing)` for the current timestep, computed
-according to `cfg.experiment`. Some experiments (the `regional_co2_*` family)
-also mutate `fields.co2_part` as a side effect. `:full_model` short-circuits
-before the experiment dispatch chain. The `:rcp26`/`:rcp45`/`:rcp60`/
+according to `cfg.experiment`. Pure - the `regional_co2_*` masks are built
+once per run by [`apply_dynamic_co2_mask!`](@ref), not here. `:full_model`
+short-circuits before the experiment dispatch chain. The `:rcp26`/`:rcp45`/`:rcp60`/
 `:custom_co2`/`:ssp*`/`:historical_co2` experiments look `year` up in
 `cfg.co2_scenario`.
 """
@@ -92,7 +92,7 @@ function forcing(it, year, cfg::PhysicsConfig, fields::ClimateFields, icmn_ctrl;
 
     # - Legacy experiments ───────────
     if cfg.experiment == :constant_topo
-        CO2 = 550.0f0  # 550 ppm CO₂ steady state
+        CO2 = 680.0f0  # 2x340 ppm
 
     elseif cfg.experiment == :a1b_scenario
         CO2_1950 = 310.0f0;
@@ -130,19 +130,6 @@ function forcing(it, year, cfg::PhysicsConfig, fields::ClimateFields, icmn_ctrl;
     elseif cfg.experiment == :solar_cycle_11yr
         CO2 = 340.0f0
         sw_solar_forcing = (1365.0f0 + 1.0f0 * sin(2f0*Float32(π) * year / 11.0f0)) / 1365.0f0
-
-    # - Enhanced A1B scenario ──────────────────────────────────────────────
-    elseif cfg.experiment == :a1b_enhanced
-        CO2_1950 = 310.0f0;
-        CO2_2000 = 370.0f0;
-        CO2_2050 = 520.0f0
-        if year <= 2000
-            CO2 = CO2_1950 + 60.0f0 / 50.0f0 * (year - 1950)
-        elseif year <= 2050
-            CO2 = CO2_2000 + 150.0f0 / 50.0f0 * (year - 2000)
-        elseif year <= 2100
-            CO2 = CO2_2050 + 180.0f0 / 50.0f0 * (year - 2050)
-        end
 
     # ── Time-varying CO₂ experiments ────────────
     elseif cfg.experiment == :co2_sine_wave
@@ -190,52 +177,17 @@ function forcing(it, year, cfg::PhysicsConfig, fields::ClimateFields, icmn_ctrl;
         CO2 = 680.0f0
 
     # - Regional/partial CO₂ experiments - dynamic masks ────────────────────
-    # `:regional_co2_ocean`/`:regional_co2_land_ice`'s mask depends only on
-    # `z_topo` and `icmn_ctrl` (both fixed for the whole scenario run), so
-    # it's computed once (`it == 1`) rather than recomputed every timestep;
-    # `fields.co2_part` holds the correct static mask for every later
-    # timestep since nothing else touches it for these two experiments.
+    # `:regional_co2_ocean`/`:regional_co2_land_ice` need a mask derived from
+    # the control run's ice cover; `apply_dynamic_co2_mask!` builds it once per
+    # run in `greb_model!`, so nothing is computed per timestep here.
     elseif startswith(string(cfg.experiment), "regional_co2_")
         if cfg.experiment == :regional_co2_ocean
-            # 2×CO₂ Ocean only
+            # 2×CO₂ Ocean only - mask from apply_dynamic_co2_mask!
             CO2 = 680.0f0
-            if it == 1
-                co2_part = fields.co2_part
-                co2_part .= 1.0f0
-                z_topo = fields.z_topo
-                for j in 1:ydim, i in 1:xdim
-                    if z_topo[i, j] > 0.0f0
-                        co2_part[i, j] = 0.5f0
-                    end
-                end
-                # Annual-mean ice cover
-                icmn_ctrl1 = dropdims(sum(icmn_ctrl, dims=3), dims=3) ./ size(icmn_ctrl, 3)
-                for j in 1:ydim, i in 1:xdim
-                    if icmn_ctrl1[i, j] >= 0.5f0
-                        co2_part[i, j] = 0.5f0
-                    end
-                end
-            end
 
         elseif cfg.experiment == :regional_co2_land_ice
-            # 2×CO₂ Land/Ice only
+            # 2×CO₂ Land/Ice only - mask from apply_dynamic_co2_mask!
             CO2 = 680.0f0
-            if it == 1
-                co2_part = fields.co2_part
-                co2_part .= 1.0f0
-                z_topo = fields.z_topo
-                for j in 1:ydim, i in 1:xdim
-                    if z_topo[i, j] <= 0.0f0
-                        co2_part[i, j] = 0.5f0
-                    end
-                end
-                icmn_ctrl1 = dropdims(sum(icmn_ctrl, dims=3), dims=3) ./ size(icmn_ctrl, 3)
-                for j in 1:ydim, i in 1:xdim
-                    if icmn_ctrl1[i, j] >= 0.5f0
-                        co2_part[i, j] = 1.0f0
-                    end
-                end
-            end
 
         elseif cfg.experiment == :regional_co2_winter
             # 2×CO₂ Boreal Winter only
@@ -249,7 +201,7 @@ function forcing(it, year, cfg::PhysicsConfig, fields::ClimateFields, icmn_ctrl;
         end
 
         # - Forced boundary condition experiments (handled in scenario loop) ─────
-    elseif cfg.experiment == :elnino || cfg.experiment == :lanina || cfg.experiment == :rcp85
+    elseif cfg.experiment == :elnino || cfg.experiment == :lanina
         CO2 = 340.0f0
     end
 

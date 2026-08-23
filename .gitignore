@@ -25,3 +25,6 @@
 
 # Local agent guidance - environment quirks and repo conventions, not shipped
 /CLAUDE.md
+# roborev
+/.roborev/
+/.roborev.toml

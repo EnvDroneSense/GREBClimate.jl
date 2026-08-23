@@ -255,7 +255,8 @@ one session (e.g. for parameter sweeps), and pass the one you want into
 
 A bare `ClimateFields()` is all zeros. Stepping the model on a zero
 climatology runs to completion but yields a physically meaningless world
-(global-mean Ts ≈ 233 K / −40 °C), so `greb_model!` **refuses** it rather than
+(global-mean Ts pinned at the 40 K stability floor / −233 °C), so
+`greb_model!` **refuses** it rather than
 returning plausible-looking nonsense:
 
 ```julia
@@ -298,7 +299,18 @@ cfg = create_experiment_config(:custom_co2; co2_path="my_co2_trajectory.txt")
 # Deconstruct experiments: toggle individual feedback processes off
 cfg = create_experiment_config(:decon_mean_climate; log_ocean_dmc=false)
 cfg = create_experiment_config(:decon_2xco2; log_clouds_drsp=false)
+
+# Orbital forcing: which row of the solar_scenarios table to load
+cfg = create_experiment_config(:obliquity; orbital_index=3)
+
+# Earth-Sun distance: percent change in orbital radius
+cfg = create_experiment_config(:earth_sun_distance; earth_sun_distance_pct=1.5)
 ```
+
+Every experiment symbol the model dispatches on is reachable this way - see the
+[physics-switches guide](https://EnvDroneSense.github.io/GREBClimate.jl/dev/switches/)
+for the full list. The `log_*` keywords apply only to the two `:decon_*`
+experiments; passing one elsewhere warns rather than being silently ignored.
 
 ### 3. Run the Model
 
