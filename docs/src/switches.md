@@ -208,12 +208,12 @@ What each `create_experiment_config` preset changes relative to `:full_model`:
 | `:decon_mean_climate` | Exposes `log_clouds_dmc`, `log_ocean_dmc`, `log_atmos_dmc`, `log_co2_dmc`, `log_hydro_dmc`, `log_qflux_dmc`, `log_ice`, `log_hdif`, `log_hadv`, `log_vdif`, `log_vadv` as keywords (all default `true`, i.e. behaves like `:full_model` unless overridden) |
 | `:decon_2xco2` | `co2_concentration = 680.0`; exposes `log_topo_drsp`, `log_clouds_drsp`, `log_humid_drsp`, `log_ocean_drsp`, `log_hydro_drsp`, `log_ice`, `log_hdif`, `log_hadv`, `log_vdif`, `log_vadv` as keywords |
 
-### Advanced / manually-constructed experiments
+### Further experiments
 
-The following experiment symbols are dispatched in `src/model.jl`/`src/tendencies.jl`
-but are not wrapped by `create_experiment_config` - construct them with
-`PhysicsConfig(experiment=:symbol, ...)` directly and read the corresponding
-branch in source for exact behavior:
+`create_experiment_config` covers all of these too. They change no switches
+relative to `:full_model` - the experiment symbol alone selects the branch in
+`src/tendencies.jl`'s `forcing`, which sets the CO₂ or solar forcing per
+timestep. Read that branch for exact behavior.
 
 | Category | Symbols |
 |:---------|:--------|
@@ -222,6 +222,22 @@ branch in source for exact behavior:
 | Other | `:sst_plus1` |
 | Regional CO₂ (static mask) | `:regional_co2_nh`, `:regional_co2_sh`, `:regional_co2_tropics`, `:regional_co2_extratropics` |
 | Regional CO₂ (dynamic/seasonal mask) | `:regional_co2_ocean`, `:regional_co2_land_ice`, `:regional_co2_winter`, `:regional_co2_summer` |
+
+Two of them take a parameter, passed as a `create_experiment_config` keyword:
+
+| Keyword | Applies to | Meaning |
+|:--------|:-----------|:--------|
+| `orbital_index` | `:obliquity`, `:eccentricity`, `:paleo_231kyr`, `:paleo_solar_modern_co2` | Which row of the `solar_scenarios/*.jld2` table to load |
+| `earth_sun_distance_pct` | `:earth_sun_distance` | Percent change in orbital radius; solar forcing scales as `(1 + 0.01·pct)^-2` |
+
+The 16 `log_*` keywords apply **only** to `:decon_mean_climate` and
+`:decon_2xco2`. Passing one for any other experiment emits a warning and is
+ignored - set the field on the returned `PhysicsConfig` instead.
+
+`:regional_co2_ocean` and `:regional_co2_land_ice` derive their mask from the
+control run's annual-mean ice cover, so it is built once per run by
+`apply_dynamic_co2_mask!` between the control and scenario phases rather than
+by `forcing`. The control run itself always sees an all-ones mask.
 
 ## Known Limitations
 

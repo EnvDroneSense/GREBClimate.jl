@@ -29,6 +29,7 @@
 end
 
 @testset "diffusion!/advection!/circulation! per-cell snapshot (incl. date-line wraparound)" begin
+    fields = ClimateFields()
     xdim_, ydim_ = GREBClimate.xdim, GREBClimate.ydim
     T1 = Float32[100.0 * i + k for i in 1:xdim_, k in 1:ydim_]
     wz = [1.0 + 0.001 * i - 0.0005 * k for i in 1:xdim_, k in 1:ydim_]

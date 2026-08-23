@@ -51,8 +51,53 @@ maintainers' working notes rather than in this file.
   run concurrently via `Threads.@spawn`.
 - `Float32` compute path throughout, matching the JLD2 input data's native
   precision.
+- **`create_experiment_config` now reaches every experiment the model
+  dispatches on** - 42, up from 21. The 22 that previously required
+  hand-building a `PhysicsConfig` (all eight `regional_co2_*`, `:obliquity`,
+  `:eccentricity`, `:earth_sun_distance`, `:co2_10x`, `:co2_half`, `:co2_zero`,
+  `:co2_sine_wave`, `:co2_step`, `:solar_cycle_11yr`, `:a1b_scenario`,
+  `:sst_plus1`, and the two crossed paleo/modern presets) are now first-class.
+  New `orbital_index` and `earth_sun_distance_pct` keywords plumb the
+  parameters those experiments need. An unknown symbol errors with the valid
+  list instead of a bare message.
+- Keyword constructors for `ClimateFields`, `CirculationWorkspace` and
+  `MonthlyAccumulator` (`Base.@kwdef`), e.g. `ClimateFields(loaded = true)`.
+  The positional and no-argument forms are unchanged. `ClimateFields`'s 39
+  fields were previously matched to 39 bare `zeros(...)` calls by ordinal
+  position alone, where a reordering would have silently assigned the wrong
+  array to the wrong field.
+
+### Removed
+- **The `:a1b_enhanced` experiment.** Its CO₂ ramp was byte-identical to
+  `:a1b_scenario`'s; use that instead.
+- `ModelState`'s ten annual-mean accumulator fields (`Tamn`, `Tomn`, `qmn`,
+  `amn`, `swmn`, `lwmn`, `qlatmn`, `qsensmn`, `ftmn`, `fqmn`) and
+  `MonthlyAccumulator.count`. All were write-only: accumulated, divided and
+  zeroed inside a single `diagnostics!` call without ever being read, so they
+  could not be used as an output path. Model output is the
+  `Vector{MonthlyRecord}` `greb_model!` returns. `ModelState` keeps `Tsmn`,
+  which backs the printed annual progress line.
+- The unused `ε` (IR emissivity) constant.
 
 ### Fixed
+- **`min_T_K` was clamping legitimate polar temperatures.** The floor was
+  233.15 K (−40 °C), cold enough to silently truncate real Antarctic and
+  Siberian winter cells; it is now 40 K, a pure numerical-stability floor.
+  **This changes results**: the control climate warms by up to ~0.6 K in the
+  affected months, and the printed global annual mean moves from 14.77 °C to
+  14.43 °C. The golden-regression snapshot was regenerated to match. A
+  data-free run now reports a 40 K world rather than a 233.15 K one.
+- `grav` corrected from 9.80665 to 9.81 m/s², matching the reference Fortran
+  GREB. Affects results at the fourth decimal.
+- `:constant_topo`'s scenario CO₂ was 550 ppm, an arbitrary value; it is now
+  680 ppm (2×340), consistent with the other doubling experiments.
+- `:a1b_scenario`'s control baseline moved from 298 ppm to 280 ppm, matching
+  every other IPCC-style scenario.
+- `forcing` is now pure. The `:regional_co2_ocean`/`:regional_co2_land_ice`
+  masks were built inside it behind an `it == 1` guard, making a per-timestep
+  function statefully non-idempotent; they are now computed once per run
+  between the control and scenario phases. Same masks, same ordering - the
+  control run still sees an all-ones mask.
 - **The multithreaded circulation path was never tested.** `tendencies!` runs
   `circulation!(Ta)`/`circulation!(q)` concurrently only when
   `Threads.nthreads() > 1`, and the test process was single-threaded, so that
@@ -113,6 +158,22 @@ recorded in the maintainers' working notes.
   `tendencies`, `output`, `postprocess`, `model`).
 - Test suite split into `light`/`heavy` shards (`GREB_TEST_SHARD` env var),
   matching the CI matrix.
+- `test/runtests.jl`, a single 1,407-line file, split into one file per subject
+  (`test_config`, `test_state`, `test_output`, `test_physics`, `test_io`,
+  `test_threading`, `test_model`, `test_golden`) plus shared fixtures in
+  `test/testutils.jl`. `runtests.jl` is now a 30-line table mapping each file to
+  its shard, so the split is declarative rather than two hand-maintained
+  function bodies.
+- The suite runs in **1m56s, down from 3m46s**, with two more assertions than
+  before (1193 vs 1191). The saving came from not running the model to test
+  things the model does not do: the `co2_part` reset lives in `init_model!`, the
+  scenario tables are read by `load_co2_scenario_jld2`/`load_custom_co2_scenario`/
+  `load_solar_forcing_jld2`, and three of the four `log_eva` branches are
+  reachable by calling `hydro!` directly - 22 simulated years became 8. The
+  threaded-vs-serial subprocess test now uses synthetic fields instead of
+  loading the 390 MB dataset twice (50s → 9.5s), which also means it runs in CI
+  rather than skipping. Shards are now balanced by measured runtime (54s/72s,
+  previously 17s/176s), cutting CI wall clock from 176s to 72s.
 
 ## [0.1.0] - 2026-08-06
 Initial extraction from the interactive Pluto notebook into a standard Julia
