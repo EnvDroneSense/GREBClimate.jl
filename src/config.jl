@@ -90,6 +90,7 @@ end
 # experiment needs nothing beyond `experiment = sym`: `forcing` sets its CO₂
 # per timestep, and `co2_concentration` is deliberately left at the default
 # because it seeds the *control* run's CO₂ (see `init_model!`).
+const _EXPERIMENT_OVERRIDES = Dict{Symbol,NamedTuple}(
     :full_model             => (;),
     :constant_topo          => (log_topo_drsp = false,),
     :a1b_scenario           => (;),
