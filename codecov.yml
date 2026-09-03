@@ -1,0 +1,21 @@
+# Coverage is reported, never enforced: a PR is not blocked because coverage
+# moved. Flip `informational` to false once the real coverage level is known
+# and worth defending.
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+# The CI matrix uploads one report per test shard (light/heavy); Codecov merges
+# them, so neither is a complete picture on its own.
+flags:
+  light:
+    carryforward: true
+  heavy:
+    carryforward: true
+
+comment: false

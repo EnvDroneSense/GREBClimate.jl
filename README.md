@@ -463,6 +463,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Original GREB Model**: Dietmar Dommenget, Janine Flöter, Tobias Bayr, Christian Stassen (Monash University)
 - **Julia Translation and Optimization**: Thomas Struys (UGent)
+- **Julia Development Guidance and Initial Package Refactor**: Michiel Stock (UGent)
 - **Pluto.jl**: For the interactive notebook environment
 - **Julia Community**: For excellent scientific computing tools
 

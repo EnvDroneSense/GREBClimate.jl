@@ -52,7 +52,5 @@ jobs:
         with:
           files: lcov.info
           flags: ${{ matrix.shard }}
-          # Public repo: uploads work without a token. Add a CODECOV_TOKEN
-          # secret if they start getting rate-limited.
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false

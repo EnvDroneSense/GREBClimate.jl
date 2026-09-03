@@ -10,7 +10,9 @@ module GREBClimate
 # lives in `notebooks/GREB_explorer.jl`; see the package docs or README for
 # usage.
 #
-# The includes below are in dependency order; changing it breaks the build.
+# Files below are included in dependency order: constants -> config -> data
+# -> state -> io -> physics/{radiation,hydrology,ocean} -> circulation ->
+# tendencies -> output -> postprocess -> model.
 # =============================================================================
 
 using LoopVectorization   # @turbo SIMD

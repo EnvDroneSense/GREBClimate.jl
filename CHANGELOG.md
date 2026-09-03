@@ -15,6 +15,26 @@ maintainers' working notes rather than in this file.
   characters).
 
 ### Added
+- **Package-hygiene and kernel-invariant tests.** `test/test_aqua.jl` runs
+  [Aqua.jl](https://github.com/JuliaTesting/Aqua.jl) (stale deps, missing
+  compat entries, method ambiguities, type piracy, unbound type parameters);
+  `test/test_invariants.jl` pins the two properties the kernel design rests
+  on - a per-kernel allocation budget that does not scale with `xdim*ydim`,
+  and a concrete return type for every kernel. The latter immediately caught
+  `seaice!` inferring `Union{Nothing,Matrix{Float32}}`.
+- **Release automation.** `TagBot` creates the git tag once the General
+  registry merges a release PR, which is also what lets `docs.yml`'s
+  `tags: ['v*']` trigger fire. `CompatHelper` opens a PR when a dependency
+  releases outside the declared `[compat]` bounds, covering the root and
+  `test/` environments.
+- **Code coverage.** `ci.yml` now instruments the current-release jobs and
+  uploads both shards to Codecov, which merges them.
+- **Doctests.** `RunSpec`, `create_experiment_config` and `nstep_yr` carry
+  `jldoctest` examples, wired up with `DocMeta.setdocmeta!`, so an example
+  that stops being true fails the docs build.
+- **`CONTRIBUTING.md`** - dev setup, the test shards, the input-data
+  requirement, the performance conventions, and credit to the original GREB
+  developers.
 - **Automatic dataset download.** The JLD2 input dataset is now fetched and
   cached on first use via [DataDeps.jl](https://github.com/oxinabox/DataDeps.jl).
   The new exported `greb_data_dir()` resolves an explicit path, then
@@ -78,8 +98,25 @@ maintainers' working notes rather than in this file.
   `Vector{MonthlyRecord}` `greb_model!` returns. `ModelState` keeps `Tsmn`,
   which backs the printed annual progress line.
 - The unused `ε` (IR emissivity) constant.
+- `[extras]`/`[targets]` from `Project.toml`. Test dependencies are declared
+  in `test/Project.toml`, which Pkg prefers when both exist, so the older
+  blocks were inert and free to drift.
+- `viz/Manifest.toml` and `notebooks/Manifest.toml` are no longer tracked,
+  matching every other environment in the repository; both `Project.toml`s
+  gained `[compat]` bounds in their place.
+- Leftover Pluto `begin ... end` cell wrappers in `src/config.jl`,
+  `src/constants.jl` and `src/state.jl`, and the over-indented docstrings
+  they hid (`CirculationWorkspace` and `MonthlyAccumulator` were rendering
+  with a stray offset on the API page).
 
 ### Fixed
+- `seaice!` returned `Union{Nothing,Matrix{Float32}}`: its early exit gave
+  `nothing` while its last expression was an `@.` broadcast evaluating to
+  `cap_surf`. No caller used the value; both paths now `return nothing`, so
+  the call site in the timestep loop infers concretely.
+- Eight references to `notebooks/GREB_julia.jl`, which no longer exists - the
+  notebook is `GREB_explorer.jl` - across `src/GREBClimate.jl`, `README.md`,
+  `docs/src/index.md` and `examples/run_greb.jl`.
 - **`min_T_K` was clamping legitimate polar temperatures.** The floor was
   233.15 K (−40 °C), cold enough to silently truncate real Antarctic and
   Siberian winter cells; it is now 40 K, a pure numerical-stability floor.

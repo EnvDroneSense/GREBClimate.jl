@@ -175,16 +175,8 @@ end
     @test isapprox(result.Q_lat_air[1, 1], -expected_dq_rain * GREBClimate.cq_latent * GREBClimate.r_qviwv; rtol = 1e-5)
 end
 
-@testset "SWradiation! is allocation-free" begin
-    fields = ClimateFields()
-    state = ModelState()
-    ts = TimeState(1, 1)
-    ws = CirculationWorkspace()
-    cfg = create_experiment_config(:full_model)
-    Ts = fill(290.0, GREBClimate.xdim, GREBClimate.ydim)
-    SWradiation!(Ts, fields, state, ts, cfg, ws)
-    @test @allocated(SWradiation!(Ts, fields, state, ts, cfg, ws)) <= 64
-end
+# The allocation budget for SWradiation! (and every other kernel) lives in
+# test_invariants.jl, alongside the return-type checks.
 
 @testset "log_hydro_dmc==false freezes humidity entirely (not just eva/rain)" begin
     # With log_hydro_dmc off, q must never move from its initial
