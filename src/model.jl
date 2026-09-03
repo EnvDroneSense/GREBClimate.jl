@@ -164,7 +164,7 @@ function apply_dynamic_co2_mask!(cfg::PhysicsConfig, fields::ClimateFields, icmn
     z_topo = fields.z_topo
     co2_part .= 1.0f0
 
-    # Annual-mean ice cover (§8.1: the annual mean, not month 1)
+    # Annual-mean ice cover, not month 1
     icmn_ctrl1 = dropdims(sum(icmn_ctrl, dims=3), dims=3) ./ size(icmn_ctrl, 3)
 
     if exp === :regional_co2_ocean
@@ -302,7 +302,7 @@ function greb_model!(run::RunSpec, cfg::PhysicsConfig;
     if !fields.loaded && !allow_uninitialized
         error("""
               greb_model! was given an uninitialized ClimateFields (all-zero climatology).
-              
+
               Load the data and pass it through:
                   fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
                   greb_model!(run, cfg; jld2_dir=jld2_dir, fields=fields)

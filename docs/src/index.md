@@ -36,8 +36,8 @@ using Pkg; Pkg.instantiate()
 
 ## Input data
 
-The model reads a **JLD2** dataset — climatology, flux corrections, solar
-forcing and scenario tables — laid out under a single directory. At ~439 MB it
+The model reads a **JLD2** dataset - climatology, flux corrections, solar
+forcing and scenario tables - laid out under a single directory. At ~439 MB it
 is not shipped with the package; [`greb_data_dir`](@ref) fetches and caches it
 on first use via [DataDeps.jl](https://github.com/oxinabox/DataDeps.jl):
 
@@ -46,7 +46,7 @@ dir    = greb_data_dir()
 fields = load_greb_jld2!(dir; dataset = :ncep)
 ```
 
-Resolution order — only the last step touches the network:
+Resolution order - only the last step touches the network:
 
 1. an explicit path, `greb_data_dir("/path/to/greb_input_data")`
 2. `ENV["GREB_DATA"]`
@@ -60,7 +60,7 @@ producing a meaningless ≈233 K world. The [Tutorial](@ref) walks through this.
 
 !!! note "Non-interactive sessions"
     Set `DATADEPS_ALWAYS_ACCEPT=true` to skip the download consent prompt. In
-    CI or any session without a terminal this is **required** — otherwise the
+    CI or any session without a terminal this is **required** - otherwise the
     process blocks waiting on stdin. `DATADEPS_DISABLE_DOWNLOAD=true` makes a
     would-be download throw instead.
 
@@ -75,6 +75,6 @@ See the [Tutorial](@ref) for a runnable end-to-end example, or the
 ## An interactive alternative
 
 The repository also ships an interactive [Pluto.jl](https://github.com/fonsp/Pluto.jl)
-notebook (`notebooks/GREB_julia.jl`) with widget-driven experiment
+notebook (`notebooks/GREB_explorer.jl`) with widget-driven experiment
 configuration - useful for exploration. It is a front-end onto the same
 package; this documentation covers the plain-Julia API it calls.

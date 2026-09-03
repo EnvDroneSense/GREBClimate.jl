@@ -11,14 +11,16 @@ include("testutils.jl")
 # the greb_model! integration suite plus the golden regression, the light job is
 # everything else plus the threading subprocesses.
 const SHARD = [
-    ("test_config.jl",    "light"),
-    ("test_state.jl",     "light"),
-    ("test_output.jl",    "light"),
-    ("test_physics.jl",   "light"),
-    ("test_io.jl",        "light"),
-    ("test_threading.jl", "light"),
-    ("test_model.jl",     "heavy"),
-    ("test_golden.jl",    "heavy"),
+    ("test_config.jl",     "light"),
+    ("test_state.jl",      "light"),
+    ("test_output.jl",     "light"),
+    ("test_physics.jl",    "light"),
+    ("test_io.jl",         "light"),
+    ("test_invariants.jl", "light"),
+    ("test_threading.jl",  "light"),
+    ("test_model.jl",      "heavy"),
+    ("test_golden.jl",     "heavy"),
+    ("test_aqua.jl",       "heavy"),
 ]
 
 shard = get(ENV, "GREB_TEST_SHARD", "all")

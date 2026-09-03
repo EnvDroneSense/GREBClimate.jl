@@ -1,9 +1,7 @@
 # =============================================================================
-# data.jl - locating the JLD2 input dataset.
-#
-# The dataset is ~439 MB and is not shipped with the package. `greb_data_dir()`
-# resolves where it lives, falling back to a DataDeps.jl download.
-#
+# data.jl - locating the JLD2 input dataset (~353 MB download, ~439 MB
+# unpacked, not shipped with the package). `greb_data_dir()` resolves where it
+# lives, falling back to a DataDeps.jl download.
 # =============================================================================
 
 """
@@ -16,7 +14,7 @@ const DATA_DEP_NAME = "GREB-input-data"
 Release tag and asset name for the published dataset bundle.
 
 The bundle is built from a validated `greb_input_data/` tree with
-`tools/package_dataset.jl`, which also prints the SHA256 below. 
+`tools/package_dataset.jl`, which also prints the SHA256 below.
 """
 const DATA_RELEASE_TAG = "data-v1"
 const DATA_ARCHIVE_NAME = "greb_input_data-v1.tar.gz"

@@ -26,6 +26,10 @@ jobs:
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+        with:
+          # Instrumentation costs runtime; measuring on both Julia versions
+          # buys no extra information.
+          coverage: ${{ matrix.julia-version == '1' }}
         env:
           GREB_TEST_SHARD: ${{ matrix.shard }}
           # The model only runs circulation!(Ta)/circulation!(q) concurrently
@@ -39,3 +43,16 @@ jobs:
           # fail loudly instead of blocking on the stdin consent prompt.
           DATADEPS_ALWAYS_ACCEPT: 'false'
           DATADEPS_DISABLE_DOWNLOAD: 'true'
+
+      # Both shards upload; Codecov merges them into one report.
+      - uses: julia-actions/julia-processcoverage@v1
+        if: matrix.julia-version == '1'
+      - uses: codecov/codecov-action@v5
+        if: matrix.julia-version == '1'
+        with:
+          files: lcov.info
+          flags: ${{ matrix.shard }}
+          # Public repo: uploads work without a token. Add a CODECOV_TOKEN
+          # secret if they start getting rate-limited.
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false

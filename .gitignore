@@ -4,6 +4,8 @@
 /benchmark/Manifest.toml
 /docs/build/
 /docs/Manifest.toml
+/notebooks/Manifest.toml
+/viz/Manifest.toml
 *.jl.cov
 *.jl.*.cov
 *.jl.mem
