@@ -1,5 +1,5 @@
 # =============================================================================
-# run_greb.jl — plain-Julia driver reproducing the GREB_julia.jl notebook flow
+# run_greb.jl - plain-Julia driver reproducing the GREB_explorer.jl notebook flow
 # on top of the extracted `GREBClimate` package (no Pluto / no @bind widgets).
 #
 # Mirrors the notebook's non-interactive path:
@@ -79,7 +79,7 @@ function run_greb(jld2_dir::AbstractString;
             Base.invokelatest(savefig, plt, joinpath(@__DIR__, "greb_global_mean_Ts.png"))
             println("\nSaved plot to examples/greb_global_mean_Ts.png")
         catch err
-            println("\n(Plots.jl not available — skipping plot; series has ",
+            println("\n(Plots.jl not available - skipping plot; series has ",
                     length(Ts_global_mean), " points)")
         end
     end
@@ -93,7 +93,7 @@ end
 const DEFAULT_JLD2_DIR = greb_data_dir(isempty(ARGS) ? nothing : ARGS[1])
 
 # Run automatically when executed as a script (`julia run_greb.jl`), but NOT when
-# `include`-d into an interactive session — so a REPL is never terminated.
+# `include`-d into an interactive session - so a REPL is never terminated.
 if abspath(PROGRAM_FILE) == @__FILE__
     run_greb(DEFAULT_JLD2_DIR)
 end

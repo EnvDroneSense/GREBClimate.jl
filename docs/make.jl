@@ -1,5 +1,5 @@
 # =============================================================================
-# docs/make.jl — builds the GREBClimate.jl Documenter site.
+# docs/make.jl - builds the GREBClimate.jl Documenter site.
 #
 # Local build (once, to link the docs env to the local package source):
 #   julia --project=docs -e 'using Pkg; Pkg.develop(path="."); Pkg.instantiate()'
@@ -11,6 +11,10 @@
 
 using Documenter
 using GREBClimate
+
+# `jldoctest` blocks run in a fresh session, so each needs the package in scope.
+# makedocs executes them and fails the build on a mismatch.
+DocMeta.setdocmeta!(GREBClimate, :DocTestSetup, :(using GREBClimate); recursive = true)
 
 makedocs(
     sitename = "GREBClimate.jl",

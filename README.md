@@ -6,7 +6,7 @@
 
 A high-performance Julia translation of the **Globally Resolved Energy Balance (GREB)** climate model, originally developed by Dietmar Dommenget and colleagues at Monash University.
 
-GREBClimate is a **Julia package**: you call it from a script or the REPL, and nothing is held as module-global state. An interactive [Pluto.jl](https://github.com/fonsp/Pluto.jl) notebook ships alongside it (`notebooks/GREB_julia.jl`) for widget-driven exploration and process-isolation decomposition experiments, but it is one front-end onto the package rather than the model itself.
+GREBClimate is a **Julia package**: you call it from a script or the REPL, and nothing is held as module-global state. An interactive [Pluto.jl](https://github.com/fonsp/Pluto.jl) notebook ships alongside it (`notebooks/GREB_explorer.jl`) for widget-driven exploration and process-isolation decomposition experiments, but it is one front-end onto the package rather than the model itself.
 
 ---
 > **Repository layout:** GREB is now organized as a standard Julia package,
@@ -15,7 +15,7 @@ GREBClimate is a **Julia package**: you call it from a script or the REPL, and n
 > topical files - see `src/GREBClimate.jl` for the include order), tests in
 > `test/`, a [Documenter.jl](https://EnvDroneSense.github.io/GREBClimate.jl/)
 > site in `docs/`, a plain-Julia driver in `examples/run_greb.jl`, and the
-> original interactive Pluto notebook - unchanged - in `notebooks/GREB_julia.jl`.
+> original interactive Pluto notebook - unchanged - in `notebooks/GREB_explorer.jl`.
 > See [Project Structure](#project-structure) for the full layout.
 >
 > ```julia
@@ -86,7 +86,7 @@ cd GREBClimate.jl
 
 ### Installation
 
-GREBClimate is not yet registered in the Julia General Registry — once it
+GREBClimate is not yet registered in the Julia General Registry - once it
 is, `Pkg.add("GREBClimate")` will work directly. Until then, install from
 the git clone above:
 
@@ -119,7 +119,7 @@ using Pluto
 Pluto.run()
 ```
 
-Open `GREB_julia.jl` from the Pluto interface.
+Open `GREB_explorer.jl` from the Pluto interface.
 
 ## 📂 Input Data
 
@@ -142,10 +142,10 @@ network:
 
 | | Source |
 |--:|:-------|
-| 1 | an explicit path — `greb_data_dir("/path/to/greb_input_data")` |
+| 1 | an explicit path - `greb_data_dir("/path/to/greb_input_data")` |
 | 2 | `$GREB_DATA` |
 | 3 | `greb_input_data/` beside the repository |
-| 4 | the `GREB-input-data` DataDep — downloaded and cached |
+| 4 | the `GREB-input-data` DataDep - downloaded and cached |
 
 So if you already have the dataset, nothing is downloaded. Point at it directly,
 or set the environment variable once:
@@ -166,7 +166,7 @@ Two environment variables are worth knowing:
 | `DATADEPS_ALWAYS_ACCEPT=true` | Skip the download prompt. **Required** in CI or any non-interactive session, which otherwise blocks waiting on stdin. |
 | `DATADEPS_DISABLE_DOWNLOAD=true` | Make a would-be download throw instead. Useful on metered connections. |
 
-Running the tests or the benchmarks never downloads anything — both resolve with
+Running the tests or the benchmarks never downloads anything - both resolve with
 `allow_download=false` and skip data-dependent work when no local dataset is
 found.
 
@@ -339,7 +339,7 @@ of the above, including a global-mean summary and an optional plot.
 
 ### Or, interactively
 
-The Pluto notebook (`notebooks/GREB_julia.jl`) exposes the same options as
+The Pluto notebook (`notebooks/GREB_explorer.jl`) exposes the same options as
 widgets instead of code:
 
 | Control | Description |
@@ -375,10 +375,10 @@ GREBClimate.jl/
 ├── test/runtests.jl            # unit, integration, and golden-regression tests
 ├── benchmark/run_benchmarks.jl # timing/allocation suite for the physics kernels
 ├── docs/                       # Documenter.jl site (index, tutorial, switches, API)
-├── examples/run_greb.jl        # plain-Julia driver (no Pluto) — start here
+├── examples/run_greb.jl        # plain-Julia driver (no Pluto) - start here
 ├── notebooks/
-│   ├── GREB_julia.jl           # interactive Pluto notebook (own Project.toml)
-│   ├── PultoUI.jl              # work-in-progress UI experiments — not wired up
+│   ├── GREB_explorer.jl        # interactive Pluto notebook (own Project.toml)
+│   ├── PultoUI.jl              # work-in-progress UI experiments - not wired up
 │   └── launch_pluto.jl         # convenience launcher
 ├── tools/
 │   ├── convert_greb_to_jld2.jl  # raw .bin -> JLD2 converter (maintainers only)
@@ -429,7 +429,9 @@ If you encounter these or other problems:
    - Error messages or unexpected behavior description
    - Steps to reproduce
 
-Contributions to fix these issues are welcome! Open a pull request or an issue on GitHub.
+Contributions to fix these issues are welcome! Open a pull request or an issue on GitHub -
+see [CONTRIBUTING.md](CONTRIBUTING.md) for the dev setup, the test shards and the
+repo conventions.
 
 ---
 ## 🔭 Future Plans

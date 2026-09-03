@@ -18,7 +18,7 @@ end
     @test create_experiment_config(:co2_double).co2_concentration == 680.0
 end
 
-@testset "create_experiment_config: :custom_co2 and decon presets (§7.2/§7.3)" begin
+@testset "create_experiment_config: :custom_co2 and decon presets" begin
     cfg_custom = create_experiment_config(:custom_co2; co2_path="/tmp/my_co2.txt")
     @test cfg_custom.experiment == :custom_co2
     @test cfg_custom.custom_co2_path == "/tmp/my_co2.txt"

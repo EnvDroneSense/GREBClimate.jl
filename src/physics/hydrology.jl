@@ -1,6 +1,3 @@
-# Hoisted from hydro!'s body (IMPROVEMENTS.md §4.5): these depend only on
-# module-level constants, not on any per-call argument, so recomputing them
-# as locals every timestep was pure waste.
 const _HYDRO_CONST_FACTOR1 = 3.75f-3
 const _HYDRO_CONST_FACTOR2 = 17.08085f0
 const _HYDRO_CONST_FACTOR3 = 234.175f0

@@ -1,80 +1,78 @@
-begin
-    """
-            CirculationWorkspace
+"""
+    CirculationWorkspace
 
-        Pre-allocated buffers for diffusion, advection, and circulation calculations.
-        Reused across all time steps to eliminate allocations.
-        """
-    Base.@kwdef mutable struct CirculationWorkspace
-        # Polar sub-stepping buffers.
-        T1h::Vector{Float32} = zeros(Float32, xdim)  # polar sub-stepping
-        dTxh::Vector{Float32} = zeros(Float32, xdim)  # polar increment (Jacobi scratch)
+Pre-allocated buffers for diffusion, advection, and circulation calculations.
+Reused across all time steps to eliminate allocations.
+"""
+Base.@kwdef mutable struct CirculationWorkspace
+    # Polar sub-stepping buffers.
+    T1h::Vector{Float32} = zeros(Float32, xdim)  # polar sub-stepping
+    dTxh::Vector{Float32} = zeros(Float32, xdim)  # polar increment (Jacobi scratch)
 
-        # Circulation work arrays
-        X_work::Matrix{Float32} = zeros(Float32, xdim, ydim)  # circulation work array
-        dX_diff::Matrix{Float32} = zeros(Float32, xdim, ydim)  # diffusion output
-        dX_adv::Matrix{Float32} = zeros(Float32, xdim, ydim)  # advection output
-        dX_conv::Matrix{Float32} = zeros(Float32, xdim, ydim)  # convection output
+    # Circulation work arrays
+    X_work::Matrix{Float32} = zeros(Float32, xdim, ydim)  # circulation work array
+    dX_diff::Matrix{Float32} = zeros(Float32, xdim, ydim)  # diffusion output
+    dX_adv::Matrix{Float32} = zeros(Float32, xdim, ydim)  # advection output
+    dX_conv::Matrix{Float32} = zeros(Float32, xdim, ydim)  # convection output
 
-        # Tendency buffers
-        temp_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # general workspace (humidity-update scratch)
-        Q_sens_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Sensible heat flux buffer
-        crcl::Matrix{Float32} = zeros(Float32, xdim, ydim)  # dq_crcl (zero stand-in when log_crcl_dmc is off)
+    # Tendency buffers
+    temp_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # general workspace (humidity-update scratch)
+    Q_sens_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Sensible heat flux buffer
+    crcl::Matrix{Float32} = zeros(Float32, xdim, ydim)  # dq_crcl (zero stand-in when log_crcl_dmc is off)
 
-        # State buffers
-        Ts0_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface temperature output
-        Ta0_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Air temperature output
-        To0_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Ocean temperature output
-        q0_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Humidity output
+    # State buffers
+    Ts0_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface temperature output
+    Ta0_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Air temperature output
+    To0_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Ocean temperature output
+    q0_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Humidity output
 
-        # LW radiation buffers
-        e_co2_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial CO₂ buffer
-        e_vapor_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial water vapor buffer
-        em_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial emissivity buffer
-        LW_surf_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface longwave
-        LW_down_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Downwelling longwave
-        LW_up_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Upwelling longwave
+    # LW radiation buffers
+    e_co2_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial CO₂ buffer
+    e_vapor_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial water vapor buffer
+    em_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial emissivity buffer
+    LW_surf_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface longwave
+    LW_down_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Downwelling longwave
+    LW_up_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Upwelling longwave
 
-        # Hydrology buffers
-        qs::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Saturation humidity buffer
-        Tskin::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Skin temperature buffer
-        rq::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Relative humidity buffer
-        ws_base::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Base wind speed buffer
-        # Hydrology
-        Q_lat_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
-        Q_lat_air_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
-        dq_eva_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
-        dq_rain_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
-        cE_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface exchange coefficient buffer
+    # Hydrology buffers
+    qs::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Saturation humidity buffer
+    Tskin::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Skin temperature buffer
+    rq::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Relative humidity buffer
+    ws_base::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Base wind speed buffer
+    # Hydrology
+    Q_lat_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
+    Q_lat_air_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
+    dq_eva_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
+    dq_rain_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
+    cE_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface exchange coefficient buffer
 
-        # Deep_ocean
-        dT_ocean_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
-        dTo_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
+    # Deep_ocean
+    dT_ocean_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
+    dTo_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
 
-        # Dedicated circulation output
-        dTa_crcl::Matrix{Float32} = zeros(Float32, xdim, ydim)  # temperature tendency
-        dq_crcl::Matrix{Float32} = zeros(Float32, xdim, ydim)  # humidity tendency
+    # Dedicated circulation output
+    dTa_crcl::Matrix{Float32} = zeros(Float32, xdim, ydim)  # temperature tendency
+    dq_crcl::Matrix{Float32} = zeros(Float32, xdim, ydim)  # humidity tendency
 
-        # SWradiation
-        ice_cover_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # ice fraction
-        a_surf_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # surface albedo
-        albedo_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # combined albedo (surface + atmosphere)
-        a_atmos_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # atmospheric albedo
-        sw_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # net shortwave flux
+    # SWradiation
+    ice_cover_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # ice fraction
+    a_surf_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # surface albedo
+    albedo_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # combined albedo (surface + atmosphere)
+    a_atmos_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # atmospheric albedo
+    sw_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # net shortwave flux
 
-        # time_loop
-        precip_out::Matrix{Float32} = zeros(Float32, xdim, ydim)  # precipitation output
-        evap_out::Matrix{Float32} = zeros(Float32, xdim, ydim)  # evaporation output
-        qcrcl_out::Matrix{Float32} = zeros(Float32, xdim, ydim)  # circulation moisture output
-        term_north::Vector{Float32} = zeros(Float32, xdim)  # northern boundary term
-        term_south::Vector{Float32} = zeros(Float32, xdim)  # southern boundary term
-    end
-end;
+    # time_loop
+    precip_out::Matrix{Float32} = zeros(Float32, xdim, ydim)  # precipitation output
+    evap_out::Matrix{Float32} = zeros(Float32, xdim, ydim)  # evaporation output
+    qcrcl_out::Matrix{Float32} = zeros(Float32, xdim, ydim)  # circulation moisture output
+    term_north::Vector{Float32} = zeros(Float32, xdim)  # northern boundary term
+    term_south::Vector{Float32} = zeros(Float32, xdim)  # southern boundary term
+end
 
 """
     SurfaceState
 
-A run's current surface/atmosphere state — `Ts`, `Ta`, `To`, `q` — passed as
+A run's current surface/atmosphere state - `Ts`, `Ta`, `To`, `q` - passed as
 one argument to [`diagnostics!`](@ref), [`output!`](@ref), [`time_loop!`](@ref),
 and [`qflux_correction!`](@ref). A thin reference wrapper around
 already-allocated arrays; construct once per run/call (like `ws`/`acc`),
@@ -87,76 +85,74 @@ struct SurfaceState
     q::Matrix{Float32}
 end
 
-begin
-    """
-            MonthlyAccumulator
+"""
+    MonthlyAccumulator
 
-        Accumulates fields over a month for monthly-mean output.
-        Reset after each month via `reset!`.
-        """
-    Base.@kwdef mutable struct MonthlyAccumulator
-        Tmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface temperature accumulator
-        Tamm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Air temperature accumulator
-        Tomm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Ocean temperature accumulator
-        qmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Humidity accumulator
-        apmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Albedo accumulator
-        icemm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Ice fraction accumulator
-        precipmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Precipitation accumulator
-        evapmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Evaporation accumulator
-        qcrclmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Circulation moisture accumulator
-        swmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Shortwave radiation accumulator
-        lwmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Longwave radiation accumulator
-        qlatmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Latent heat accumulator
-        qsensmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Sensible heat accumulator
-    end
+Accumulates fields over a month for monthly-mean output.
+Reset after each month via `reset!`.
+"""
+Base.@kwdef mutable struct MonthlyAccumulator
+    Tmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface temperature accumulator
+    Tamm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Air temperature accumulator
+    Tomm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Ocean temperature accumulator
+    qmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Humidity accumulator
+    apmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Albedo accumulator
+    icemm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Ice fraction accumulator
+    precipmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Precipitation accumulator
+    evapmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Evaporation accumulator
+    qcrclmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Circulation moisture accumulator
+    swmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Shortwave radiation accumulator
+    lwmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Longwave radiation accumulator
+    qlatmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Latent heat accumulator
+    qsensmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Sensible heat accumulator
+end
 
-    function reset!(acc::MonthlyAccumulator)
-        fill!(acc.Tmm, 0.0f0)
-        fill!(acc.Tamm, 0.0f0)
-        fill!(acc.Tomm, 0.0f0)
-        fill!(acc.qmm, 0.0f0)
-        fill!(acc.apmm, 0.0f0)
-        fill!(acc.icemm, 0.0f0)
-        fill!(acc.precipmm, 0.0f0)
-        fill!(acc.evapmm, 0.0f0)
-        fill!(acc.qcrclmm, 0.0f0)
-        fill!(acc.swmm, 0.0f0)
-        fill!(acc.lwmm, 0.0f0)
-        fill!(acc.qlatmm, 0.0f0)
-        fill!(acc.qsensmm, 0.0f0)
-    end
+function reset!(acc::MonthlyAccumulator)
+    fill!(acc.Tmm, 0.0f0)
+    fill!(acc.Tamm, 0.0f0)
+    fill!(acc.Tomm, 0.0f0)
+    fill!(acc.qmm, 0.0f0)
+    fill!(acc.apmm, 0.0f0)
+    fill!(acc.icemm, 0.0f0)
+    fill!(acc.precipmm, 0.0f0)
+    fill!(acc.evapmm, 0.0f0)
+    fill!(acc.qcrclmm, 0.0f0)
+    fill!(acc.swmm, 0.0f0)
+    fill!(acc.lwmm, 0.0f0)
+    fill!(acc.qlatmm, 0.0f0)
+    fill!(acc.qsensmm, 0.0f0)
+end
 
-    function accumulate!(acc::MonthlyAccumulator, Ts, Ta, To, q, albedo, ice, precip, evap, qcrcl, sw, lw, qlat, qsens)
-        Tmm = acc.Tmm; Tamm = acc.Tamm; Tomm = acc.Tomm; qmm = acc.qmm
-        apmm = acc.apmm; icemm = acc.icemm
-        precipmm = acc.precipmm; evapmm = acc.evapmm; qcrclmm = acc.qcrclmm
-        swmm = acc.swmm; lwmm = acc.lwmm; qlatmm = acc.qlatmm; qsensmm = acc.qsensmm
+function accumulate!(acc::MonthlyAccumulator, Ts, Ta, To, q, albedo, ice, precip, evap, qcrcl, sw, lw, qlat, qsens)
+    Tmm = acc.Tmm; Tamm = acc.Tamm; Tomm = acc.Tomm; qmm = acc.qmm
+    apmm = acc.apmm; icemm = acc.icemm
+    precipmm = acc.precipmm; evapmm = acc.evapmm; qcrclmm = acc.qcrclmm
+    swmm = acc.swmm; lwmm = acc.lwmm; qlatmm = acc.qlatmm; qsensmm = acc.qsensmm
 
-        @turbo for j in 1:ydim
-            for i in 1:xdim
-                Tmm[i, j] += Ts[i, j]
-                Tamm[i, j] += Ta[i, j]
-                Tomm[i, j] += To[i, j]
-                qmm[i, j] += q[i, j]
-                apmm[i, j] += albedo[i, j]
-                icemm[i, j] += ice[i, j]
-                precipmm[i, j] += precip[i, j]
-                evapmm[i, j] += evap[i, j]
-                qcrclmm[i, j] += qcrcl[i, j]
-                swmm[i, j] += sw[i, j]
-                lwmm[i, j] += lw[i, j]
-                qlatmm[i, j] += qlat[i, j]
-                qsensmm[i, j] += qsens[i, j]
-            end
+    @turbo for j in 1:ydim
+        for i in 1:xdim
+            Tmm[i, j] += Ts[i, j]
+            Tamm[i, j] += Ta[i, j]
+            Tomm[i, j] += To[i, j]
+            qmm[i, j] += q[i, j]
+            apmm[i, j] += albedo[i, j]
+            icemm[i, j] += ice[i, j]
+            precipmm[i, j] += precip[i, j]
+            evapmm[i, j] += evap[i, j]
+            qcrclmm[i, j] += qcrcl[i, j]
+            swmm[i, j] += sw[i, j]
+            lwmm[i, j] += lw[i, j]
+            qlatmm[i, j] += qlat[i, j]
+            qsensmm[i, j] += qsens[i, j]
         end
     end
-end;
+end
 
 """
     ClimateFields
 
 Loaded climatology, derived grid fields, flux corrections, and the
-regional-CO2 mask/solar table — everything `load_greb_jld2!` fills in and
+regional-CO2 mask/solar table - everything `load_greb_jld2!` fills in and
 every physics function reads. One instance per `greb_model!` run; never
 shared as global state.
 
@@ -226,19 +222,17 @@ Base.@kwdef mutable struct ClimateFields
     loaded::Bool = false
 end
 
-begin
-    """
-        TimeState
+"""
+    TimeState
 
-    Tracks the model's position within the current year: `jday` (calendar
-    day, 1..365) and `ityr` (timestep-of-year, 1..`nstep_yr`). Mutated in
-    place each timestep by [`time_loop!`](@ref)/[`qflux_correction!`](@ref).
-    """
-    mutable struct TimeState
-        jday::Int  # Current calendar day in year [1..365]
-        ityr::Int  # Current timestep in year [1..730]
-    end
-end;
+Tracks the model's position within the current year: `jday` (calendar
+day, 1..365) and `ityr` (timestep-of-year, 1..`nstep_yr`). Mutated in
+place each timestep by [`time_loop!`](@ref)/[`qflux_correction!`](@ref).
+"""
+mutable struct TimeState
+    jday::Int  # Current calendar day in year [1..365]
+    ityr::Int  # Current timestep in year [1..730]
+end
 
 """
     ModelState

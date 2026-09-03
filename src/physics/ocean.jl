@@ -13,7 +13,7 @@ function seaice!(Ts0, fields::ClimateFields, timestate, cfg::PhysicsConfig)
     cap_surf = fields.cap_surf
 
     if !cfg.log_ocean_dmc
-        return     # No ice feedback: skip sea ice calculation
+        return nothing   # No ice feedback: skip sea ice calculation
     end
 
     # Compute ice‑dependent heat capacity for ocean points
@@ -44,6 +44,7 @@ function seaice!(Ts0, fields::ClimateFields, timestate, cfg::PhysicsConfig)
 
     # Glacier override: ice sheets have land heat capacity.
     @. cap_surf = ifelse(glacier > 0.5f0, cap_land, cap_surf)
+    return nothing
 end
 
 """

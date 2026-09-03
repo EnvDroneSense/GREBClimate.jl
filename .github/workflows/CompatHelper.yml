@@ -1,0 +1,29 @@
+# Opens a PR when a dependency releases outside the declared [compat] bounds,
+# so maintenance finds you rather than the reverse. Covers docs/ and test/ too,
+# since both carry their own [compat].
+name: CompatHelper
+
+on:
+  schedule:
+    - cron: '0 5 * * 1'   # Mondays, 05:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  CompatHelper:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - name: Install CompatHelper
+        run: import Pkg; Pkg.add("CompatHelper")
+        shell: julia --color=yes {0}
+      - name: Run CompatHelper
+        run: import CompatHelper; CompatHelper.main(; subdirs = ["", "docs", "test"])
+        shell: julia --color=yes {0}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -106,7 +106,7 @@ end
     @test_throws ErrorException hydro!(Ts, q, ClimateFields(), TimeState(1, 1), cfg, CirculationWorkspace())
 end
 
-@testset "hydro! log_eva==1 gust includes Fortran's carried-over +2.0²/+3.0² base term (§8.2)" begin
+@testset "hydro! log_eva==1 gust includes Fortran's carried-over +2.0²/+3.0² base term" begin
     mkfields(topo) = begin
         fields = ClimateFields()
         fields.z_topo .= topo
@@ -141,7 +141,7 @@ end
     end
 end
 
-@testset "hydro! doesn't apply an extra -0.9q clamp to dq_rain (§8.3)" begin
+@testset "hydro! doesn't apply an extra -0.9q clamp to dq_rain" begin
     fields = ClimateFields()
     fields.z_topo .= 1.0
     fields.mldclim .= 50.0

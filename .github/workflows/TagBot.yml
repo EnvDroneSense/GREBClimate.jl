@@ -1,0 +1,38 @@
+# Creates the git tag once the General registry merges a release PR. Without
+# it a registered version has no tag, so docs.yml's `tags: ['v*']` never fires.
+name: TagBot
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      lookback:
+        default: '3'
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  deployments: read
+  issues: read
+  discussions: read
+  packages: read
+  pages: read
+  pull-requests: read
+  repository-projects: read
+  security-events: read
+  statuses: read
+
+jobs:
+  TagBot:
+    # Only react to the registry bot's comment, never to a human's.
+    if: github.event_name == 'workflow_dispatch' || github.actor == 'JuliaTagBot'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: JuliaRegistries/TagBot@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # Optional: lets TagBot trigger a docs build for the tagged version.
+          # Harmless if the secret does not exist.
+          ssh: ${{ secrets.DOCUMENTER_KEY }}

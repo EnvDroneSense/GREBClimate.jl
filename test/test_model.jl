@@ -10,7 +10,7 @@
     @test result.ctrl[1] isa MonthlyRecord
 end
 
-@testset "greb_model! flux-correction spin-up: loaded files aren't overwritten by qflux_correction! (§8.5)" begin
+@testset "greb_model! flux-correction spin-up: loaded files aren't overwritten by qflux_correction!" begin
     tmpdir = mktempdir()
     try
         mkpath(joinpath(tmpdir, "climatology"))
@@ -134,7 +134,7 @@ end
     end
 end
 
-@testset "apply_dynamic_co2_mask! uses the annual-mean ice cover, not January (§8.1)" begin
+@testset "apply_dynamic_co2_mask! uses the annual-mean ice cover, not January" begin
     fields = ClimateFields()  # z_topo defaults to 0 everywhere -> land branch never fires
     cfg = PhysicsConfig(experiment = :regional_co2_ocean)
 
@@ -232,7 +232,7 @@ end
     end
 end
 
-@testset "custom CO2 trajectory loads from a plain-text file (§7.2)" begin
+@testset "custom CO2 trajectory loads from a plain-text file" begin
     with_tempdir() do dir
         co2_path = joinpath(dir, "my_co2.txt")
         write(co2_path, "# comment line, should be skipped\n1950 300.0\n1951 301.0\n\n")

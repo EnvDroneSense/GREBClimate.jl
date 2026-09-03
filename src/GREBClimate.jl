@@ -7,12 +7,10 @@ module GREBClimate
 # humidity forward under shortwave/longwave radiation, hydrology, sea ice,
 # deep-ocean coupling, and atmospheric circulation (diffusion, advection,
 # moisture convergence). An interactive Pluto version of the same model
-# lives in `notebooks/GREB_julia.jl`; see the package docs or README for
+# lives in `notebooks/GREB_explorer.jl`; see the package docs or README for
 # usage.
 #
-# Files below are included in dependency order: constants → config → data
-# → state → io → physics/{radiation,hydrology,ocean} → circulation →
-# tendencies → output → postprocess → model.
+# The includes below are in dependency order; changing it breaks the build.
 # =============================================================================
 
 using LoopVectorization   # @turbo SIMD
