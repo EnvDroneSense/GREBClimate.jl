@@ -62,14 +62,18 @@ end
         @test all(iszero, getfield(cf, f))
     end
 
-    # CirculationWorkspace: four length-xdim vectors, the rest (xdim, ydim).
+    # CirculationWorkspace: four vectors, the rest matrices. The zonal-stencil
+    # buffers carry longitude ghost cells, so their first dimension is `xghost`.
     cw = CirculationWorkspace()
+    XP = GREBClimate.xghost
     cw_vec = (:T1h, :dTxh, :term_north, :term_south)
-    @test length(fieldnames(CirculationWorkspace)) == 42
+    cw_ghosted = (:T1h, :X_work, :wz_ghost)
+    @test length(fieldnames(CirculationWorkspace)) == 43
     for f in fieldnames(CirculationWorkspace)
         v = getfield(cw, f)
+        n = f in cw_ghosted ? XP : X
         @test eltype(v) === Float32
-        @test size(v) == (f in cw_vec ? (X,) : (X, Y))
+        @test size(v) == (f in cw_vec ? (n,) : (n, Y))
         @test all(iszero, v)
     end
 

@@ -1,3 +1,43 @@
+# ── Ghost-cell helpers ───────────────────────────────────────────────
+# Ghosted buffer layout and why it exists: see `nghost` in `constants.jl`.
+
+"Refresh the wrap-around ghost rows of a `(xghost, ydim)` buffer."
+@inline function refresh_ghosts!(P::AbstractMatrix{Float32})
+    @inbounds for k in axes(P, 2), h in 1:nghost
+        P[h, k] = P[xdim+h, k]              # west ghosts <- east edge
+        P[xdim+nghost+h, k] = P[nghost+h, k]    # east ghosts <- west edge
+    end
+    return nothing
+end
+
+"Refresh the wrap-around ghost entries of a length-`xghost` vector."
+@inline function refresh_ghosts!(v::AbstractVector{Float32})
+    @inbounds for h in 1:nghost
+        v[h] = v[xdim+h]
+        v[xdim+nghost+h] = v[nghost+h]
+    end
+    return nothing
+end
+
+"Copy an `(xdim, ydim)` field into the ghosted buffer `P` and fill its ghosts."
+function to_ghosted!(P::Matrix{Float32}, A::Matrix{Float32})
+    @inbounds for k in 1:ydim
+        copyto!(P, (k - 1) * xghost + nghost + 1, A, (k - 1) * xdim + 1, xdim)
+    end
+    refresh_ghosts!(P)
+    return P
+end
+
+function to_ghosted!(P::AbstractMatrix{Float32}, A::AbstractMatrix{<:Real})
+    @inbounds for k in 1:ydim
+        @simd for i in 1:xdim
+            P[i+nghost, k] = A[i, k]
+        end
+    end
+    refresh_ghosts!(P)
+    return P
+end
+
 """
     convergence!(T1, fields::ClimateFields, timestate, ws::CirculationWorkspace)
 
@@ -12,6 +52,30 @@ function convergence!(T1, fields::ClimateFields, timestate, ws::CirculationWorks
     return nothing
 end
 
+# Same tendency, reading a ghosted field.
+function _convergence!(Xp::Matrix{Float32}, fields::ClimateFields, timestate, ws::CirculationWorkspace)
+    omega = @view fields.omegaclim[:, :, timestate.ityr]
+    dX_conv = ws.dX_conv
+
+    @inbounds for k in 1:ydim
+        @turbo for i in 1:xdim
+            dX_conv[i, k] = -Xp[i+nghost, k] * omega[i, k] * const_factor
+        end
+    end
+    return nothing
+end
+
+"Select `wz_air`/`wz_vapor` for a scale height, erroring on anything else."
+@inline function _wz_for(h_scl, fields::ClimateFields)
+    if h_scl == z_air
+        return fields.wz_air
+    elseif h_scl == z_vapor
+        return fields.wz_vapor
+    else
+        error("Invalid h_scl = $h_scl (must be z_air or z_vapor)")
+    end
+end
+
 """
     diffusion!(T1, h_scl, fields::ClimateFields, ws::CirculationWorkspace, timestate)
 
@@ -20,117 +84,117 @@ tendency into `ws.dX_diff`. `h_scl` (`z_air` or `z_vapor`) selects the
 topographic weighting field.
 """
 function diffusion!(T1, h_scl, fields::ClimateFields, ws::CirculationWorkspace, timestate)
-    # Zero output buffer (we will accumulate into it)
-    fill!(ws.dX_diff, 0.0f0)
+    wz = _wz_for(h_scl, fields)
+    to_ghosted!(ws.X_work, T1)
+    to_ghosted!(ws.wz_ghost, wz)
+    _diffusion!(ws.X_work, ws.wz_ghost, ws)
+    return nothing
+end
 
-    # Topographic scaling (choose based on scale height)
-    wz = if h_scl == z_air
-        fields.wz_air
-    elseif h_scl == z_vapor
-        fields.wz_vapor
-    else
-        error("Invalid h_scl = $h_scl (must be z_air or z_vapor)")
-    end
+# Core kernel. `Tp`/`wzp` are ghosted with valid ghost rows; the tendency lands in
+# the plain `(xdim, ydim)` `ws.dX_diff`.
+function _diffusion!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, ws::CirculationWorkspace)
+    dX_diff = ws.dX_diff
 
     # Precomputed geometry/coefficients
-    dxlat = dxlat_grid
     ccy = ccy_diff
     ccx = ccx_diff
+    is_polar = IS_POLAR
 
-    # Pre‑cached neighbour indices
-    jm1, jp1 = lon_jm1, lon_jp1
-    jm2, jp2 = lon_jm2, lon_jp2
-    jm3, jp3 = lon_jm3, lon_jp3
+    term_north = ws.term_north
+    term_south = ws.term_south
+    T1h = ws.T1h
+    dTxh = ws.dTxh
 
-    # ----- Precompute k‑independent terms for the poles -----
-    # For k == 1 (North Pole)
-    @views @. ws.term_north = ccy * wz[:, 2] * (T1[:, 2] - T1[:, 1])
-    # For k == ydim (South Pole)
-    @views @. ws.term_south = ccy * wz[:, ydim-1] * (T1[:, ydim-1] - T1[:, ydim])
+    # ----- Precompute k-independent terms for the poles -----
+    @turbo for i in 1:xdim
+        ip = i + nghost
+        # For k == 1 (North Pole)
+        term_north[i] = ccy * wzp[ip, 2] * (Tp[ip, 2] - Tp[ip, 1])
+        # For k == ydim (South Pole)
+        term_south[i] = ccy * wzp[ip, ydim-1] * (Tp[ip, ydim-1] - Tp[ip, ydim])
+    end
 
-    for k in 1:ydim
+    @inbounds for k in 1:ydim
         # ----- Meridional diffusion -----
         if k == 1
             @turbo for i in 1:xdim
-                ws.dX_diff[i, k] += wz[i, k] * ws.term_north[i]
+                dX_diff[i, k] = wzp[i+nghost, k] * term_north[i]
             end
         elseif k == ydim
             @turbo for i in 1:xdim
-                ws.dX_diff[i, k] += wz[i, k] * ws.term_south[i]
+                dX_diff[i, k] = wzp[i+nghost, k] * term_south[i]
             end
         else
-            # Mid‑latitudes: no precomputation possible (depends on k‑1, k+1)
+            # Mid-latitudes: no precomputation possible (depends on k-1, k+1)
             @turbo for i in 1:xdim
-                ws.dX_diff[i, k] += wz[i, k] * ccy * (
-                    wz[i, k-1] * (T1[i, k-1] - T1[i, k]) +
-                    wz[i, k+1] * (T1[i, k+1] - T1[i, k])
+                dX_diff[i, k] = wzp[i+nghost, k] * ccy * (
+                    wzp[i+nghost, k-1] * (Tp[i+nghost, k-1] - Tp[i+nghost, k]) +
+                    wzp[i+nghost, k+1] * (Tp[i+nghost, k+1] - Tp[i+nghost, k])
                 )
             end
         end
 
         # ----- Zonal diffusion -----
-        if dxlat[k] > 2.5f5   # mid‑latitudes, normal time step
+        if !is_polar[k]   # mid-latitudes, normal time step
+            cc = ccx[k] * 0.05f0
             @turbo for j in 1:xdim
-                jm1v = jm1[j];
-                jp1v = jp1[j]
-                jm2v = jm2[j];
-                jp2v = jp2[j]
-                jm3v = jm3[j];
-                jp3v = jp3[j]
+                # Ghost offsets: j-3 -> j, j-2 -> j+1, j-1 -> j+2, j -> j+3, ...
+                wm3 = wzp[j, k];   wm2 = wzp[j+1, k]; wm1 = wzp[j+2, k]
+                w0 = wzp[j+3, k]
+                wp1 = wzp[j+4, k]; wp2 = wzp[j+5, k]; wp3 = wzp[j+6, k]
+                tm3 = Tp[j, k];    tm2 = Tp[j+1, k];  tm1 = Tp[j+2, k]
+                t0 = Tp[j+3, k]
+                tp1 = Tp[j+4, k];  tp2 = Tp[j+5, k];  tp3 = Tp[j+6, k]
 
-                dTx = ccx[k] * 0.05f0 * (
-                    10.0f0 * (wz[jm1v, k] * (T1[jm1v, k] - T1[j, k]) +
-                            wz[jp1v, k] * (T1[jp1v, k] - T1[j, k])) +
-                    4.0f0 * (wz[jm2v, k] * (T1[jm2v, k] - T1[jm1v, k]) +
-                           wz[jm1v, k] * (T1[j, k] - T1[jm1v, k])) +
-                    4.0f0 * (wz[jp1v, k] * (T1[j, k] - T1[jp1v, k]) +
-                           wz[jp2v, k] * (T1[jp2v, k] - T1[jp1v, k])) +
-                    1.0f0 * (wz[jm3v, k] * (T1[jm3v, k] - T1[jm2v, k]) +
-                           wz[jm2v, k] * (T1[jm1v, k] - T1[jm2v, k])) +
-                    1.0f0 * (wz[jp2v, k] * (T1[jp1v, k] - T1[jp2v, k]) +
-                           wz[jp3v, k] * (T1[jp3v, k] - T1[jp2v, k]))
+                dTx = cc * (
+                    10.0f0 * (wm1 * (tm1 - t0) + wp1 * (tp1 - t0)) +
+                    4.0f0 * (wm2 * (tm2 - tm1) + wm1 * (t0 - tm1)) +
+                    4.0f0 * (wp1 * (t0 - tp1) + wp2 * (tp2 - tp1)) +
+                    1.0f0 * (wm3 * (tm3 - tm2) + wm2 * (tm1 - tm2)) +
+                    1.0f0 * (wp2 * (tp1 - tp2) + wp3 * (tp3 - tp2))
                 )
-                ws.dX_diff[j, k] += wz[j, k] * dTx
+                dX_diff[j, k] += w0 * dTx
             end
-        else   # polar regions – sub‑timestepping
-            # Number of sub‑steps for stability (precomputed, depends only on k)
+        else   # polar regions - sub-timestepping
+            # Number of sub-steps for stability (precomputed, depends only on k)
             time2 = POLAR_DIFF_TIME2[k]
-            ccx2 = POLAR_DIFF_CCX2[k]
+            cc2 = POLAR_DIFF_CCX2[k] * 0.05f0
 
-            # Copy current row into temporary buffer
-            ws.T1h .= @view T1[:, k]
+            # Copy current row (ghosts included) into the temporary buffer
+            @simd for i in 1:xghost
+                T1h[i] = Tp[i, k]
+            end
 
             for _ in 1:time2
                 # Jacobi
                 @turbo for j in 1:xdim
-                    jm1v = jm1[j];
-                    jp1v = jp1[j]
-                    jm2v = jm2[j];
-                    jp2v = jp2[j]
-                    jm3v = jm3[j];
-                    jp3v = jp3[j]
+                    wm3 = wzp[j, k];   wm2 = wzp[j+1, k]; wm1 = wzp[j+2, k]
+                    wp1 = wzp[j+4, k]; wp2 = wzp[j+5, k]; wp3 = wzp[j+6, k]
+                    tm3 = T1h[j];      tm2 = T1h[j+1];    tm1 = T1h[j+2]
+                    t0 = T1h[j+3]
+                    tp1 = T1h[j+4];    tp2 = T1h[j+5];    tp3 = T1h[j+6]
 
-                    ws.dTxh[j] = ccx2 * 0.05f0 * (
-                        10.0f0 * (wz[jm1v, k] * (ws.T1h[jm1v] - ws.T1h[j]) +
-                                wz[jp1v, k] * (ws.T1h[jp1v] - ws.T1h[j])) +
-                        4.0f0 * (wz[jm2v, k] * (ws.T1h[jm2v] - ws.T1h[jm1v]) +
-                               wz[jm1v, k] * (ws.T1h[j] - ws.T1h[jm1v])) +
-                        4.0f0 * (wz[jp1v, k] * (ws.T1h[j] - ws.T1h[jp1v]) +
-                               wz[jp2v, k] * (ws.T1h[jp2v] - ws.T1h[jp1v])) +
-                        1.0f0 * (wz[jm3v, k] * (ws.T1h[jm3v] - ws.T1h[jm2v]) +
-                               wz[jm2v, k] * (ws.T1h[jm1v] - ws.T1h[jm2v])) +
-                        1.0f0 * (wz[jp2v, k] * (ws.T1h[jp1v] - ws.T1h[jp2v]) +
-                               wz[jp3v, k] * (ws.T1h[jp3v] - ws.T1h[jp2v]))
+                    dTxh[j] = cc2 * (
+                        10.0f0 * (wm1 * (tm1 - t0) + wp1 * (tp1 - t0)) +
+                        4.0f0 * (wm2 * (tm2 - tm1) + wm1 * (t0 - tm1)) +
+                        4.0f0 * (wp1 * (t0 - tp1) + wp2 * (tp2 - tp1)) +
+                        1.0f0 * (wm3 * (tm3 - tm2) + wm2 * (tm1 - tm2)) +
+                        1.0f0 * (wp2 * (tp1 - tp2) + wp3 * (tp3 - tp2))
                     )
                 end
                 @turbo for j in 1:xdim
-                    dq = ifelse(ws.dTxh[j] <= -ws.T1h[j], -0.9f0 * ws.T1h[j], ws.dTxh[j])
-                    ws.T1h[j] += dq
+                    t0 = T1h[j+3]
+                    dq = ifelse(dTxh[j] <= -t0, -0.9f0 * t0, dTxh[j])
+                    T1h[j+3] = t0 + dq
                 end
+                refresh_ghosts!(T1h)
             end
 
             # Add total change (scaled by outer wz) to output buffer
-            @views @. ws.dX_diff[:, k] += wz[:, k] * (ws.T1h - T1[:, k])
+            @turbo for i in 1:xdim
+                dX_diff[i, k] += wzp[i+nghost, k] * (T1h[i+nghost] - Tp[i+nghost, k])
+            end
         end
     end
 
@@ -150,9 +214,17 @@ function advection!(T1, h_scl, fields::ClimateFields, ws::CirculationWorkspace, 
         fill!(ws.dX_adv, 0.0f0)
         return nothing
     end
+    wz = _wz_for(h_scl, fields)
+    to_ghosted!(ws.X_work, T1)
+    to_ghosted!(ws.wz_ghost, wz)
+    _advection!(ws.X_work, ws.wz_ghost, fields, ws, timestate)
+    return nothing
+end
 
-    # Pre-zero the output buffer (we will accumulate into it)
-    fill!(ws.dX_adv, 0.0f0)
+# Core kernel. `Tp`/`wzp` are ghosted; the switch check has already run.
+function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateFields,
+                     ws::CirculationWorkspace, timestate)
+    dX_adv = ws.dX_adv
 
     # Extract 2D views for current time step
     vclim_p_t = @view fields.vclim_p[:, :, timestate.ityr]
@@ -160,126 +232,129 @@ function advection!(T1, h_scl, fields::ClimateFields, ws::CirculationWorkspace, 
     uclim_p_t = @view fields.uclim_p[:, :, timestate.ityr]
     uclim_m_t = @view fields.uclim_m[:, :, timestate.ityr]
 
-    # Topographic scaling (choose based on scale height)
-    wz = if h_scl == z_air
-        fields.wz_air
-    elseif h_scl == z_vapor
-        fields.wz_vapor
-    else
-        error("Invalid h_scl = $h_scl (must be z_air or z_vapor)")
-    end
-
     # Precomputed constants
-    dxlat = dxlat_grid
     ccy = ccy_adv
     ccx = ccx_adv
     is_polar = IS_POLAR
+
+    T1h = ws.T1h
+    dTxh = ws.dTxh
 
     @inbounds for k in 1:ydim
         # ----- Meridional (v) advection -----
         if k == 1          # North Pole
             @turbo for j in 1:xdim
                 v_p = vclim_p_t[j, k]
-                ws.dX_adv[j, k] += ccy * v_p * (
-                    wz[j, 2] * (T1[j, 1] - T1[j, 2]) +
-                    wz[j, 3] * (T1[j, 1] - T1[j, 3])
+                dX_adv[j, k] = ccy * v_p * (
+                    wzp[j+nghost, 2] * (Tp[j+nghost, 1] - Tp[j+nghost, 2]) +
+                    wzp[j+nghost, 3] * (Tp[j+nghost, 1] - Tp[j+nghost, 3])
                 ) / 3.0f0
             end
         elseif k == 2
             @turbo for j in 1:xdim
                 v_m = vclim_m_t[j, k]
                 v_p = vclim_p_t[j, k]
-                ws.dX_adv[j, k] += ccy * (
-                    -v_m * wz[j, 1] * (T1[j, 2] - T1[j, 1]) +
-                    v_p * (wz[j, 3] * (T1[j, 2] - T1[j, 3]) +
-                           wz[j, 4] * (T1[j, 2] - T1[j, 4])) / 3.0f0
+                dX_adv[j, k] = ccy * (
+                    -v_m * wzp[j+nghost, 1] * (Tp[j+nghost, 2] - Tp[j+nghost, 1]) +
+                    v_p * (wzp[j+nghost, 3] * (Tp[j+nghost, 2] - Tp[j+nghost, 3]) +
+                           wzp[j+nghost, 4] * (Tp[j+nghost, 2] - Tp[j+nghost, 4])) / 3.0f0
                 )
             end
         elseif k >= 3 && k <= ydim-2
+            km1, km2 = k-1, k-2
+            kp1, kp2 = k+1, k+2
             @turbo for j in 1:xdim
-                km1, km2 = k-1, k-2
-                kp1, kp2 = k+1, k+2
                 v_m = vclim_m_t[j, k]
                 v_p = vclim_p_t[j, k]
-                ws.dX_adv[j, k] += ccy * (
-                    -v_m * (wz[j, km1] * (T1[j, k] - T1[j, km1]) +
-                            wz[j, km2] * (T1[j, k] - T1[j, km2])) +
-                    v_p * (wz[j, kp1] * (T1[j, k] - T1[j, kp1]) +
-                           wz[j, kp2] * (T1[j, k] - T1[j, kp2]))
+                dX_adv[j, k] = ccy * (
+                    -v_m * (wzp[j+nghost, km1] * (Tp[j+nghost, k] - Tp[j+nghost, km1]) +
+                            wzp[j+nghost, km2] * (Tp[j+nghost, k] - Tp[j+nghost, km2])) +
+                    v_p * (wzp[j+nghost, kp1] * (Tp[j+nghost, k] - Tp[j+nghost, kp1]) +
+                           wzp[j+nghost, kp2] * (Tp[j+nghost, k] - Tp[j+nghost, kp2]))
                 ) / 3.0f0
             end
         elseif k == ydim-1
+            km1, km2 = k-1, k-2
+            kp1 = k+1
             @turbo for j in 1:xdim
-                km1, km2 = k-1, k-2
-                kp1 = k+1
                 v_m = vclim_m_t[j, k]
                 v_p = vclim_p_t[j, k]
-                ws.dX_adv[j, k] += ccy * (
-                    -v_m * (wz[j, km1] * (T1[j, k] - T1[j, km1]) +
-                            wz[j, km2] * (T1[j, k] - T1[j, km2])) / 3.0f0 +
-                    v_p * wz[j, kp1] * (T1[j, k] - T1[j, kp1])
+                dX_adv[j, k] = ccy * (
+                    -v_m * (wzp[j+nghost, km1] * (Tp[j+nghost, k] - Tp[j+nghost, km1]) +
+                            wzp[j+nghost, km2] * (Tp[j+nghost, k] - Tp[j+nghost, km2])) / 3.0f0 +
+                    v_p * wzp[j+nghost, kp1] * (Tp[j+nghost, k] - Tp[j+nghost, kp1])
                 )
             end
         else               # k == ydim (South Pole)
+            km1, km2 = k-1, k-2
             @turbo for j in 1:xdim
-                km1, km2 = k-1, k-2
                 v_m = vclim_m_t[j, k]
-                ws.dX_adv[j, k] += ccy * (
-                    -v_m * (wz[j, km1] * (T1[j, k] - T1[j, km1]) +
-                            wz[j, km2] * (T1[j, k] - T1[j, km2]))
+                dX_adv[j, k] = ccy * (
+                    -v_m * (wzp[j+nghost, km1] * (Tp[j+nghost, k] - Tp[j+nghost, km1]) +
+                            wzp[j+nghost, km2] * (Tp[j+nghost, k] - Tp[j+nghost, km2]))
                 ) / 3.0f0
             end
         end
 
         # ----- Zonal (u) advection -----
-        if !is_polar[k]   # mid‑latitudes, normal timestep
+        if !is_polar[k]   # mid-latitudes, normal timestep
+            cc = ccx[k]
             @turbo for j in 1:xdim
-                jm1, jp1 = lon_jm1[j], lon_jp1[j]
-                jm2, jp2 = lon_jm2[j], lon_jp2[j]
+                wm2 = wzp[j+1, k]; wm1 = wzp[j+2, k]
+                wp1 = wzp[j+4, k]; wp2 = wzp[j+5, k]
+                tm2 = Tp[j+1, k];  tm1 = Tp[j+2, k]
+                t0 = Tp[j+3, k]
+                tp1 = Tp[j+4, k];  tp2 = Tp[j+5, k]
                 u_m = uclim_m_t[j, k]
                 u_p = uclim_p_t[j, k]
-                ws.dX_adv[j, k] += ccx[k] * (
-                    -u_m * (wz[jm1, k] * (T1[j, k] - T1[jm1, k]) +
-                            wz[jm2, k] * (T1[j, k] - T1[jm2, k])) +
-                    u_p * (wz[jp1, k] * (T1[j, k] - T1[jp1, k]) +
-                           wz[jp2, k] * (T1[j, k] - T1[jp2, k]))
+                dX_adv[j, k] += cc * (
+                    -u_m * (wm1 * (t0 - tm1) + wm2 * (t0 - tm2)) +
+                    u_p * (wp1 * (t0 - tp1) + wp2 * (t0 - tp2))
                 ) / 3.0f0
             end
-        else # polar regions – sub‑timestepping
-            # Number of sub‑steps (CFL stability. Precomputed, depends only on k)
+        else # polar regions - sub-timestepping
+            # Number of sub-steps (CFL stability. Precomputed, depends only on k)
             time2 = POLAR_ADV_TIME2[k]
             ccx2 = POLAR_ADV_CCX2[k]
 
-            # Copy current row into temporary buffer
-            ws.T1h .= @view T1[:, k]
+            # Copy current row (ghosts included) into the temporary buffer
+            @simd for i in 1:xghost
+                T1h[i] = Tp[i, k]
+            end
 
             for _ in 1:time2
                 # Jacobi
                 @turbo for j in 1:xdim
-                    jm1, jp1 = lon_jm1[j], lon_jp1[j]
-                    jm2, jp2 = lon_jm2[j], lon_jp2[j]
-                    jm3, jp3 = lon_jm3[j], lon_jp3[j]
+                    wm3 = wzp[j, k];   wm2 = wzp[j+1, k]; wm1 = wzp[j+2, k]
+                    wp1 = wzp[j+4, k]; wp2 = wzp[j+5, k]; wp3 = wzp[j+6, k]
+                    tm3 = T1h[j];      tm2 = T1h[j+1];    tm1 = T1h[j+2]
+                    t0 = T1h[j+3]
+                    tp1 = T1h[j+4];    tp2 = T1h[j+5];    tp3 = T1h[j+6]
                     u_m = uclim_m_t[j, k]
                     u_p = uclim_p_t[j, k]
 
-                    ws.dTxh[j] = ccx2 * (
-                        -u_m * (10.0f0 * wz[jm1, k] * (ws.T1h[j] - ws.T1h[jm1]) +
-                                4.0f0 * wz[jm2, k] * (ws.T1h[jm1] - ws.T1h[jm2]) +
-                                1.0f0 * wz[jm3, k] * (ws.T1h[jm2] - ws.T1h[jm3])) +
-                        u_p * (10.0f0 * wz[jp1, k] * (ws.T1h[j] - ws.T1h[jp1]) +
-                               4.0f0 * wz[jp2, k] * (ws.T1h[jp1] - ws.T1h[jp2]) +
-                               1.0f0 * wz[jp3, k] * (ws.T1h[jp2] - ws.T1h[jp3]))
+                    dTxh[j] = ccx2 * (
+                        -u_m * (10.0f0 * wm1 * (t0 - tm1) +
+                                4.0f0 * wm2 * (tm1 - tm2) +
+                                1.0f0 * wm3 * (tm2 - tm3)) +
+                        u_p * (10.0f0 * wp1 * (t0 - tp1) +
+                               4.0f0 * wp2 * (tp1 - tp2) +
+                               1.0f0 * wp3 * (tp2 - tp3))
                     ) / 20.0f0
                 end
                 @turbo for j in 1:xdim
                     # Stability clamp (avoid negative water vapour)
-                    dq = ifelse(ws.dTxh[j] <= -ws.T1h[j], -0.9f0 * ws.T1h[j], ws.dTxh[j])
-                    ws.T1h[j] += dq
+                    t0 = T1h[j+3]
+                    dq = ifelse(dTxh[j] <= -t0, -0.9f0 * t0, dTxh[j])
+                    T1h[j+3] = t0 + dq
                 end
+                refresh_ghosts!(T1h)
             end
 
             # Add total change to the output buffer
-            @views @. ws.dX_adv[:, k] += ws.T1h - T1[:, k]
+            @turbo for i in 1:xdim
+                dX_adv[i, k] += T1h[i+nghost] - Tp[i+nghost, k]
+            end
         end
     end
 
@@ -308,28 +383,40 @@ function circulation!(X_in, h_scl, dX_out, fields::ClimateFields, ws::Circulatio
     do_adv_h = cfg.log_hadv && h_scl == z_air
     do_conv = cfg.log_conv && h_scl == z_vapor
 
-    copyto!(ws.X_work, X_in)
+    # `wz` is static for the whole run, so its ghosted copy is built once per
+    # call and reused across all `ntime` sub-steps.
+    wzp = ws.wz_ghost
+    to_ghosted!(wzp, _wz_for(h_scl, fields))
 
-    fill!(ws.dX_diff, 0.0f0)
-    fill!(ws.dX_adv, 0.0f0)
-    fill!(ws.dX_conv, 0.0f0)
+    Xp = ws.X_work
+    to_ghosted!(Xp, X_in)
+
+    dX_diff = ws.dX_diff
+    dX_adv = ws.dX_adv
+    dX_conv = ws.dX_conv
+    fill!(dX_diff, 0.0f0)
+    fill!(dX_adv, 0.0f0)
+    fill!(dX_conv, 0.0f0)
 
     for _tt in 1:ntime
-        do_diff_v && diffusion!(ws.X_work, h_scl, fields, ws, timestate)
-        do_diff_h && diffusion!(ws.X_work, h_scl, fields, ws, timestate)
-        do_adv_v && advection!(ws.X_work, h_scl, fields, ws, timestate, cfg)
-        do_adv_h && advection!(ws.X_work, h_scl, fields, ws, timestate, cfg)
-        do_conv && convergence!(ws.X_work, fields, timestate, ws)
+        (do_diff_v || do_diff_h) && _diffusion!(Xp, wzp, ws)
+        (do_adv_v || do_adv_h) && _advection!(Xp, wzp, fields, ws, timestate)
+        do_conv && _convergence!(Xp, fields, timestate, ws)
 
-        @turbo for j in 1:ydim
-            for i in 1:xdim
-                ws.X_work[i, j] += ws.dX_diff[i, j] + ws.dX_adv[i, j] + ws.dX_conv[i, j]
+        @inbounds for j in 1:ydim
+            @turbo for i in 1:xdim
+                Xp[i+nghost, j] += dX_diff[i, j] + dX_adv[i, j] + dX_conv[i, j]
             end
         end
+        refresh_ghosts!(Xp)
     end
 
     # Final difference
-    @. dX_out = ws.X_work - X_in
+    @inbounds for j in 1:ydim
+        @simd for i in 1:xdim
+            dX_out[i, j] = Xp[i+nghost, j] - X_in[i, j]
+        end
+    end
 
     return nothing
 end
