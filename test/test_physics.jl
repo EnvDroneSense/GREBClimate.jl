@@ -64,6 +64,16 @@ end
         @test isapprox(ws.dX_diff[i, k], dX_diff_ref[(i, k)]; atol=1e-3, rtol=1e-4)
     end
 
+    # The public API accepts Float64 arrays and views. Those miss `to_ghosted!`'s
+    # `Matrix{Float32}` memcpy fast path and take the generic fallback, which
+    # the snapshots above never reach. These values are exactly representable in
+    # Float32, so both paths must agree bit for bit.
+    dX_diff_f32 = copy(ws.dX_diff)
+    diffusion!(Float64.(T1), GREBClimate.z_air, fields, ws, ts)
+    @test ws.dX_diff == dX_diff_f32
+    diffusion!(view(T1, :, :), GREBClimate.z_air, fields, ws, ts)
+    @test ws.dX_diff == dX_diff_f32
+
     advection!(T1, GREBClimate.z_air, fields, ws, ts, cfg)
     dX_adv_ref = Dict(
         (1,1)=>99.99281072836801, (2,1)=>37.62423619149657, (3,1)=>6.428217314852662,
@@ -175,16 +185,8 @@ end
     @test isapprox(result.Q_lat_air[1, 1], -expected_dq_rain * GREBClimate.cq_latent * GREBClimate.r_qviwv; rtol = 1e-5)
 end
 
-@testset "SWradiation! is allocation-free" begin
-    fields = ClimateFields()
-    state = ModelState()
-    ts = TimeState(1, 1)
-    ws = CirculationWorkspace()
-    cfg = create_experiment_config(:full_model)
-    Ts = fill(290.0, GREBClimate.xdim, GREBClimate.ydim)
-    SWradiation!(Ts, fields, state, ts, cfg, ws)
-    @test @allocated(SWradiation!(Ts, fields, state, ts, cfg, ws)) <= 64
-end
+# The allocation budget for SWradiation! (and every other kernel) lives in
+# test_invariants.jl, alongside the return-type checks.
 
 @testset "log_hydro_dmc==false freezes humidity entirely (not just eva/rain)" begin
     # With log_hydro_dmc off, q must never move from its initial

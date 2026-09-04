@@ -1,8 +1,10 @@
 # GREB Climate Model - Julia Implementation
 
+[![CI](https://github.com/EnvDroneSense/GREBClimate.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/EnvDroneSense/GREBClimate.jl/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/github/EnvDroneSense/GREBClimate.jl/graph/badge.svg?token=CKFBW810SH)](https://codecov.io/github/EnvDroneSense/GREBClimate.jl)
+[![docs dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://EnvDroneSense.github.io/GREBClimate.jl/dev/)
 [![Julia](https://img.shields.io/badge/Julia-1.10+-9558B2?logo=julia)](https://julialang.org/)
 [![Pluto](https://img.shields.io/badge/Pluto-Interactive-purple)](https://github.com/fonsp/Pluto.jl)
-[![docs](https://img.shields.io/badge/docs-stable-blue.svg)](https://EnvDroneSense.github.io/GREBClimate.jl/)
 
 A high-performance Julia translation of the **Globally Resolved Energy Balance (GREB)** climate model, originally developed by Dietmar Dommenget and colleagues at Monash University.
 
@@ -463,6 +465,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Original GREB Model**: Dietmar Dommenget, Janine Flöter, Tobias Bayr, Christian Stassen (Monash University)
 - **Julia Translation and Optimization**: Thomas Struys (UGent)
+- **Julia Development Guidance and Initial Package Refactor**: Michiel Stock (UGent)
 - **Pluto.jl**: For the interactive notebook environment
 - **Julia Community**: For excellent scientific computing tools
 

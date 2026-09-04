@@ -121,13 +121,38 @@ const ccx_diff = Float32[κ * Δt_crcl / dxlat_grid[k]^2 for k in 1:ydim]
 const ccy_adv = Δt_crcl / dyy_grid / 2.0f0
 const ccx_adv = Float32[Δt_crcl / dxlat_grid[k] / 2.0f0 for k in 1:ydim]
 
-# ── periodic longitude neighbour indices ───────────────────────
-const lon_jm1 = Int32[mod1(i-1, xdim) for i in 1:xdim]
-const lon_jp1 = Int32[mod1(i+1, xdim) for i in 1:xdim]
-const lon_jm2 = Int32[mod1(i-2, xdim) for i in 1:xdim]
-const lon_jp2 = Int32[mod1(i+2, xdim) for i in 1:xdim]
-const lon_jm3 = Int32[mod1(i-3, xdim) for i in 1:xdim]
-const lon_jp3 = Int32[mod1(i+3, xdim) for i in 1:xdim]
+# ── periodic ghost cells (longitude) ─────────────────────────────
+"""
+    nghost
+
+*Periodic ghost cells* held at each end of the longitude axis by the
+circulation buffers, so wrap-around is a unit-stride read instead of a gather.
+
+A ghosted column stores `A[i, k]` at row `i + nghost`, with each end mirroring
+the other:
+
+    row    1 … 3  │  4 … 99         │  100 … 102
+    holds  94…96  │  1 … 96 (real)  │  1 … 3
+
+So `A[j-1, k]` is just `P[j+2, k]`. The `lon_jm1`..`lon_jp3` index arrays this
+replaced cost ~12 gather instructions per inner loop.
+
+`nghost` is the zonal stencils' reach, so it is 3 and they spell their offsets
+out literally (`j` … `j+6`); widening the stencil means widening both.
+
+Also called *halo cells* (the usual term in climate models) or *guard cells*.
+The literature covers the distributed-memory use, where ghosts cache a
+neighbouring MPI rank and are refreshed by a "halo exchange" - Kjolstad & Snir,
+"The Ghost Cell Pattern" (ParaPLoP 2010). Here there is one process and the
+neighbour is the opposite edge of the same array, so ghost cells buy
+vectorisable addressing, not avoided communication.
+"""
+const nghost = 3
+"Row count of a ghosted circulation buffer (`xdim + 2nghost`)."
+const xghost = xdim + 2 * nghost
+
+# More ghost cells than grid points would wrap past the opposite edge.
+@assert nghost <= xdim
 
 const ΔT_AIR_FACTOR = Δt / cap_air
 

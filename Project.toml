@@ -1,7 +1,7 @@
 name = "GREBClimate"
 uuid = "128c3379-415a-4bc6-90bd-d536e37a6aec"
 version = "1.0.0"
-authors = ["Thomas Struys", "Dietmar Dommenget and colleagues (original GREB)"]
+authors = ["Thomas Struys", "Michiel Stock", "Dietmar Dommenget and colleagues (original GREB)"]
 
 [deps]
 DataDeps = "124859b0-ceae-595e-8997-d05f6a7a8dfe"

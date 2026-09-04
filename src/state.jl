@@ -5,12 +5,14 @@ Pre-allocated buffers for diffusion, advection, and circulation calculations.
 Reused across all time steps to eliminate allocations.
 """
 Base.@kwdef mutable struct CirculationWorkspace
-    # Polar sub-stepping buffers.
-    T1h::Vector{Float32} = zeros(Float32, xdim)  # polar sub-stepping
+    # Polar sub-stepping buffers. `T1h` carries ghost cells (see `nghost`).
+    T1h::Vector{Float32} = zeros(Float32, xghost)  # polar sub-stepping (ghosted)
     dTxh::Vector{Float32} = zeros(Float32, xdim)  # polar increment (Jacobi scratch)
 
-    # Circulation work arrays
-    X_work::Matrix{Float32} = zeros(Float32, xdim, ydim)  # circulation work array
+    # Circulation work arrays. `X_work` and `wz_ghost` carry ghost cells
+    # (`xghost, ydim`) so the zonal stencils load neighbours contiguously.
+    X_work::Matrix{Float32} = zeros(Float32, xghost, ydim)  # circulation work array (ghosted)
+    wz_ghost::Matrix{Float32} = zeros(Float32, xghost, ydim)  # ghosted copy of wz_air/wz_vapor
     dX_diff::Matrix{Float32} = zeros(Float32, xdim, ydim)  # diffusion output
     dX_adv::Matrix{Float32} = zeros(Float32, xdim, ydim)  # advection output
     dX_conv::Matrix{Float32} = zeros(Float32, xdim, ydim)  # convection output

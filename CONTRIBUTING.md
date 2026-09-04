@@ -35,8 +35,9 @@ CI runs.
 julia --project=. -e 'using Pkg; Pkg.test()'
 ```
 
-The suite is split into two shards, balanced by measured runtime rather than
-file count. CI runs them as separate jobs; locally you can run one:
+The suite is split into two shards, grouped by measured runtime rather than
+file count and only roughly balanced. CI runs them as separate jobs; locally
+you can run one:
 
 ```bash
 GREB_TEST_SHARD=light julia --project=. -e 'using Pkg; Pkg.test()'
@@ -68,8 +69,9 @@ around that:
 - Fields are `Float32` throughout, on a fixed `xdim x ydim` grid.
 - Physics kernels write into pre-allocated `CirculationWorkspace` buffers
   instead of allocating. `test/test_invariants.jl` enforces a small byte
-  budget per kernel and checks that every kernel's return type is concrete -
-  a change that allocates per grid cell will fail it immediately.
+  budget per physics kernel and checks its return type is concrete - a change
+  that allocates per grid cell will fail it immediately. A new kernel must be
+  added to both tables in that file; an assertion there fails if you forget.
 - Configuration is passed explicitly. Nothing is held as module-global
   mutable state.
 
@@ -125,6 +127,6 @@ the right thing to cite for the model.
 The Julia package is the work of:
 
 - **Thomas Struys** (UGent) - Julia translation and optimization
-- **Michiel Stock** (UGent) - guidance + intial package reformat
+- **Michiel Stock** (UGent) - Julia development guidance, initial package refactor
 
 If you contribute, add yourself here.
