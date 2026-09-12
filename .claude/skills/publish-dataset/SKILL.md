@@ -114,5 +114,5 @@ container, or accept the URL check plus the constants test.
 
 - `tools/convert_greb_to_jld2.jl` — builds `greb_input_data/` from raw `.bin`.
   Pass `--all` only to inspect extra fields, never to build a release tree.
-- `.claude/notes/datadeps-context.md` — measured sizes, why `.tar.gz` and not
+- The ClimaModel vault, `03-findings/datadeps-context.md` — measured sizes, why `.tar.gz` and not
   `.tar.xz`, and the split-bundle option that was deliberately deferred.

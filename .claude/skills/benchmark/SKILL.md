@@ -13,10 +13,10 @@ all against the real dataset, post-JIT-warmup:
 | `year` (default) | Wall-clock time for a real 1-simulated-year `:full_model` control run. |
 | `stages` | Per-timestep breakdown: times each of `tendencies!`'s stages (`circulation!` for `Ta`/`q`, `SWradiation!`, `LWradiation!`, `hydro!`, `deep_ocean!`) individually and reports each one's share of the total. |
 | `threads` | Runs `year` in separate `-t N` subprocesses (thread count is fixed at Julia startup) and reports relative speedup vs. `-t 1`. |
-| `alloc` | Reports bytes allocated by one `tendencies!` call - a regression guard for the zero-allocation hot path. Currently **0 bytes**. |
+| `alloc` | Reports bytes allocated by one `tendencies!` call - a regression guard for the zero-allocation hot path. Budget is **256 bytes** (`benchmark/run_benchmarks.jl:205`, enforced in `test/test_invariants.jl:58`). |
 
 The model runs natively in `Float32` throughout (climatology, workspace
-buffers, model state - see `.claude/notes/performance.md` §2.3); current baseline
+buffers, model state - see the ClimaModel vault, `03-findings/performance.md` §2.3); current baseline
 on this machine is **~0.6-0.75s/simulated year at `-t 2`** (down from the
 pre-`Float32` ~1.1-1.2s/year); a 2026-08-21 run measured 0.63s mean
 (0.56-0.71s across 3 reps). Treat any reading far outside that band as
@@ -78,8 +78,9 @@ low-variance choice.
 3. If comparing thread counts, prefer `threads` over running `year` manually
    at each count - it does exactly that, back-to-back, and prints the
    speedup table directly. **Threading recommendation (re-reviewed
-   2026-08-13, post-`Float32` — see `.claude/notes/performance.md` §2.11): `-t 2`
-   is the reliable default.** Circulation is now ~98% of per-timestep cost
+   2026-08-13, post-`Float32` — see the ClimaModel vault, `03-findings/performance.md` §2.11): `-t 2`
+   is the reliable default.** Circulation was ~98% of per-timestep cost pre-ghost-cell;
+   after `865ae01`'s periodic ghost cells it is ~93% and has not been re-measured since
    (`Float32` sped up the other stages proportionally more than
    circulation), so the third lane `-t 3` used to justify is nearly free -
    `-t 2` already captures almost all the real parallelism via work-stealing
@@ -117,7 +118,7 @@ low-variance choice.
   `@turbo` loop with neighbor-index lookups (`circulation.jl`'s
   `diffusion!`/`advection!`), a wall-clock number alone can hide a width
   mismatch (e.g. `Float32` data gathered through `Int64` indices - see
-  `.claude/notes/performance.md` §2.3's `lon_jm1`/etc. `Int32` fix). Check with
+  the ClimaModel vault, `03-findings/performance.md` §2.3's `lon_jm1`/etc. `Int32` fix). Check with
   `InteractiveUtils.code_native` and grep the output for `"gather"` and for
   `cvtss2sd`/`cvtsd2ss`-style conversions - a rising gather count or any
   conversion instruction in a loop that shouldn't have one is a real signal
@@ -128,10 +129,10 @@ low-variance choice.
   script) on just that function - with realistic, not synthetic-zero, input
   data - gives a cleaner signal than `year`'s whole-model number, which
   mixes in dataset loading and every other stage's noise. This is how every
-  number in `.claude/notes/performance.md` §2.3/§2.15 was actually produced before
+  number in the ClimaModel vault, `03-findings/performance.md` §2.3/§2.15 was actually produced before
   being confirmed against the real `year`/`stages` numbers here.
 - **Threaded-vs-serial equivalence** is covered by a test, not just by
-  benchmarking: `test/runtests.jl`'s "threaded circulation matches serial"
+  benchmarking: `test/test_threading.jl`'s "threaded circulation matches serial"
   testset spawns `-t 1` and `-t 2` subprocesses and asserts bit-identical
   monthly means. Run the heavy shard after touching `tendencies!`'s
   parallel branch or either `circulation!` call. Note `Pkg.test()` alone is
@@ -139,6 +140,6 @@ low-variance choice.
   `Threads.@spawn` path locally; CI sets `JULIA_NUM_THREADS=2` as well.
 - **Numeric regression alongside any timing change**: a faster wrong answer
   is not a win. Pair any timing comparison with a correctness check -
-  `test/runtests.jl`'s golden-regression test, or a direct diff against a
+  `test/test_golden.jl`'s golden-regression test, or a direct diff against a
   saved reference run - especially for anything touching numerical
   precision (`Float32` conversions, reassociated arithmetic).

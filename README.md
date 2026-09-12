@@ -395,8 +395,9 @@ Not committed, but expected at runtime or used by maintainers (all gitignored):
 ```
 greb_input_data/                # the .jld2 dataset the model reads (~439 MB, auto-downloaded)
 Data/                           # raw GREB .bin inputs, only to regenerate the above (~581 MB)
-.claude/notes/                  # maintainers' working notes
 ```
+
+Maintainers' working notes live in the separate ClimaModel Obsidian vault, not in this repo.
 
 ## 🔬 Key Model Components
 
