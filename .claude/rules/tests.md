@@ -6,11 +6,11 @@ paths: ["test/**/*.jl"]
 `names(GREBClimate)` — only *exported* `!`-kernels are ever picked up. An
 unexported kernel (e.g. `_diffusion!`, `_advection!`) is invisible to the
 guard directly; it is only covered because the exported wrapper that calls it
-(`diffusion!`, `advection!`) is in the allocation table at `L48-57`. A new
+(`diffusion!`, `advection!`) is in the allocation table at `L48-59`. A new
 unexported kernel with no exported caller would silently never be checked —
 this asymmetry is easy to get wrong.
 
-The allocation table (`L48-57`) is guarded by an equality assertion
+The allocation table (`L48-59`) is guarded by an equality assertion
 (`L73`); the return-type `signatures` table (`L92-102`) has **no** such
 assertion — adding a new kernel there is convention, not machine-checked.
 

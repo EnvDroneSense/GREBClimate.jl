@@ -15,9 +15,6 @@ was ~98% of per-timestep cost; it is now ~93% after the ghost-cell change
 and has not been re-measured since — treat `-t 2` as the current
 recommendation, not a settled conclusion.
 
-Benchmarks run under `--project=.` (no `benchmark/Project.toml`;
-`benchmark/Manifest.toml` is a gitignored leftover, not an environment).
-
 Never record wall-clock test timings as if they were benchmark results.
 Assertion counts from the test suite are stable across runs; timings from
 this harness are not — don't conflate the two kinds of number.
