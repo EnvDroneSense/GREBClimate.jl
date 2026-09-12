@@ -81,8 +81,9 @@ Benchmarks:
 julia --project=. -t 2 benchmark/run_benchmarks.jl year
 ```
 
-Two threads, not three: circulation is ~98% of per-timestep cost and there is
-no third lane of work.
+Two threads, not three: circulation was ~98% of per-timestep cost pre-ghost-cell;
+after `865ae01`'s periodic ghost cells it is ~93% and has not been re-measured
+since. Either way there is no third lane of reliable work.
 
 ## Documentation
 

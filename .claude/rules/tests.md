@@ -14,7 +14,7 @@ The allocation table (`L48-59`) is guarded by an equality assertion
 (`L73`); the return-type `signatures` table (`L92-102`) has **no** such
 assertion — adding a new kernel there is convention, not machine-checked.
 
-`Pkg.test()` forces `--check-bounds=yes` (see `test_threading.jl:24-26`).
+`Pkg.test()` forces `--check-bounds=yes` (see `test_threading.jl:25-27`).
 This is deliberate, not overhead to shave off: the code indexes ghost-cell
 buffers by hand under `@inbounds`/`@turbo`, exactly where bounds checking
 earns its cost. Do not disable or "optimize" it away.

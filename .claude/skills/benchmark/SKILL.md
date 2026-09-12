@@ -62,11 +62,11 @@ low-variance choice.
      Check with `julia --project -e 'using Pkg; Pkg.precompile()'` - if it
      recompiles `GREB` (not just prints the manifest-resolution warning),
      re-run the benchmark afterward.
-   - **Post-restart background load**: right after a reboot, `OneDrive.exe`,
-     `OneDrive.Sync.Service.exe`, and `SearchIndexer.exe` (this repo lives in
-     a OneDrive-synced folder) contend for disk/CPU for a couple of minutes.
-     Check with `tasklist | grep -i -E "onedrive|searchindexer"` and, if
-     present and the machine was recently restarted, wait ~1-2 min and re-run.
+   - **Post-restart background load**: right after a reboot, indexing and
+     other Windows background services (e.g. `SearchIndexer.exe`) can contend
+     for disk/CPU for a couple of minutes. Check with
+     `tasklist | grep -i searchindexer` and, if present and the machine was
+     recently restarted, wait ~1-2 min and re-run.
    - General wall-clock noise on this shared/dev machine is real even without
      either cause above - a ~50-150ms swing across repeated `year` runs is
      normal at the current ~0.7s baseline (proportionally similar to the
@@ -100,7 +100,7 @@ low-variance choice.
    `-t 2`+ and average several sweeps before calling anything a regression. Don't take one
    `threads` run as settling a `-t 2` vs `-t 3` question either way -
    `-t 3`/`-t 4` are the ones sensitive enough to background load
-   (OneDrive/SearchIndexer, see below) to flip either direction; run it a
+   (SearchIndexer and similar, see below) to flip either direction; run it a
    few times before concluding a real regression or improvement at those
    counts specifically. `-t 4`+ has no reliable reason to help further on
    this grid size regardless. Compare *relative* speedup, not just absolute
@@ -134,7 +134,7 @@ low-variance choice.
 - **Threaded-vs-serial equivalence** is covered by a test, not just by
   benchmarking: `test/test_threading.jl`'s "threaded circulation matches serial"
   testset spawns `-t 1` and `-t 2` subprocesses and asserts bit-identical
-  monthly means. Run the heavy shard after touching `tendencies!`'s
+  monthly means. Run the light shard after touching `tendencies!`'s
   parallel branch or either `circulation!` call. Note `Pkg.test()` alone is
   single-threaded, so that subprocess pair is the only thing exercising the
   `Threads.@spawn` path locally; CI sets `JULIA_NUM_THREADS=2` as well.
