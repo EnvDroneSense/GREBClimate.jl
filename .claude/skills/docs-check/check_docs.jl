@@ -125,7 +125,7 @@ let datadir = joinpath(ROOT, "greb_input_data")
         if isempty(dead)
             ok("all .jld2 files are referenced")
         else
-            println("  NOTE  $(length(dead)) unreferenced file(s) - see .claude/notes/data-distribution.md")
+            println("  NOTE  $(length(dead)) unreferenced file(s) - see the ClimaModel vault, 03-findings/data-distribution.md")
             foreach(f -> println("          $f"), sort(dead))
         end
     end
