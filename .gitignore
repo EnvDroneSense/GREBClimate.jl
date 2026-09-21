@@ -22,14 +22,14 @@
 # as GitHub release assets rather than committed
 /greb_input_data-*.tar.gz
 
-# Agent working notes - local development scratch, not part of the package
-/.claude/notes/
-
 # Local agent guidance - environment quirks and repo conventions, not shipped
 /CLAUDE.md
 # roborev
 /.roborev/
 /.roborev.toml
 
-# Local Claude Code settings (machine-specific paths)
-/.claude/settings.local.json
+# Local Claude Code settings
+/.claude
+
+# viz demo output
+/demo_out/

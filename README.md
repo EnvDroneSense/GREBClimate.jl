@@ -8,7 +8,7 @@
 
 A high-performance Julia translation of the **Globally Resolved Energy Balance (GREB)** climate model, originally developed by Dietmar Dommenget and colleagues at Monash University.
 
-GREBClimate is a **Julia package**: you call it from a script or the REPL, and nothing is held as module-global state. An interactive [Pluto.jl](https://github.com/fonsp/Pluto.jl) notebook ships alongside it (`notebooks/GREB_explorer.jl`) for widget-driven exploration and process-isolation decomposition experiments, but it is one front-end onto the package rather than the model itself.
+GREBClimate is a **Julia package**: you call it from a script or the REPL, and nothing is held as module-global state. An interactive [Pluto.jl](https://github.com/fonsp/Pluto.jl) notebook (`notebooks/GREB_explorer.jl`) and a plotting toolbox (`viz/`) ship alongside it; both are front-ends onto the package, with their own environment.
 
 ---
 > **Repository layout:** GREB is now organized as a standard Julia package,
@@ -17,7 +17,7 @@ GREBClimate is a **Julia package**: you call it from a script or the REPL, and n
 > topical files - see `src/GREBClimate.jl` for the include order), tests in
 > `test/`, a [Documenter.jl](https://EnvDroneSense.github.io/GREBClimate.jl/)
 > site in `docs/`, a plain-Julia driver in `examples/run_greb.jl`, and the
-> original interactive Pluto notebook - unchanged - in `notebooks/GREB_explorer.jl`.
+> interactive explorer notebook in `notebooks/GREB_explorer.jl`.
 > See [Project Structure](#project-structure) for the full layout.
 >
 > ```julia
@@ -67,7 +67,7 @@ This implementation has been translated from Fortran90 to Julia with a focus on:
 
 - 🌍 Global grid resolution: 96×48 (longitude × latitude)
 - ⏱️ 12-hour main time steps with 30-minute sub-steps for circulation
-- 📊 Real-time visualization of climate variables
+- 📊 Plotting toolbox (`viz/`) and an interactive Pluto explorer for maps, time series, seasonal cycles, Hovmöller diagrams and animations
 - 🔬 Support for multiple climate datasets (NCEP, ERA-Interim)
 - 🌡️ IPCC climate scenarios - all four RCPs and five SSPs are implemented (`:rcp26`/`:rcp45`/`:rcp60`/`:rcp85`, `:ssp119`/`:ssp126`/`:ssp245`/`:ssp460`/`:ssp585`), plus a historical CO2 (1850–2017) hindcast (`:historical_co2`) and a user-supplied CO2 trajectory (`:custom_co2`)
 - 🧩 "Deconstruct" experiments (`:decon_mean_climate`, `:decon_2xco2`) - toggle individual mean-climate/2×CO₂-response feedback processes on or off via `log_*_dmc`/`log_*_drsp` keywords passed to `create_experiment_config`
@@ -107,8 +107,8 @@ This installs all dependencies from `Project.toml`:
 | `LoopVectorization` | SIMD performance |
 | `PrecompileTools` | Precompiles hot kernels at build time (faster first run) |
 
-The Pluto notebook environment (`notebooks/`) separately depends on `PlutoUI`
-for its interactive controls. The [Documenter.jl](https://EnvDroneSense.github.io/GREBClimate.jl/)
+The notebook and the `viz/` plotting toolbox share the `viz/` environment
+(Plots, Pluto, PlutoUI). The [Documenter.jl](https://EnvDroneSense.github.io/GREBClimate.jl/)
 site under `docs/` has its own environment too.
 
 ### Launch Pluto (optional)
@@ -116,12 +116,11 @@ site under `docs/` has its own environment too.
 The interactive notebook is one way to run the model - see
 [Running the Model](#running-the-model) below for the plain-Julia path.
 
-```julia
-using Pluto
-Pluto.run()
+```bash
+julia notebooks/launch_pluto.jl
 ```
 
-Open `GREB_explorer.jl` from the Pluto interface.
+This activates the `viz/` environment and opens `notebooks/GREB_explorer.jl`.
 
 ## 📂 Input Data
 
@@ -322,8 +321,10 @@ result = greb_model!(run, cfg; jld2_dir=jld2_dir, fields=fields)
 ```
 
 This runs, in order: an optional flux-correction spin-up (nudges toward
-climatology), a control run at fixed CO₂, and a scenario run under
-time-varying forcing (e.g. a CO₂ ramp).
+climatology), a control run at fixed CO₂, and a scenario run under the
+experiment's forcing (e.g. a CO₂ doubling or ramp). The control and spin-up
+run at `cfg.co2_concentration` (340 ppm; 280 for the IPCC scenarios); the
+experiment sets only the scenario's CO₂.
 
 ### 4. Access Results
 
@@ -335,27 +336,28 @@ result.scnr    # Vector{MonthlyRecord} (scenario)
 Each `MonthlyRecord` is a `NamedTuple` of `(xdim, ydim)` `Matrix{Float32}` fields:
 `Ts, Ta, To, q, albedo, ice, precip, evap, qcrcl, sw, lw, qlat, qsens`
 
+`result.ctrl` is in absolute units. `result.scnr` is an **anomaly**: each month
+minus the same calendar month of the control's final year. The exceptions are
+the orbital experiments (`:obliquity`, `:eccentricity`, `:earth_sun_distance`)
+and runs with `ctrl=0`, whose scenario stays absolute.
+
 See the [Tutorial](https://EnvDroneSense.github.io/GREBClimate.jl/tutorial/) or
 [`examples/run_greb.jl`](examples/run_greb.jl) for the full runnable version
 of the above, including a global-mean summary and an optional plot.
 
 ### Or, interactively
 
-The Pluto notebook (`notebooks/GREB_explorer.jl`) exposes the same options as
-widgets instead of code:
+The Pluto notebook (`notebooks/GREB_explorer.jl`) runs any preset experiment
+and plots it with the `viz/` toolbox: maps, time series, seasonal cycles,
+Hovmöller diagrams and an animated map. From a script:
 
-| Control | Description |
-|:--------|:------------|
-| **Experiment** | Preset experiments (2×CO₂, El Niño, RCP8.5, etc.) |
-| **Configuration Preset** | Full physics, no feedbacks, MSCM, custom |
-| **Mean Climate Switches** | Toggle clouds, vapor, ice, circulation, etc. |
-| **CO₂ Response Switches** | Process-specific response toggles |
-| **Circulation Components** | Diffusion, advection, convergence |
-| **Hydrology Parameters** | Rain/EVA modes, climatology dataset |
-| **Run Duration** | Flux correction, control, and scenario years |
+```julia
+include("viz/GREBViz.jl"); using .GREBViz   # with --project=viz
+plot_map(result; var=:Ts, fields=fields)
+plot_timeseries(result; annual=true)
+```
 
-Toggle the **Execute Model** checkbox to run; results land in `last_run`
-(same `.ctrl`/`.scnr` shape as above).
+`julia --project=viz viz/demo.jl` saves every plot to PNG.
 
 ## 📁 Project Structure
 
@@ -379,9 +381,9 @@ GREBClimate.jl/
 ├── docs/                       # Documenter.jl site (index, tutorial, switches, API)
 ├── examples/run_greb.jl        # plain-Julia driver (no Pluto) - start here
 ├── notebooks/
-│   ├── GREB_explorer.jl        # interactive Pluto notebook (own Project.toml)
-│   ├── PultoUI.jl              # work-in-progress UI experiments - not wired up
-│   └── launch_pluto.jl         # convenience launcher
+│   ├── GREB_explorer.jl        # interactive Pluto notebook (uses the viz/ environment)
+│   └── launch_pluto.jl         # launcher: activates viz/ and opens the notebook
+├── viz/                        # plotting toolbox (own Project.toml): GREBViz.jl, demo.jl, test.jl
 ├── tools/
 │   ├── convert_greb_to_jld2.jl  # raw .bin -> JLD2 converter (maintainers only)
 │   └── package_dataset.jl       # build the published dataset archive + SHA256
@@ -423,10 +425,10 @@ Maintainers' working notes live in the separate ClimaModel Obsidian vault, not i
 
 ### 🐛 Reporting Issues
 
-If you encounter these or other problems:
+If you run into a problem:
 1. Check that all input data files are correctly formatted and located
 2. Verify Julia and package versions match requirements
-3. Try restarting the Pluto notebook
+3. If the notebook misbehaves, restart it with `julia notebooks/launch_pluto.jl`
 4. Open an issue on GitHub with:
    - Julia version (`versioninfo()`)
    - Error messages or unexpected behavior description

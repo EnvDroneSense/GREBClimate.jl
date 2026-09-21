@@ -95,15 +95,15 @@ Base.@kwdef struct RunSpec
 end
 
 # Static PhysicsConfig overrides per experiment. An empty NamedTuple means the
-# experiment needs nothing beyond `experiment = sym`: `forcing` sets its CO₂
-# per timestep, and `co2_concentration` is deliberately left at the default
-# because it seeds the *control* run's CO₂ (see `init_model!`).
+# experiment needs nothing beyond `experiment = sym`. None sets
+# `co2_concentration`: it seeds the control run (see `init_model!`), and
+# `forcing` sets the scenario CO₂.
 const _EXPERIMENT_OVERRIDES = Dict{Symbol,NamedTuple}(
     :full_model             => (;),
     :constant_topo          => (log_topo_drsp = false,),
     :a1b_scenario           => (;),
-    :co2_double             => (co2_concentration = 680.0f0,),
-    :co2_quadruple          => (co2_concentration = 1360.0f0,),
+    :co2_double             => (;),
+    :co2_quadruple          => (;),
     :co2_10x                => (;),
     :co2_half               => (;),
     :co2_zero               => (;),
@@ -111,7 +111,7 @@ const _EXPERIMENT_OVERRIDES = Dict{Symbol,NamedTuple}(
     :co2_step               => (;),
     :solar_plus27           => (;),
     :solar_cycle_11yr       => (;),
-    :paleo_231kyr           => (co2_concentration = 200.0f0,),
+    :paleo_231kyr           => (;),
     :paleo_solar_modern_co2 => (;),
     :modern_solar_paleo_co2 => (;),
     :obliquity              => (;),
@@ -165,10 +165,9 @@ warns and is ignored, rather than being silently dropped. `co2_path` applies
 only to `:custom_co2`, `orbital_index` to the paleo/orbital experiments, and
 `earth_sun_distance_pct` to `:earth_sun_distance`.
 
-Only `:constant_topo`, `:co2_double`, `:co2_quadruple`, `:paleo_231kyr` and
-the three forced-boundary experiments carry a static override; every other
-entry is `experiment = sym` alone, because [`forcing`](@ref) sets the
-scenario CO₂ per timestep and `co2_concentration` seeds the *control* run.
+Only `:constant_topo` and the three forced-boundary experiments carry a
+static override. `co2_concentration` seeds the *control* run; [`forcing`](@ref)
+sets the scenario CO₂ per timestep.
 
 # Experiments
 - `:full_model` - All processes active (default)
@@ -202,8 +201,8 @@ scenario CO₂ per timestep and `co2_concentration` seeds the *control* run.
 ```jldoctest
 julia> cfg = create_experiment_config(:co2_double);
 
-julia> cfg.experiment, cfg.co2_concentration
-(:co2_double, 680.0f0)
+julia> cfg.experiment, cfg.co2_concentration   # control CO₂; `forcing` doubles it
+(:co2_double, 340.0f0)
 
 julia> create_experiment_config(:constant_topo).log_topo_drsp
 false
@@ -231,7 +230,7 @@ function create_experiment_config(experiment::Symbol; co2_path::AbstractString="
             log_vdif=on(log_vdif), log_vadv=on(log_vadv))
 
     elseif experiment === :decon_2xco2
-        return PhysicsConfig(experiment=:decon_2xco2, co2_concentration=680.0f0,
+        return PhysicsConfig(experiment=:decon_2xco2,
             log_topo_drsp=on(log_topo_drsp), log_clouds_drsp=on(log_clouds_drsp),
             log_humid_drsp=on(log_humid_drsp), log_ocean_drsp=on(log_ocean_drsp),
             log_hydro_drsp=on(log_hydro_drsp),

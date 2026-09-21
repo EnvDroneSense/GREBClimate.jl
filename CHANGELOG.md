@@ -15,6 +15,12 @@ maintainers' working notes rather than in this file.
   characters).
 
 ### Added
+- **Maps through time in `viz/` and the explorer notebook.** `viz/animation.jl`
+  adds `evolution`/`evolution_frame`/`evolution_gif`: one frame per month or per
+  year, control and scenario side by side, on colour scales fixed across every
+  frame (anomalies centred on zero, clipped at the 99th percentile of |value|).
+  The notebook's new section 5 scrubs with a slider, plays with a clock, and
+  exports the animation as a downloadable GIF.
 - **Package-hygiene and kernel-invariant tests.** `test/test_aqua.jl` runs
   [Aqua.jl](https://github.com/JuliaTesting/Aqua.jl) (stale deps, missing
   compat entries, method ambiguities, type piracy, unbound type parameters);
@@ -88,6 +94,11 @@ maintainers' working notes rather than in this file.
   array to the wrong field.
 
 ### Removed
+- `notebooks/PultoUI.jl` (a copy of PlutoUI's tutorial) and the unused
+  `notebooks/Project.toml`.
+- `viz/`: the plot registry (`render`, `numbers`, `register!`, `Run`,
+  `greb_runs`), the difference map, zonal mean, regional means and
+  `to_absolute`.
 - **The `:a1b_enhanced` experiment.** Its CO₂ ramp was byte-identical to
   `:a1b_scenario`'s; use that instead.
 - `ModelState`'s ten annual-mean accumulator fields (`Tamn`, `Tomn`, `qmn`,
@@ -110,6 +121,17 @@ maintainers' working notes rather than in this file.
   with a stray offset on the API page).
 
 ### Fixed
+- **`:co2_double`, `:co2_quadruple`, `:paleo_231kyr` and `:decon_2xco2` showed
+  no climate response.** Their presets set `co2_concentration`, which seeds the
+  control run, to the scenario CO₂, so both runs used the same CO₂. The control
+  now stays at 340 ppm and `forcing` sets the scenario CO₂. Results for these
+  four experiments change.
+- `viz/`: an absolute scenario (orbital experiments, or `ctrl=0`) was labelled
+  an anomaly. The kind is now read from the data.
+- `viz/`: `coastlines!` drew the outline as a contour of `z_topo`, which a heatmap
+  with fixed colour limits excluding 0 m (any absolute temperature map) clipped
+  away without error. It now draws the land/ocean cell edges as plain lines.
+  The explorer notebook also showed a literal `&nbsp;` between controls.
 - `seaice!` returned `Union{Nothing,Matrix{Float32}}`: its early exit gave
   `nothing` while its last expression was an `@.` broadcast evaluating to
   `cap_surf`. No caller used the value; both paths now `return nothing`, so
@@ -182,6 +204,15 @@ recorded in the maintainers' working notes.
   a single `flux_corrections.jld2` - ~35% faster to load, no size penalty.
 
 ### Changed
+- **`viz/` cut to basic plots as plain functions:** `plot_map`,
+  `plot_timeseries`, `plot_seasonal`, `plot_hovmoller` and `evolution` take a
+  `greb_model!` result (control and scenario as separate panels) or a record
+  vector. Anomaly maps use a diverging scale. The explorer notebook is reduced
+  to a run, a variable picker, the four plots and the animation. Adds
+  `viz/test.jl`; `viz/demo.jl` now writes to `<tempdir>/greb_viz_demo`. The demo
+  and notebook run a 3-year flux-correction spin-up (`flux=3`, the Fortran
+  default); with `flux=0` the control drifted and the scenario anomaly started
+  several K below zero.
 - The dataset shrank from 580 MB / 49 files to **439 MB / 39 files**: 11 files
   that no code reads were removed, mostly CMIP5 `.new` variants of fields the
   model reads in their non-`.new` form. The official MSCM Fortran GREB opens

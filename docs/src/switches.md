@@ -81,7 +81,7 @@ contribution to the *change* under a CO₂ doubling - isolating each
 process's role in climate sensitivity, since feedback strength is
 mean-state dependent and a fair "no-feedback" test must not also change the
 climate the feedback acts on (MSCM §2.1–2.2). `:decon_2xco2` always applies
-the CO₂ doubling itself as the forcing (`co2_concentration = 680.0`); there
+the CO₂ doubling itself as the scenario forcing (680 ppm against a 340 ppm control); there
 is no `log_co2_drsp` because the response experiments' entire purpose is to
 measure feedbacks *to* that forcing, not to disable it.
 
@@ -178,7 +178,7 @@ Scenario parameters rather than physics switches - set via
 | Field | Type | Default | Purpose |
 |:------|:-----|:--------|:--------|
 | `experiment` | `Symbol` | `:full_model` | Selects the experiment branch - see [Experiment Presets](#experiment-presets) below |
-| `co2_concentration` | `Float64` | `340.0` | Static CO₂ (ppm) for experiments without a time-varying scenario table |
+| `co2_concentration` | `Float32` | `340.0` | Control-run CO₂ (ppm), and the scenario CO₂ of `:full_model` and `:decon_mean_climate`; `forcing` sets every other experiment's scenario CO₂ |
 | `orbital_index` | `Int` | `0` | Row index into the `solar_scenarios` table for `:obliquity`/`:eccentricity` |
 | `earth_sun_distance_pct` | `Float64` | `0.0` | Percent change in orbital radius for `:earth_sun_distance` |
 | `co2_scenario` | `Dict{Int,Float64}` | `Dict()` | Year→ppm lookup, auto-populated for IPCC RCP/SSP/historical/custom-CO2 experiments |
@@ -196,17 +196,17 @@ What each `create_experiment_config` preset changes relative to `:full_model`:
 |:-------|:-------------------|
 | `:full_model` | Nothing - the baseline |
 | `:constant_topo` | `log_topo_drsp = false` |
-| `:co2_double` | `co2_concentration = 680.0` |
-| `:co2_quadruple` | `co2_concentration = 1360.0` |
+| `:co2_double` | Scenario at 680 ppm (control stays at 340) |
+| `:co2_quadruple` | Scenario at 1360 ppm (control stays at 340) |
 | `:solar_plus27` | Solar constant +27 W/m² |
 | `:elnino` / `:lanina` | The three `log_*_ext` switches set `true`; adds/subtracts ERA-Interim ENSO anomalies |
-| `:paleo_231kyr` | `co2_concentration = 200.0`; paleo solar-forcing table |
+| `:paleo_231kyr` | Scenario at 200 ppm with the paleo solar-forcing table (control stays at 340) |
 | `:rcp85` | `log_*_ext` switches `true`; loads CMIP5 RCP8.5 anomaly fields |
 | `:rcp26` / `:rcp45` / `:rcp60` / `:ssp119` / `:ssp126` / `:ssp245` / `:ssp460` / `:ssp585` | No switches change; loads a year→CO2 lookup table |
 | `:historical_co2` | Year counter starts at 1850; loads the observed CO₂ record |
 | `:custom_co2` | `custom_co2_path` set from the `co2_path` keyword |
 | `:decon_mean_climate` | Exposes `log_clouds_dmc`, `log_ocean_dmc`, `log_atmos_dmc`, `log_co2_dmc`, `log_hydro_dmc`, `log_qflux_dmc`, `log_ice`, `log_hdif`, `log_hadv`, `log_vdif`, `log_vadv` as keywords (all default `true`, i.e. behaves like `:full_model` unless overridden) |
-| `:decon_2xco2` | `co2_concentration = 680.0`; exposes `log_topo_drsp`, `log_clouds_drsp`, `log_humid_drsp`, `log_ocean_drsp`, `log_hydro_drsp`, `log_ice`, `log_hdif`, `log_hadv`, `log_vdif`, `log_vadv` as keywords |
+| `:decon_2xco2` | Scenario at 680 ppm (control stays at 340); exposes `log_topo_drsp`, `log_clouds_drsp`, `log_humid_drsp`, `log_ocean_drsp`, `log_hydro_drsp`, `log_ice`, `log_hdif`, `log_hadv`, `log_vdif`, `log_vadv` as keywords |
 
 ### Further experiments
 
