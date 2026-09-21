@@ -12,6 +12,37 @@ cd GREBClimate.jl
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
 
+## Project structure
+
+```
+GREBClimate.jl/
+├── src/                        # the package (module GREBClimate)
+│   ├── GREBClimate.jl          # module shell + include order
+│   ├── constants.jl            # grid/physical constants
+│   ├── config.jl               # PhysicsConfig, RunSpec, experiment presets
+│   ├── state.jl                # ClimateFields, ModelState, workspaces
+│   ├── data.jl                 # greb_data_dir(): dataset location + DataDep
+│   ├── io.jl                   # JLD2 loaders
+│   ├── physics/                # radiation.jl, hydrology.jl, ocean.jl
+│   ├── circulation.jl          # diffusion/advection/convergence
+│   ├── tendencies.jl           # per-timestep physics pipeline, forcing()
+│   ├── output.jl               # diagnostics!/output!/time_loop!
+│   ├── postprocess.jl          # monthly climatology/anomalies
+│   └── model.jl                # init_model!/qflux_correction!/greb_model!
+├── test/                       # one file per subject; runtests.jl lists them
+├── benchmark/run_benchmarks.jl # timing/allocation suite
+├── docs/                       # Documenter site
+├── examples/run_greb.jl        # plain-Julia driver
+├── notebooks/                  # Pluto explorer + launcher (uses the viz/ environment)
+├── viz/                        # plotting toolbox, own Project.toml
+├── tools/                      # dataset converter and packager (maintainers)
+├── DATA_README.md              # raw .bin input inventory (maintainers)
+└── CHANGELOG.md
+```
+
+`greb_input_data/` (the dataset) and `Data/` (raw `.bin` inputs) are expected
+at runtime or by maintainers but gitignored.
+
 ## Input data
 
 The package needs the GREB input climatology (about 353 MB) to run the model.
@@ -75,15 +106,15 @@ around that:
 - Configuration is passed explicitly. Nothing is held as module-global
   mutable state.
 
-Benchmarks:
+**Benchmarks:**
 
 ```bash
 julia --project=. -t 2 benchmark/run_benchmarks.jl year
 ```
 
-Two threads, not three: circulation was ~98% of per-timestep cost pre-ghost-cell;
-after `865ae01`'s periodic ghost cells it is ~93% and has not been re-measured
-since. Either way there is no third lane of reliable work.
+Two threads is the current recommendation: the temperature and humidity
+transport run in parallel, and a third thread has measured no consistent gain.
+It has not been re-measured since the circulation was last optimised.
 
 ## Documentation
 
@@ -105,10 +136,23 @@ function's behaviour or signature, check whether an example needs updating.
 
 ## Reporting a bug
 
-Open an issue with the Julia version, the OS, the experiment configuration
-(`create_experiment_config` call and any switches you changed), and the full
-error or the unexpected output. A `RunSpec` short enough to reproduce quickly
-helps a lot.
+First check that the input data is complete and where `greb_data_dir()`
+expects it, and that your Julia and package versions meet the requirements.
+Then open an issue with the Julia version (`versioninfo()`), the OS, the
+experiment configuration (`create_experiment_config` call and any switches you
+changed), and the full error or the unexpected output. A `RunSpec` short enough
+to reproduce quickly helps a lot.
+
+## Roadmap
+
+Contributions towards these are especially welcome:
+
+- **NetCDF output** - optional direct write of monthly means.
+- **Visualisation dashboard** - interactive maps and time series, similar to the
+  [MSCM interactive database](https://mscm.dkrz.de/GREB_model.html?locale=EN).
+- **Physics guide** - a derivation-level companion to the
+  [Model overview](https://EnvDroneSense.github.io/GREBClimate.jl/dev/model/).
+- **Package registration** - register GREBClimate.jl in the Julia General Registry.
 
 ## Credits
 
