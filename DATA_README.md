@@ -1,202 +1,127 @@
-# GREB Raw Input Data Inventory (maintainers)
+# GREB raw input data (maintainers)
 
 > **You do not need this to run the model.** GREBClimate reads a prepared
-> `.jld2` dataset - see [README.md, "Getting the data"](README.md#getting-the-data).
-> This document is the inventory of the **raw** GREB `.bin` files from which
-> that dataset is *generated*, and is only relevant if you are regenerating or
-> extending it.
->
-> The raw files are collated from several upstream sources (NCEP, ERA-Interim,
-> ISCCP, WOCE, CMIP5, IPCC scenario tables) and are not redistributed from this
-> repository.
+> `.jld2` dataset that it downloads on first use; see
+> [Input data](https://EnvDroneSense.github.io/GREBClimate.jl/dev/data/).
+> This page lists the **raw** GREB `.bin` files that dataset is generated from.
+> They are collated from several upstream sources (NCEP, ERA-Interim, ISCCP,
+> WOCE, CMIP5, IPCC scenario tables) and are not redistributed here.
 
-Once the raw files are in place, produce the `.jld2` dataset with:
+## Converting
 
 ```bash
-julia --project=. tools/convert_greb_to_jld2.jl <input_dir> [output_dir]
-# output_dir defaults to greb_input_data/
+julia --project=. tools/convert_greb_to_jld2.jl <input_dir> [output_dir]   # defaults: Data/, greb_input_data/
+julia --project=. tools/package_dataset.jl greb_input_data greb_input_data-v1.tar.gz
 ```
 
-## 📁 Data Directory Structure
-
-The converter expects the `.bin`/`.ctl`/`.txt` files **flat** in the input
-directory, with solar-forcing scenarios in an optional subdirectory:
+The converter reads the `.bin` files (and matching `.ctl` files, if present)
+**flat** from the input directory:
 
 ```
-Data/                                  # <input_dir>; the converter's default
-├── [climate data files - see below]   # *.bin + matching *.ctl, flat
-├── ipcc.scenario.*.forcing.txt        # CO2 scenario tables
-└── solar_forcing_scenarios/           # optional
+Data/                                  # <input_dir>
+├── *.bin, *.ctl                       # the fields below
+├── ipcc.scenario.*.forcing*.txt       # CO2 scenario tables (optional)
+└── solar_forcing_scenarios/           # orbital/paleo solar tables (optional)
     └── greb.solar.*.bin
 ```
 
-Any directory works - pass it as the first argument. The default is `Data/`
-relative to the repository root.
+It converts only the fields the model reads - `MODEL_FIELD_NAMES` in
+`tools/convert_greb_to_jld2.jl` is the authoritative list - and warns about any
+that are missing. `--all` converts every `.bin` present. `package_dataset.jl`
+checks the result against the same list before building the release archive.
 
-## 📋 Required Input Files
+## Required fields
 
-### Static 2D Fields
+All 3D fields are 96×48×730 (one year at 12-hour steps).
 
-| File | Size | Description |
-|------|------|-------------|
-| `global.topography.bin` | 96×48 | Global topography (m), ocean points < 0 |
-| `greb.glaciers.bin` | 96×48 | Glacier mask (0 or 1) |
+**Static (96×48)**
 
-### 3D Climatology Fields (96×48×730)
+| File | Content |
+|------|---------|
+| `global.topography.bin` | Topography (m); ocean points < 0 |
+| `greb.glaciers.bin` | Glacier mask (0 or 1) |
 
-All climatology files contain 730 time steps (12-hour intervals over one year).
+**Solar (48×730)**
 
-#### NCEP Dataset Files
-| File | Description |
-|------|-------------|
-| `ncep.tsurf.1948-2007.clim.bin` | Surface temperature climatology (K) |
-| `ncep.zonal_wind.850hpa.clim.bin` | Zonal wind at 850 hPa (m/s) |
-| `ncep.meridional_wind.850hpa.clim.bin` | Meridional wind at 850 hPa (m/s) |
-| `ncep.atmospheric_humidity.clim.bin` | Atmospheric specific humidity (kg/kg) |
-| `ncep.soil_moisture.clim.bin` | Soil moisture fraction (0-1) |
+| File | Content |
+|------|---------|
+| `solar_radiation.clim.bin` | 24-hour mean top-of-atmosphere solar radiation (W/m²) |
 
-#### ERA-Interim Dataset Files (Alternative)
-| File | Description |
-|------|-------------|
-| `erainterim.tsurf.1979-2015.clim.bin` | Surface temperature climatology (K) |
-| `erainterim.zonal_wind.850hpa.clim.bin` | Zonal wind at 850 hPa (m/s) |
-| `erainterim.meridional_wind.850hpa.clim.bin` | Meridional wind at 850 hPa (m/s) |
-| `erainterim.atmospheric_humidity.clim.bin` | Atmospheric specific humidity (kg/kg) |
+**Climatology: one of the two datasets** (`dataset=:ncep` or `:era`)
+
+| NCEP | ERA-Interim | Content |
+|------|-------------|---------|
+| `ncep.tsurf.1948-2007.clim.bin` | `erainterim.tsurf.1979-2015.clim.bin` | Surface temperature (K) |
+| `ncep.zonal_wind.850hpa.clim.bin` | `erainterim.zonal_wind.850hpa.clim.bin` | Zonal wind at 850 hPa (m/s) |
+| `ncep.meridional_wind.850hpa.clim.bin` | `erainterim.meridional_wind.850hpa.clim.bin` | Meridional wind at 850 hPa (m/s) |
+| `ncep.atmospheric_humidity.clim.bin` | `erainterim.atmospheric_humidity.clim.bin` | Specific humidity (kg/kg) |
+| `ncep.soil_moisture.clim.bin` | (uses the NCEP file) | Soil moisture fraction (0-1) |
+
+**Climatology: used with both datasets**
+
+| File | Content |
+|------|---------|
+| `isccp.cloud_cover.clim.bin` | Cloud cover fraction (0-1) |
+| `woce.ocean_mixed_layer_depth.clim.bin` | Ocean mixed-layer depth (m) |
+| `Tocean.clim.bin` | Deep-ocean temperature (K) |
 | `erainterim.omega.vertmean.clim.bin` | Vertical velocity (Pa/s) |
-| `erainterim.omega_std.vertmean.clim.bin` | Vertical velocity std deviation |
+| `erainterim.omega_std.vertmean.clim.bin` | Standard deviation of vertical velocity |
 | `erainterim.windspeed.850hpa.clim.bin` | Wind speed at 850 hPa (m/s) |
 
-#### Common Files (Required for Both Datasets)
-| File | Description |
-|------|-------------|
-| `isccp.cloud_cover.clim.bin` | Cloud cover fraction (0-1) from ISCCP |
-| `woce.ocean_mixed_layer_depth.clim.bin` | Ocean mixed layer depth (m) |
-| `Tocean.clim.bin` | Deep ocean temperature (K) |
+**Flux corrections** (combined into one `flux_corrections.jld2`)
 
-### MSCM-Specific Fields (96×48×730)
+| File | Content |
+|------|---------|
+| `Tsurf_flux_correction.bin` | Surface temperature correction (W/m²) |
+| `vapour_flux_correction.bin` | Water vapour correction (kg/m²/s) |
+| `Tocean_flux_correction.bin` | Deep-ocean correction (W/m²) |
 
-| File | Description |
-|------|-------------|
-| `cmip5.omega.rcp85.ensmean.forcing.new.bin` | Vertical velocity from CMIP5 |
-| `cmip5.omegastd.rcp85.ensmean.forcing.new.bin` | Vertical velocity std dev |
+**Anomaly forcing** (only for the experiments named)
 
-### Flux Correction Fields (96×48×730)
+| Files | Used by |
+|-------|---------|
+| `cmip5.{tsurf,zonal.wind,meridional.wind,windspeed,omega}.rcp85.ensmean.forcing.bin` | `:rcp85` (CMIP5 ensemble-mean anomalies) |
+| `erainterim.{tsurf,zonal.wind,meridional.wind,windspeed,omega}.{elnino,lanina}.forcing.bin` | `:elnino`, `:lanina` |
 
-| File | Description |
-|------|-------------|
-| `Tsurf_flux_correction.bin` | Surface temperature flux correction (W/m²) |
-| `vapour_flux_correction.bin` | Water vapor flux correction (kg/m²/s) |
-| `Tocean_flux_correction.bin` | Deep ocean flux correction (W/m²) |
+## Optional inputs
 
-### Solar Radiation (48×730)
+**CO2 scenario tables.** Whitespace-separated text, one row per year, no
+header: `year CO2`. Extra columns are ignored. They are combined into
+`scenario/ipcc_scenarios.jld2`, keyed by the name between `ipcc.scenario.`
+and `.forcing` (e.g. `"rcp85"`, `"hist"`).
 
-| File | Description |
-|------|-------------|
-| `solar_radiation.clim.bin` | 24-hour mean solar radiation at top of atmosphere (W/m²) |
+| File | Scenario |
+|------|----------|
+| `ipcc.scenario.rcp{26,45,6,85}.forcing.txt` | RCP 2.6, 4.5, 6.0, 8.5 |
+| `ipcc.scenario.ssp{119,126,245,460,585}.forcing.txt` | SSP1-1.9, 1-2.6, 2-4.5, 4-6.0, 5-8.5 |
+| `ipcc.scenario.hist.forcing.CO2.emission.pop.txt` | Historical CO2, 1850-2017 |
 
-### Scenario Forcing Files
+The CO2 values in the RCP files are GREB's simplified forcing index, not
+literal atmospheric ppm. `:historical_co2` starts its clock at 1850 (the other
+scenarios at 1950), so `RunSpec(scnr=168)` covers the whole record. The
+historical file's columns 3-4 (emissions, population) are not read by the
+model; the converter keeps them in `scenario/historical_emissions_population.jld2`
+for other use.
 
-Text files containing time series of forcing values. Each `ipcc.scenario.*.txt`
-file is whitespace-separated, one row per year, no header: `year CO2` (ppm,
-GREB's simplified CO2-forcing index - not literal atmospheric ppm for the RCP
-files) - extra trailing columns (as in the historical file) are ignored by
-the parser. Converted by `tools/convert_greb_to_jld2.jl` into a single
-combined `scenario/ipcc_scenarios.jld2`, keyed by the name between
-`ipcc.scenario.` and `.forcing` (e.g. `"rcp85"`, `"ssp585"`, `"hist"`); loaded
-at runtime via `load_co2_scenario_jld2` (see README.md's "Input Data" section).
+**Solar forcing scenarios** in `solar_forcing_scenarios/`:
 
-| File | Description |
-|------|-------------|
-| `ipcc.scenario.rcp26.forcing.txt` | RCP 2.6 scenario (low emissions) |
-| `ipcc.scenario.rcp45.forcing.txt` | RCP 4.5 scenario (moderate emissions) |
-| `ipcc.scenario.rcp6.forcing.txt` | RCP 6.0 scenario |
-| `ipcc.scenario.rcp85.forcing.txt` | RCP 8.5 scenario (high emissions) |
-| `ipcc.scenario.ssp119.forcing.txt` | SSP1-1.9 scenario (very low emissions) |
-| `ipcc.scenario.ssp126.forcing.txt` | SSP1-2.6 scenario (low emissions) |
-| `ipcc.scenario.ssp245.forcing.txt` | SSP2-4.5 scenario (moderate emissions) |
-| `ipcc.scenario.ssp460.forcing.txt` | SSP4-6.0 scenario |
-| `ipcc.scenario.ssp585.forcing.txt` | SSP5-8.5 scenario (high emissions) |
-| `ipcc.scenario.hist.forcing.CO2.emission.pop.txt` | Historical CO2/emission/population (1850–2017); 4 columns, only the first two drive `:historical_co2` |
+| Files | Experiment |
+|-------|------------|
+| `greb.solar.eccentricity.{0-60}.bin` | `:eccentricity` |
+| `greb.solar.obliquity.{0-230}.bin` (steps of 5) | `:obliquity` |
+| `greb.solar.231K_hybers.corrected.bin` | `:paleo_231kyr` |
 
-`:historical_co2` (stored under the `"hist"` key) starts its scenario clock at **1850**, not 1950 like every other IPCC-family experiment - use `RunSpec(scnr=168)` to cover the file's full 1850–2017 span. It shares the 280 ppm control-run baseline with the rest of the IPCC family.
+## File format
 
-Columns 3–4 (emissions, population) aren't read by the original Fortran
-model either. `convert_greb_to_jld2.jl`now preserves them anyway, in a separate `scenario/historical_emissions_population.jld2` (`year => (co2_emissions_gt_co2_yr, population_billions)`, 
-field names inferred from magnitude, not confirmed by any file metadata) for optional
-future use - nothing reads this file today.
+GrADS binary: 32-bit little-endian floats, no header, Fortran (column-major)
+order longitude × latitude × time. Longitude and latitude are 96 × 48 points at
+3.75°. The `.ctl` files describe this layout for GrADS; the converter copies
+their text into the dataset but does not need them.
 
-### Optional: Solar Forcing Scenarios
+## Troubleshooting
 
-Located in `solar_forcing_scenarios/` subdirectory:
-
-- Eccentricity variations: `greb.solar.eccentricity.{0-60}.bin`
-- Obliquity variations: `greb.solar.obliquity.{0-230}.bin` (steps of 5)
-- Paleoclimate: `greb.solar.231K_hybers.corrected.bin`
-
-## 🔧 Data Format Specifications
-
-### GrADS Binary Format
-
-All `.bin` files are in GrADS binary format:
-- **Data type**: 32-bit floating point (Float32)
-- **Byte order**: Little-endian (standard)
-- **Storage order**: Column-major (Fortran-style): longitude, latitude, time
-
-### Dimensions
-
-- **Longitude**: 96 points (3.75° resolution)
-- **Latitude**: 48 points (3.75° resolution)
-- **Time**: 730 steps (12-hour intervals, one year)
-
-### Control Files (.ctl)
-
-Some datasets include `.ctl` files that describe the binary file structure for GrADS. These are not required by the Julia code but can be useful for verification.
-
-## ✅ Verification
-
-To verify your data files are correctly formatted, the model will print diagnostic information when loading:
-
-```julia
-load_greb_input_data!("Data/input"; dataset=:ncep)
-```
-
-Expected output:
-```
-═══════════════════════════════════════════════════════════
-  Loading GREB Climate Data
-  Directory: Data/input
-  Dataset: ncep
-═══════════════════════════════════════════════════════════
-
-[1/4] Loading static 2D fields...
-  • Topography... ✓
-  • Glacier mask... ✓
-
-[2/4] Loading 3D climatology fields (96×48×730)...
-  • Surface temperature... ✓
-  ...
-```
-
-## 🐛 Troubleshooting
-
-### File Not Found Errors
-
-- Ensure all required files are in `Data/input/`
-- Check file names match exactly (case-sensitive on Linux/Mac)
-- Verify file extensions are `.bin` (not `.BIN` or `.binary`)
-
-### Size Mismatch Errors
-
-- Verify files have correct dimensions (96×48×730 for 3D fields)
-- Check that files are in Float32 format
-- Ensure no header bytes in binary files
-
-### NaN or Unrealistic Values
-
-- Check that ocean/land masks are correctly applied
-- Verify flux correction files are available
-- Ensure topography file has negative values for ocean points
-
----
-
-**Last Updated**: March 2026
+| Problem | Check |
+|---------|-------|
+| The converter warns about missing fields | File names match exactly (case-sensitive on Linux/macOS) and sit flat in the input directory |
+| A field fails to convert | Its size is 96×48, 48×730 or 96×48×730 Float32 values with no header bytes |
+| Unrealistic model output | The flux-correction files are present, and topography is negative over ocean |

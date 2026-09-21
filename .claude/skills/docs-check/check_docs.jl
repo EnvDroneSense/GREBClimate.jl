@@ -22,8 +22,7 @@
 const ROOT = normpath(joinpath(@__DIR__, "..", "..", ".."))
 const DOC_FILES = ["README.md", "DATA_README.md", "CHANGELOG.md",
                    "docs/src/index.md", "docs/src/tutorial.md",
-                   "docs/src/switches.md", "docs/src/api.md",
-                   ".claude/notes/INDEX.md"]
+                   "docs/src/switches.md", "docs/src/api.md"]
 
 failures = String[]
 fail(msg) = (push!(failures, msg); println("  FAIL  ", msg))
@@ -126,7 +125,7 @@ let datadir = joinpath(ROOT, "greb_input_data")
         if isempty(dead)
             ok("all .jld2 files are referenced")
         else
-            println("  NOTE  $(length(dead)) unreferenced file(s) - see .claude/notes/data-distribution.md")
+            println("  NOTE  $(length(dead)) unreferenced file(s) - see the ClimaModel vault, 03-findings/data-distribution.md")
             foreach(f -> println("          $f"), sort(dead))
         end
     end

@@ -5,7 +5,9 @@
     # control + 1yr scenario run against the actual NCEP dataset,
     # snapshotted as monthly global-mean Ts/Ta/q. Drift beyond
     # float-reassociation noise (~1e-12) means real behavior changed.
-    # Set RUN_GOLDEN=0 to skip this locally; CI always runs it.
+    # Set RUN_GOLDEN=0 to skip this locally. CI skips it too - it has no
+    # dataset, so the !isdir(DATA_DIR) branch below always fires there. This
+    # guards nothing in CI: a golden break is local-red and CI-green.
     if !isdir(DATA_DIR)
         @test_skip "greb_input_data/ not present"
     elseif get(ENV, "RUN_GOLDEN", "1") == "0"

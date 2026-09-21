@@ -1,32 +1,23 @@
-# Julia package artifacts
-/Manifest.toml
-/test/Manifest.toml
-/benchmark/Manifest.toml
+# Julia environments: resolved versions stay local
+Manifest.toml
+
+# Build and coverage output
 /docs/build/
-/docs/Manifest.toml
-/notebooks/Manifest.toml
-/viz/Manifest.toml
 *.jl.cov
 *.jl.*.cov
 *.jl.mem
-.DS_Store
 
-# example outputs
-/examples/*.png
-
-# Local model input data (not committed - see DATA_README.md)
+# Model data (see DATA_README.md) and dataset release archives
 /Data/
 /greb_input_data/
-
-# Built dataset archives (see tools/package_dataset.jl) - large, and published
-# as GitHub release assets rather than committed
 /greb_input_data-*.tar.gz
 
-# Agent working notes - local development scratch, not part of the package
-/.claude/notes/
+# Generated plots
+/examples/*.png
+/demo_out/
 
-# Local agent guidance - environment quirks and repo conventions, not shipped
-/CLAUDE.md
-# roborev
-/.roborev/
-/.roborev.toml
+# Claude Code: only local settings; the rules and skills are tracked
+/.claude/settings.local.json
+
+# macOS
+.DS_Store

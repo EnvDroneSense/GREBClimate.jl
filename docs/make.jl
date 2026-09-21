@@ -24,6 +24,9 @@ makedocs(
     pages = [
         "Home" => "index.md",
         "Tutorial" => "tutorial.md",
+        "Input data" => "data.md",
+        "Model overview" => "model.md",
+        "Plots and notebook" => "viz.md",
         "Physics Switches" => "switches.md",
         "API Reference" => "api.md",
     ],

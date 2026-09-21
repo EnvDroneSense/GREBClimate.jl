@@ -1,32 +1,23 @@
 # Physics Switches
 
-A "switch" here means a [`PhysicsConfig`](@ref) field that turns a physical
-process on/off or selects between parameterizations. They're grouped below
-by the same families used in `src/config.jl`, since a single physical
-process (e.g. clouds) is often controlled by *two different* switches with
-different mechanisms - one for the mean-climate state, one for the response
-to CO₂ forcing - so grouping by code family avoids duplicating that
-explanation. Build a config with [`create_experiment_config`](@ref) and
-override individual fields afterwards, e.g. `cfg.log_rain = 1`.
+A switch is a [`PhysicsConfig`](@ref) field that turns a process on or off or
+selects a parameterization. Build a config with
+[`create_experiment_config`](@ref) and override fields afterwards, e.g.
+`cfg.log_rain = 1`.
 
-Two naming suffixes recur throughout: `_dmc` ("deconstruct mean climate")
-and `_drsp` ("deconstruct response"). Setting a `_dmc` switch to `false`
-removes that process from the model entirely and the model is normally
-re-run to a new equilibrium - this quantifies how much the process shapes
-the *mean* climate. Setting a `_drsp` switch to `false` keeps the control
-climate fixed (flux corrections are re-estimated so the baseline is
-unaffected) and only disables that process's contribution to the *change*
-under CO₂ forcing - this isolates the process's role in climate
-*sensitivity* rather than the mean state. This is the same deconstruction
-approach used in the MSCM experiments (see [References](#references)
-below, MSCM §2.1–2.2).
+Two suffixes recur:
+
+| Suffix | Meaning | Measures |
+|:-------|:--------|:---------|
+| `_dmc` | **Deconstruct mean climate**: `false` removes the process from the model | How much the process shapes the mean climate |
+| `_drsp` | **Deconstruct response**: `false` keeps the control climate but removes the process's part of the CO₂ response | The process's role in climate sensitivity |
 
 ## Overview
 
 | Switch | Type | Default | Family | Effect |
 |:-------|:-----|:--------|:-------|:-------|
 | `log_clouds_dmc` | Bool | `true` | Mean climate | Zeroes cloud climatology at init when `false` |
-| `log_vapor_dmc`[^1] | Bool | `true` | Mean climate | No effect - see [Known Limitations](#known-limitations) |
+| `log_vapor_dmc` | Bool | `true` | Mean climate | No effect - see [Known Limitations](#known-limitations) |
 | `log_crcl_dmc` | Bool | `true` | Mean climate | Disables circulation (advection+diffusion+convergence) when `false` |
 | `log_hydro_dmc` | Bool | `true` | Mean climate | Disables hydrology (evap/rain/latent heat) when `false` |
 | `log_atmos_dmc` | Bool | `true` | Mean climate | Master atmosphere switch - decouples atmosphere from surface when `false` |
@@ -44,7 +35,7 @@ below, MSCM §2.1–2.2).
 | `log_hadv` | Bool | `true` | Circulation | Horizontal (heat) advection |
 | `log_vdif` | Bool | `true` | Circulation | Vertical/meridional diffusion (water vapor) |
 | `log_vadv` | Bool | `true` | Circulation | Advection (water vapor) |
-| `log_conv`[^2] | Bool | `true` | Circulation | Moisture convergence sub-step |
+| `log_conv` | Bool | `true` | Circulation | Moisture convergence sub-step (not a `create_experiment_config` keyword) |
 | `log_rain` | Int | `0` | Hydrology | Selects the precipitation parameterization |
 | `log_eva` | Int | `-1` | Hydrology | Selects the evaporation/exchange-coefficient parameterization |
 | `log_clim` | Int | `0` | Hydrology | NCEP-tuned hydrology coefficient override |
@@ -52,76 +43,54 @@ below, MSCM §2.1–2.2).
 | `log_hwind_ext` | Bool | `false` | External forcing | Loads horizontal-wind anomaly forcing |
 | `log_omega_ext` | Bool | `false` | External forcing | Loads vertical-velocity anomaly forcing |
 
-[^1]: Declared in `src/config.jl` but never read anywhere in `src/` - has no effect. See [Known Limitations](#known-limitations).
-[^2]: Behaves like the other circulation switches but is not exposed as a keyword by `create_experiment_config` - set `cfg.log_conv` directly. See [Known Limitations](#known-limitations).
-
 ## Mean-Climate Deconstruction Switches (`_dmc`)
 
-These switches, forwarded as keywords by `create_experiment_config(:decon_mean_climate; ...)`,
-remove a process from the model entirely so it can be re-equilibrated
-without it - quantifying that process's contribution to the mean climate
-(DF11 §3.8; MSCM §2.1).
+Passed as keywords to `create_experiment_config(:decon_mean_climate; ...)`.
 
 | Switch | Default | Effect when `false` |
 |:-------|:--------|:---------------------|
-| `log_clouds_dmc` | `true` | Cloud climatology zeroed at init - no cloud shortwave reflection or longwave-emissivity contribution (DF11 §3.1–3.2). Cloud cover is a *prescribed* seasonal field in GREB, not a simulated/responding one, so this removes the process outright rather than disabling a dynamic feedback. |
+| `log_clouds_dmc` | `true` | Cloud climatology zeroed: no cloud reflection or cloud emissivity. Clouds are prescribed, so this removes them outright. |
 | `log_vapor_dmc` | `true` | No effect (dead switch - see [Known Limitations](#known-limitations)). |
-| `log_crcl_dmc` | `true` | `circulation!` returns zero tendencies - no advection, diffusion, or convergence. GREB's circulation is a fixed climatological wind field, not a responding dynamical core (DF11 §3.5), so this isolates how much of the spatial temperature/humidity pattern depends on that fixed transport. |
-| `log_hydro_dmc` | `true` | Humidity climatology zeroed at init; `hydro!` (latent heat, evaporation, rain) disabled entirely - removes the hydrological cycle described in Hydro19 from the mean climate. |
-| `log_atmos_dmc` | `true` | Master switch: disables sensible heat flux, freezes the downward-longwave feedback, and also gates circulation and hydrology - effectively decouples the atmosphere from the surface. |
-| `log_co2_dmc` | `true` | Control-run CO₂ forced to 0 ppm - removes the greenhouse-gas baseline from the mean climate (DF11 §3.2, Eq. 4). |
-| `log_ocean_dmc` | `true` | Master ocean-coupling switch: surface heat capacity uses the land value everywhere (no mixed layer), sea-ice heat-capacity blending is skipped, and the deep ocean contributes zero heat exchange (DF11 §3.7–3.8) - removes ocean heat storage/transport from the mean climate. |
-| `log_qflux_dmc` | `true` | Governs whether the empirical flux-correction terms (the residual added to force the model's climatology to match observations, DF11 §3.8) are computed via spin-up, loaded from a precomputed file, or zeroed, depending on its combination with `log_topo_drsp`. |
+| `log_crcl_dmc` | `true` | No transport: no advection, diffusion or convergence. |
+| `log_hydro_dmc` | `true` | Humidity climatology zeroed and `hydro!` (evaporation, rain, latent heat) disabled. |
+| `log_atmos_dmc` | `true` | Decouples the atmosphere: no sensible heat flux, fixed downward longwave, no transport or hydrology. |
+| `log_co2_dmc` | `true` | Control-run CO₂ set to 0 ppm. |
+| `log_ocean_dmc` | `true` | No ocean heat storage: land heat capacity everywhere, no sea-ice blending, no deep-ocean exchange. |
+| `log_qflux_dmc` | `true` | Together with `log_topo_drsp`, decides whether flux corrections are computed in the spin-up, loaded from file, or zeroed. |
 
 ## CO₂-Response Deconstruction Switches (`_drsp`)
 
-These switches, forwarded as keywords by `create_experiment_config(:decon_2xco2; ...)`,
-keep the control/mean climate fixed and instead disable a process's
-contribution to the *change* under a CO₂ doubling - isolating each
-process's role in climate sensitivity, since feedback strength is
-mean-state dependent and a fair "no-feedback" test must not also change the
-climate the feedback acts on (MSCM §2.1–2.2). `:decon_2xco2` always applies
-the CO₂ doubling itself as the forcing (`co2_concentration = 680.0`); there
-is no `log_co2_drsp` because the response experiments' entire purpose is to
-measure feedbacks *to* that forcing, not to disable it.
+Passed as keywords to `create_experiment_config(:decon_2xco2; ...)`, which
+doubles CO₂ in the scenario (680 against 340 ppm). There is no `log_co2_drsp`:
+the CO₂ doubling is the forcing whose response is being measured.
 
 | Switch | Default | Effect when `false` |
 |:-------|:--------|:---------------------|
-| `log_clouds_drsp` | `true` | Cloud cover frozen at a constant 0.7 rather than the seasonal climatology - removes the cloud contribution to the CO₂ response while keeping *some* cloud cover present (MSCM p. 2161). |
-| `log_crcl_drsp` | `true` | Removes circulation's contribution to the forced response (combined with `log_crcl_dmc` to fully gate `circulation!`). |
-| `log_hydro_drsp` | `true` | Removes hydrology's contribution to the forced response (combined with `log_hydro_dmc` to fully gate `hydro!`). |
-| `log_topo_drsp` | `true` | Topography capped at 1.0 m ("constant topography") - removes topographic modulation of the response; also interacts with `log_qflux_dmc` in the flux-correction branching. |
-| `log_humid_drsp` | `true` | Humidity frozen at a constant 0.0052 kg/kg - removes the water-vapor feedback to CO₂ (DF11 §3.2, Eq. 5) specifically, while `log_hydro_drsp` covers the rest of the hydrological cycle's response. |
-| `log_ocean_drsp` | `true` | Mixed-layer depth held constant (no seasonal variation) and the deep ocean contributes zero response tendency - removes the ocean heat-uptake response to CO₂ forcing (DF11 §3.7). |
+| `log_clouds_drsp` | `true` | Cloud cover fixed at 0.7 instead of the seasonal climatology. |
+| `log_crcl_drsp` | `true` | No transport contribution to the response. |
+| `log_hydro_drsp` | `true` | No hydrology contribution to the response. |
+| `log_topo_drsp` | `true` | Topography capped at 1 m ("constant topography"). Also affects the flux-correction choice (see `log_qflux_dmc`). |
+| `log_humid_drsp` | `true` | Humidity fixed at 0.0052 kg/kg: no water-vapour feedback. |
+| `log_ocean_drsp` | `true` | Constant mixed-layer depth and no deep-ocean response: no ocean heat uptake. |
 
 ## Circulation Components
 
-GREB's atmospheric transport uses a fixed climatological wind field - it
-does not itself respond to forcing (DF11 §3.5). Diffusion approximates the
-smearing effect of weather disturbances with a roughly one-week lifetime;
-advection moves heat/moisture with the mean wind; both are scaled by
-topography. The vertical terms additionally let the model represent
-convergence-driven precipitation (e.g. the ITCZ) from the prescribed
-vertical-velocity field under continuity/hydrostatic assumptions
-(Hydro19 §3.1, §3.3, Eqs. 11, 17–18).
+Transport uses fixed climatological winds and does not respond to forcing.
 
 | Switch | Default | Effect when `false` |
 |:-------|:--------|:---------------------|
-| `log_ice` | `true` | Disables the ice-albedo feedback: albedo becomes a constant value regardless of surface temperature, and heat capacity ignores ice fraction (DF11 §3.6, Fig. 3). GREB has no explicit sea-ice model - albedo and heat capacity near freezing are simple functions of surface temperature, which is what this switch removes. |
+| `log_ice` | `true` | No ice-albedo feedback: constant albedo, and heat capacity ignores ice. |
 | `log_hdif` | `true` | Disables horizontal (heat) diffusion. |
 | `log_hadv` | `true` | Disables horizontal (heat) advection. |
 | `log_vdif` | `true` | Disables vertical/meridional diffusion of water vapor. |
 | `log_vadv` | `true` | Disables advection of water vapor. |
-| `log_conv`[^2] | `true` | Disables the moisture-convergence sub-step (water vapor only). Not exposed via `create_experiment_config` - set `cfg.log_conv` directly. |
+| `log_conv` | `true` | Disables the moisture-convergence sub-step (water vapor only). Not exposed via `create_experiment_config` - set `cfg.log_conv` directly. |
 
 ## Hydrology Parameterization
 
-Evaporation in GREB is a bulk formula on the saturation deficit, wind speed,
-and a *prescribed* (climatological, not dynamically simulated) soil-wetness
-fraction. Precipitation scales with relative humidity and vertical velocity
-(both mean and variability), which is what lets the model reproduce the
-ITCZ and midlatitude storm tracks rather than only a diffuse pattern
-(Hydro19, Abstract & §3.1–3.3, Eqs. 11–18).
+Evaporation is a bulk formula on the saturation deficit, wind speed and a
+prescribed soil wetness. Precipitation scales with humidity, relative humidity
+and vertical velocity.
 
 **`log_rain`** - selects the precipitation regression coefficients:
 
@@ -151,18 +120,12 @@ When `log_rain == 1`, a rain-rate limiter is additionally applied.
 | `0` (default) | No override |
 | `1` | If also `log_rain == 0`, overrides the precipitation coefficients to a hardcoded NCEP-tuned set - independent of which climatology *files* were loaded via `load_greb_jld2!` |
 
-> **Note:** `log_rain == 0 && log_clim == 1` is the only combination where
-> `log_clim` has any effect - it's easy to set `log_clim = 1` and see no
-> change if `log_rain` isn't also `0`.
+`log_clim = 1` only has an effect together with `log_rain = 0`.
 
 ## External-Forcing Gates
 
-**These three switches only matter for `:elnino`, `:lanina`, and `:rcp85`.**
-They gate whether the corresponding anomaly field is *loaded from disk*;
-the anomaly is then applied unconditionally in `init_model!` based on
-`cfg.experiment` alone, not on these switches. `create_experiment_config`
-already sets all three to `true` for those three experiments - you should
-not normally need to touch them directly.
+Used only by `:elnino`, `:lanina` and `:rcp85`, whose presets already set
+all three to `true`. They decide which anomaly fields are loaded from disk.
 
 | Switch | Default | Effect when `true` |
 |:-------|:--------|:---------------------|
@@ -178,7 +141,7 @@ Scenario parameters rather than physics switches - set via
 | Field | Type | Default | Purpose |
 |:------|:-----|:--------|:--------|
 | `experiment` | `Symbol` | `:full_model` | Selects the experiment branch - see [Experiment Presets](#experiment-presets) below |
-| `co2_concentration` | `Float64` | `340.0` | Static CO₂ (ppm) for experiments without a time-varying scenario table |
+| `co2_concentration` | `Float32` | `340.0` | Control-run CO₂ (ppm), and the scenario CO₂ of `:full_model` and `:decon_mean_climate`; `forcing` sets every other experiment's scenario CO₂ |
 | `orbital_index` | `Int` | `0` | Row index into the `solar_scenarios` table for `:obliquity`/`:eccentricity` |
 | `earth_sun_distance_pct` | `Float64` | `0.0` | Percent change in orbital radius for `:earth_sun_distance` |
 | `co2_scenario` | `Dict{Int,Float64}` | `Dict()` | Year→ppm lookup, auto-populated for IPCC RCP/SSP/historical/custom-CO2 experiments |
@@ -196,17 +159,17 @@ What each `create_experiment_config` preset changes relative to `:full_model`:
 |:-------|:-------------------|
 | `:full_model` | Nothing - the baseline |
 | `:constant_topo` | `log_topo_drsp = false` |
-| `:co2_double` | `co2_concentration = 680.0` |
-| `:co2_quadruple` | `co2_concentration = 1360.0` |
+| `:co2_double` | Scenario at 680 ppm (control stays at 340) |
+| `:co2_quadruple` | Scenario at 1360 ppm (control stays at 340) |
 | `:solar_plus27` | Solar constant +27 W/m² |
 | `:elnino` / `:lanina` | The three `log_*_ext` switches set `true`; adds/subtracts ERA-Interim ENSO anomalies |
-| `:paleo_231kyr` | `co2_concentration = 200.0`; paleo solar-forcing table |
+| `:paleo_231kyr` | Scenario at 200 ppm with the paleo solar-forcing table (control stays at 340) |
 | `:rcp85` | `log_*_ext` switches `true`; loads CMIP5 RCP8.5 anomaly fields |
 | `:rcp26` / `:rcp45` / `:rcp60` / `:ssp119` / `:ssp126` / `:ssp245` / `:ssp460` / `:ssp585` | No switches change; loads a year→CO2 lookup table |
 | `:historical_co2` | Year counter starts at 1850; loads the observed CO₂ record |
 | `:custom_co2` | `custom_co2_path` set from the `co2_path` keyword |
 | `:decon_mean_climate` | Exposes `log_clouds_dmc`, `log_ocean_dmc`, `log_atmos_dmc`, `log_co2_dmc`, `log_hydro_dmc`, `log_qflux_dmc`, `log_ice`, `log_hdif`, `log_hadv`, `log_vdif`, `log_vadv` as keywords (all default `true`, i.e. behaves like `:full_model` unless overridden) |
-| `:decon_2xco2` | `co2_concentration = 680.0`; exposes `log_topo_drsp`, `log_clouds_drsp`, `log_humid_drsp`, `log_ocean_drsp`, `log_hydro_drsp`, `log_ice`, `log_hdif`, `log_hadv`, `log_vdif`, `log_vadv` as keywords |
+| `:decon_2xco2` | Scenario at 680 ppm (control stays at 340); exposes `log_topo_drsp`, `log_clouds_drsp`, `log_humid_drsp`, `log_ocean_drsp`, `log_hydro_drsp`, `log_ice`, `log_hdif`, `log_hadv`, `log_vdif`, `log_vadv` as keywords |
 
 ### Further experiments
 
@@ -250,11 +213,7 @@ by `forcing`. The control run itself always sees an all-ones mask.
 
 ## References
 
-Abbreviations used above: **DF11** = Dommenget & Flöter (2011); **Hydro19**
-= Stassen, Dommenget & Loveday (2019); **MSCM** = Dommenget et al. (2019).
-
-1. **DF11** - Dommenget, D., and Flöter, J. (2011). Conceptual Understanding of Climate Change with a Globally Resolved Energy Balance Model. *Journal of Climate Dynamics*, 37: 2143. [doi:10.1007/s00382-011-1026-0](https://doi.org/10.1007/s00382-011-1026-0)
-2. **Hydro19** - Stassen, C., Dommenget, D., and Loveday, N. (2019). A hydrological cycle model for the Globally Resolved Energy Balance (GREB) model v1.0. *Geoscientific Model Development*, 12, 425-440. [doi:10.5194/gmd-12-425-2019](https://doi.org/10.5194/gmd-12-425-2019)
-3. **MSCM** - Dommenget, D., Nice, K., Bayr, T., Kasang, D., Stassen, C., and Rezny, M. The Monash Simple Climate Model Experiments: An interactive database of the mean climate, climate change and scenarios simulations. *Geoscientific Model Development*, 12, 2155-2179. [doi:10.5194/gmd-12-2155-2019](https://doi.org/10.5194/gmd-12-2155-2019)
+1. Dommenget, D., and Flöter, J. (2011). Conceptual Understanding of Climate Change with a Globally Resolved Energy Balance Model. *Climate Dynamics*, 37: 2143. [doi:10.1007/s00382-011-1026-0](https://doi.org/10.1007/s00382-011-1026-0)
+2. Stassen, C., Dommenget, D., and Loveday, N. (2019). A hydrological cycle model for the Globally Resolved Energy Balance (GREB) model v1.0. *Geoscientific Model Development*, 12, 425-440. [doi:10.5194/gmd-12-425-2019](https://doi.org/10.5194/gmd-12-425-2019)
 
 See the repository [README](https://github.com/EnvDroneSense/GREBClimate.jl#references)'s References section for the original GREB model homepage link.

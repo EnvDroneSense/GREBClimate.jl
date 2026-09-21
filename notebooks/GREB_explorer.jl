@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.21
+# v1.0.3
 
 using Markdown
 using InteractiveUtils
@@ -16,15 +16,6 @@ macro bind(def, element)
     #! format: on
 end
 
-# ╔═╡ b37f2536-200b-49b1-a823-d5625431c1c7
-md"""
-# GREB explorer
-
-Run an experiment, then explore the output. Every plot below comes from the
-`viz/` registry - drop a file in `viz/plots/` and it appears in the menu with
-no change to this notebook.
-"""
-
 # ╔═╡ 5f08d8d1-c39d-4bb4-bead-7133854f0715
 begin
     import Pkg
@@ -36,138 +27,122 @@ begin
     md"*environment ready*"
 end
 
+# ╔═╡ b37f2536-200b-49b1-a823-d5625431c1c7
+md"""
+# GREB explorer
+
+Run an experiment, then look at the output with the `viz/` plots.
+"""
+
 # ╔═╡ 2759e19a-df8b-45d3-9d66-f45b9498f972
-md"""## 1. Data"""
+md"""## 1. Run"""
 
 # ╔═╡ 34ed8352-d79c-418d-ae5b-014b09a8ff30
-fields_master = load_greb_jld2!(GREBClimate.greb_data_dir(allow_download=false); dataset=:ncep);
-
-# ╔═╡ 504a2ed8-f4c1-4607-85cc-8b0c68117f70
-md"""## 2. Experiment"""
-
-# ╔═╡ 81e2898f-92b5-4bfa-837d-82319d446a7b
 begin
-    # Prefer the package's own experiment table so this menu never drifts from
-    # what the model actually supports. It is a private const, so fall back to a
-    # curated list rather than breaking if it is ever renamed.
-    experiment_choices = isdefined(GREBClimate, :_EXPERIMENT_OVERRIDES) ?
-        sort(collect(keys(GREBClimate._EXPERIMENT_OVERRIDES))) :
-        [:full_model, :co2_double, :co2_quadruple, :co2_half, :rcp85,
-         :elnino, :lanina, :sst_plus1, :solar_plus27, :paleo_231kyr]
-    md"""Experiment $(@bind experiment Select(experiment_choices, default=:co2_double))"""
-end
-
-# ╔═╡ 5e5b94a6-59d6-4f92-9978-c0ca505a5f2e
-md"""Control years $(@bind n_ctrl Slider(1:30, default=5, show_value=true)) &nbsp;
-Scenario years $(@bind n_scnr Slider(0:50, default=15, show_value=true))"""
-
-# ╔═╡ 2589f0ec-b842-4728-82df-86273b8d0803
-md"""Tick to run the model (it re-runs whenever anything above changes):
-$(@bind go CheckBox(default=false))"""
-
-# ╔═╡ 79fdb975-0f02-43f7-9a05-39e8f5408c5f
-result = if go
-    cfg = create_experiment_config(experiment)
-    f = deepcopy(fields_master)
-    redirect_stdout(devnull) do
-        greb_model!(RunSpec(flux=0, ctrl=n_ctrl, scnr=n_scnr), cfg;
-                    jld2_dir=GREBClimate.greb_data_dir(allow_download=false), fields=f)
-    end
-else
-    nothing
+    data_dir = greb_data_dir(allow_download=false)
+    fields = load_greb_jld2!(data_dir; dataset=:ncep)
 end;
 
-# ╔═╡ d5a2c14d-2b20-47e4-8d36-9a5188fda10a
-runs = result === nothing ? nothing : greb_runs(result; scnr=String(experiment));
+# ╔═╡ 81e2898f-92b5-4bfa-837d-82319d446a7b
+md"""Experiment $(@bind experiment Select(sort(collect(keys(GREBClimate._EXPERIMENT_OVERRIDES))), default=:co2_double))"""
 
-# ╔═╡ ca0cefe0-ac19-4e8c-ac4c-0ff3075ccbfd
-if runs === nothing
-    md"""!!! warning "Not run yet"
-        Tick the box above to run the model."""
-else
-    md"""Ready: $(join(["**$(r.label)** (`:$(r.kind)`, $(length(r.records)) months)" for r in runs], " · "))"""
-end
+# ╔═╡ 5e5b94a6-59d6-4f92-9978-c0ca505a5f2e
+md"""Control years $(@bind n_ctrl Slider(1:30, default=5, show_value=true))
+
+Scenario years $(@bind n_scnr Slider(0:50, default=15, show_value=true))
+
+Run the model $(@bind go CheckBox(default=false))"""
+
+# ╔═╡ 79fdb975-0f02-43f7-9a05-39e8f5408c5f
+result = go ? redirect_stdout(devnull) do
+    greb_model!(RunSpec(flux=3, ctrl=n_ctrl, scnr=n_scnr), create_experiment_config(experiment);
+                jld2_dir=data_dir, fields=deepcopy(fields))   # the model mutates fields
+end : nothing;
 
 # ╔═╡ 372f4e9a-f1be-4e57-b293-b2592e29c60f
-md"""## 3. Explore"""
+md"""## 2. Plots"""
 
 # ╔═╡ df41b455-c829-4ae6-bd04-263f0b28a9e4
 md"""
-Plot $(@bind which Select(viz_options())) &nbsp;
-Variable $(@bind v Select(var_options(runs === nothing ? [(; Ts=zeros(Float32,1,1))] : runs[1].records))) &nbsp;
-Region $(@bind reg Select(region_options()))
-"""
+Variable $(@bind v Select([k => fieldinfo(k).label for k in (result === nothing ? [:Ts] : keys(first(result.ctrl)))]))
 
-# ╔═╡ b120788d-c724-4d8c-b2dc-03a1a616a79b
-md"""
-Annual means $(@bind yearly CheckBox(default=false)) &nbsp;
-Coastlines $(@bind coast CheckBox(default=true)) &nbsp;
 Map month $(@bind mon Select([:mean => "run mean", :last => "final month"]))
+
+Annual means $(@bind yearly CheckBox(default=false))
 """
 
 # ╔═╡ fba7c888-e783-442e-8d1a-ab66a7629d8c
-if runs === nothing
-    md"*run the model first*"
-else
-    try
-        render(which, runs; var=v, region=reg, annual=yearly,
-               month=mon, coastlines=coast, fields=fields_master)
-    catch e
-        md"""!!! danger "Cannot draw this"
-            $(sprint(showerror, e))"""
-    end
-end
-
-# ╔═╡ a0e60d10-c2f8-42ae-9cb5-e7b8b4787b7e
-md"""## 4. Scenario in real units
-
-A scenario from `greb_model!` is an *anomaly* against its control, which is why
-it gets its own panel above. `to_absolute` adds the control climatology back so
-the two can share an axis - and so a difference map means something.
-"""
+result === nothing ? md"*Tick **Run the model** above.*" : plot_map(result; var=v, month=mon, fields=fields)
 
 # ╔═╡ 8b90b23a-8014-40fc-9fb0-1b3c04a30f53
-if runs === nothing || length(runs) < 2 || length(runs[1].records) < 12
-    md"*needs a control of at least 12 months and a scenario*"
-else
-    abs_scnr = to_absolute(runs[2], runs[1])
-    render(:diffmap, [abs_scnr, runs[1]]; var=v, month=mon,
-           coastlines=coast, fields=fields_master)
-end
+result === nothing ? md"" : plot_timeseries(result; var=v, annual=yearly)
 
-# ╔═╡ df59a1d6-f019-442d-a9c4-a7b80f2a3c28
-md"""### What is registered
+# ╔═╡ a0e60d10-c2f8-42ae-9cb5-e7b8b4787b7e
+result === nothing ? md"" : plot_seasonal(result; var=v)
 
-Adding a file to `viz/plots/` extends this list, and the menu above, automatically.
+# ╔═╡ ca0cefe0-ac19-4e8c-ac4c-0ff3075ccbfd
+result === nothing ? md"" : plot_hovmoller(result; var=v)
+
+# ╔═╡ 604877f9-26bc-4dde-abc4-f7969831d3f7
+md"""## 3. Through the run
+
+Step $(@bind evo_step Select([:year => "yearly means", :month => "monthly"]))
 """
 
-# ╔═╡ 8f4020b1-52f7-4132-9a9b-d5f3c7071347
-begin
-    _lines = String[]
-    for spec in vizlist()
-        push!(_lines, "- `:$(spec.key)` \u2014 **$(spec.label)**")
-        isempty(spec.help) || push!(_lines, "   $(spec.help)")
+# ╔═╡ 12f808c0-c3c3-4154-ad1b-3abcee55658f
+evo = result === nothing ? nothing : evolution(result; var=v, step=evo_step);
+
+# ╔═╡ aff47e88-daa7-40f7-9167-5ee510419968
+md"""
+Frame $(@bind evo_frame Slider(1:(evo === nothing ? 1 : frame_count(evo)), show_value=true))
+
+Play $(@bind evo_play CheckBox(default=false)) $(@bind evo_tick Clock(0.4))
+
+*To animate, tick **Play** and press **Start**.*
+"""
+
+# ╔═╡ 65a00347-bfe3-4445-848d-9d9a80d1b4c5
+if evo === nothing
+    md""
+else
+    # The clock never resets, so it picks the frame only while Play is ticked.
+    evolution_frame(evo, evo_play ? mod1(evo_tick, frame_count(evo)) : evo_frame; fields=fields)
+end
+
+# ╔═╡ 06071081-4a67-4eb6-a30d-dc10460457b3
+md"""
+Write GIF $(@bind evo_write CheckBox(default=false))
+
+frames/s $(@bind evo_fps Slider(2:12, default=6, show_value=true))
+"""
+
+# ╔═╡ 90176953-2498-4b7e-94d9-89723cf3322e
+if evo === nothing || !evo_write
+    md"*Tick **Write GIF** to render every frame (a 15-year monthly run takes ~15 s).*"
+else
+    let path = joinpath(tempdir(), "greb_evolution_$(evo.var)_$(evo.step).gif")
+        evolution_gif(path, evo; fps=evo_fps, fields=fields)
+        md"$(DownloadButton(read(path), basename(path))) $(LocalResource(path))"
     end
-    Markdown.parse(join(_lines, "\n"))
 end
 
 # ╔═╡ Cell order:
 # ╟─b37f2536-200b-49b1-a823-d5625431c1c7
-# ╠═5f08d8d1-c39d-4bb4-bead-7133854f0715
+# ╟─5f08d8d1-c39d-4bb4-bead-7133854f0715
 # ╟─2759e19a-df8b-45d3-9d66-f45b9498f972
-# ╠═34ed8352-d79c-418d-ae5b-014b09a8ff30
-# ╟─504a2ed8-f4c1-4607-85cc-8b0c68117f70
-# ╠═81e2898f-92b5-4bfa-837d-82319d446a7b
+# ╟─34ed8352-d79c-418d-ae5b-014b09a8ff30
+# ╟─81e2898f-92b5-4bfa-837d-82319d446a7b
 # ╟─5e5b94a6-59d6-4f92-9978-c0ca505a5f2e
-# ╟─2589f0ec-b842-4728-82df-86273b8d0803
-# ╠═79fdb975-0f02-43f7-9a05-39e8f5408c5f
-# ╠═d5a2c14d-2b20-47e4-8d36-9a5188fda10a
-# ╠═ca0cefe0-ac19-4e8c-ac4c-0ff3075ccbfd
+# ╟─79fdb975-0f02-43f7-9a05-39e8f5408c5f
 # ╟─372f4e9a-f1be-4e57-b293-b2592e29c60f
 # ╟─df41b455-c829-4ae6-bd04-263f0b28a9e4
-# ╟─b120788d-c724-4d8c-b2dc-03a1a616a79b
-# ╠═fba7c888-e783-442e-8d1a-ab66a7629d8c
+# ╟─fba7c888-e783-442e-8d1a-ab66a7629d8c
+# ╟─8b90b23a-8014-40fc-9fb0-1b3c04a30f53
 # ╟─a0e60d10-c2f8-42ae-9cb5-e7b8b4787b7e
-# ╠═8b90b23a-8014-40fc-9fb0-1b3c04a30f53
-# ╟─df59a1d6-f019-442d-a9c4-a7b80f2a3c28
-# ╠═8f4020b1-52f7-4132-9a9b-d5f3c7071347
+# ╟─ca0cefe0-ac19-4e8c-ac4c-0ff3075ccbfd
+# ╟─604877f9-26bc-4dde-abc4-f7969831d3f7
+# ╟─12f808c0-c3c3-4154-ad1b-3abcee55658f
+# ╟─aff47e88-daa7-40f7-9167-5ee510419968
+# ╟─65a00347-bfe3-4445-848d-9d9a80d1b4c5
+# ╟─06071081-4a67-4eb6-a30d-dc10460457b3
+# ╟─90176953-2498-4b7e-94d9-89723cf3322e

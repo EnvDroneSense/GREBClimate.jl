@@ -107,8 +107,8 @@ function forcing(it, year, cfg::PhysicsConfig, fields::ClimateFields, icmn_ctrl;
         end
 
     # - CO₂ scaling experiments ──────────────────────────────────────────────
-    elseif cfg.experiment == :co2_double
-        CO2 = 680.0f0  # 2×CO₂ (already set, but explicit)
+    elseif cfg.experiment == :co2_double || cfg.experiment == :decon_2xco2
+        CO2 = 680.0f0  # 2×CO₂
 
     elseif cfg.experiment == :co2_quadruple
         CO2 = 1360.0f0  # 4×CO₂

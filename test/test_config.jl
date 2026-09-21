@@ -15,7 +15,7 @@ end
         @test c.experiment == exp
     end
 
-    @test create_experiment_config(:co2_double).co2_concentration == 680.0
+    @test create_experiment_config(:co2_double).co2_concentration == 340.0  # control CO2
 end
 
 @testset "create_experiment_config: :custom_co2 and decon presets" begin
@@ -36,9 +36,9 @@ end
     @test cfg_dmc_off.log_ocean_dmc == false
     @test cfg_dmc_off.log_clouds_dmc == true  # untouched switches stay at default
 
-    # decon_2xco2: defaults all true + doubled CO2, one override propagates
+    # decon_2xco2: defaults all true, control CO2 at 340 (forcing doubles it)
     cfg_drsp = create_experiment_config(:decon_2xco2)
-    @test cfg_drsp.co2_concentration == 680.0
+    @test cfg_drsp.co2_concentration == 340.0
     for switch in (cfg_drsp.log_topo_drsp, cfg_drsp.log_clouds_drsp, cfg_drsp.log_humid_drsp,
                    cfg_drsp.log_ocean_drsp, cfg_drsp.log_hydro_drsp,
                    cfg_drsp.log_ice, cfg_drsp.log_hdif, cfg_drsp.log_hadv,
@@ -75,7 +75,8 @@ end
     for exp in (:co2_10x, :co2_half, :co2_zero, :co2_sine_wave, :co2_step,
                 :a1b_scenario, :solar_cycle_11yr, :sst_plus1,
                 :regional_co2_nh, :regional_co2_ocean, :regional_co2_winter,
-                :paleo_solar_modern_co2, :modern_solar_paleo_co2)
+                :paleo_solar_modern_co2, :modern_solar_paleo_co2,
+                :co2_double, :co2_quadruple, :paleo_231kyr)
         factory = create_experiment_config(exp)
         manual = PhysicsConfig(experiment = exp)
         for f in fieldnames(PhysicsConfig)
@@ -90,9 +91,6 @@ end
               earth_sun_distance_pct = 1.5).earth_sun_distance_pct == 1.5f0
 
     # Unchanged presets stay unchanged.
-    @test create_experiment_config(:co2_double).co2_concentration == 680.0f0
-    @test create_experiment_config(:co2_quadruple).co2_concentration == 1360.0f0
-    @test create_experiment_config(:paleo_231kyr).co2_concentration == 200.0f0
     @test create_experiment_config(:constant_topo).log_topo_drsp == false
     @test create_experiment_config(:elnino).log_tsurf_ext == true
     @test create_experiment_config(:rcp85).log_omega_ext == true
@@ -125,4 +123,14 @@ end
     cfg = create_experiment_config(:full_model)
     cfg.log_rain = 4
     @test_throws ErrorException set_hydrology_parameters!(cfg)
+end
+
+@testset "CO2 presets: control at 340 ppm, scenario from forcing" begin
+    fields = ClimateFields()
+    ice = zeros(Float32, X, Y, 12)
+    for (exp, co2) in ((:co2_double, 680), (:co2_quadruple, 1360), (:paleo_231kyr, 200), (:decon_2xco2, 680))
+        cfg = create_experiment_config(exp)
+        @test quiet(() -> init_model!(cfg, fields)).CO2_ctrl == 340
+        @test forcing(1, 1950, cfg, fields, ice).CO2 == co2
+    end
 end
