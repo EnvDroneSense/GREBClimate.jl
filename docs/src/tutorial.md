@@ -127,6 +127,8 @@ use them to check shapes and code paths, never climate numbers.
 - The [Model overview](@ref) explains what each component computes.
 - [Plots and notebook](@ref) shows how to plot a result and explore it interactively.
 - `benchmark/run_benchmarks.jl` micro-benchmarks the per-timestep physics
-  kernels (`year`, `stages`, `threads` and `alloc` modes).
+  kernels (`year`, `stages`, `threads`, `alloc` and `years` modes - the last
+  runs a `--ctrl`/`--scnr`-year control+scenario run, for long-run cost and
+  stability rather than one year).
 - `test/runtests.jl` doubles as executable documentation for individual
   kernels' behavior under different config switches.

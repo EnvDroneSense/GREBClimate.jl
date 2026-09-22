@@ -6,6 +6,9 @@
 #   stages  - time each physics stage of one timestep
 #   threads - time `year` at -t 1, 2, 3, 4
 #   alloc   - bytes allocated by one tendencies! call
+#   years   - time a multi-year control+scenario run, e.g.:
+#               julia --project=. -t 2 benchmark/run_benchmarks.jl years --ctrl=10 --scnr=100
+#             --ctrl=N, --scnr=N (default 10/10), --experiment=NAME (default full_model)
 
 using GREBClimate
 
@@ -44,6 +47,51 @@ function time_1yr(jld2_dir::AbstractString; cfg=create_experiment_config(:full_m
 
     println("mean: ", round(sum(times) / length(times), digits=3), " s  ",
         "(min ", round(minimum(times), digits=3), "s, max ", round(maximum(times), digits=3), "s)")
+    return times
+end
+
+"""
+Time a `ctrl`-year control run followed by a `scnr`-year scenario run, `reps`
+times; returns seconds per run. Unlike `time_1yr` (fixed 1-year control
+run, no scenario), this is for checking long-run cost and stability.
+
+`cfg`'s experiment: `forcing()` takes a fast path for `:full_model` that holds CO2 
+constant across the whole scenario regardless of `scnr`. For an actual multi-year 
+forced change, pass a `cfg` from an experiment with a real CO2 trajectory.
+"""
+function time_years(jld2_dir::AbstractString; cfg=create_experiment_config(:full_model),
+        ctrl::Int=10, scnr::Int=10, reps::Int=1)
+    _require_data(jld2_dir) || return nothing
+    reps >= 1 || throw(ArgumentError("reps must be at least 1, got $reps"))
+    ctrl >= 1 || throw(ArgumentError("ctrl must be at least 1, got $ctrl"))
+    scnr >= 0 || throw(ArgumentError("scnr must be >= 0, got $scnr"))
+    total_years = ctrl + scnr
+
+    println("Threads.nthreads() = ", Threads.nthreads())
+    println("ctrl=$ctrl scnr=$scnr ($total_years simulated years/rep), experiment=$(cfg.experiment)")
+    fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
+
+    # Warm-up with a minimal run.
+    redirect_stdout(devnull) do
+        greb_model!(RunSpec(ctrl=1, scnr=0), deepcopy(cfg); jld2_dir=jld2_dir, fields=deepcopy(fields))
+    end
+
+    times = Float64[]
+    for r in 1:reps
+        fields_r = deepcopy(fields)  # the model mutates fields
+        cfg_r = deepcopy(cfg)
+        t = @elapsed redirect_stdout(devnull) do
+            greb_model!(RunSpec(ctrl=ctrl, scnr=scnr), cfg_r; jld2_dir=jld2_dir, fields=fields_r)
+        end
+        push!(times, t)
+        println("  run $r: ", round(t, digits=3), " s  (",
+            round(t / total_years, digits=3), " s/simulated year)")
+    end
+
+    mean_t = sum(times) / length(times)
+    println("mean: ", round(mean_t, digits=3), " s  ",
+        "(min ", round(minimum(times), digits=3), "s, max ", round(maximum(times), digits=3), "s)  ",
+        "= ", round(mean_t / total_years, digits=3), " s/simulated year over ", total_years, " years")
     return times
 end
 
@@ -165,7 +213,7 @@ function check_allocations(jld2_dir::AbstractString)
     return bytes
 end
 
-const _MODES = ("year", "stages", "threads", "alloc")
+const _MODES = ("year", "stages", "threads", "alloc", "years")
 
 if abspath(PROGRAM_FILE) == @__FILE__
     mode, rest = if isempty(ARGS)
@@ -178,6 +226,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
         error("unknown mode $(repr(ARGS[1])); expected one of $(join(_MODES, ", ")) " *
               "or a path to an existing dataset directory")
     end
+
+    # `--name=value` flags (only `years` uses them today) can appear anywhere
+    # in `rest`, so they're stripped before the positional [jld2_dir] [reps].
+    flags, rest = split_flags(rest)
 
     jld2_dir = !isempty(rest) ? rest[1] : default_data_dir()
 
@@ -192,5 +244,11 @@ if abspath(PROGRAM_FILE) == @__FILE__
     elseif mode == "alloc"
         reps === nothing || error("the alloc mode takes no reps argument")
         check_allocations(jld2_dir)
+    elseif mode == "years"
+        ctrl = haskey(flags, "ctrl") ? parse_nonneg_int("ctrl", flags["ctrl"]) : 10
+        scnr = haskey(flags, "scnr") ? parse_nonneg_int("scnr", flags["scnr"]) : 10
+        experiment = Symbol(get(flags, "experiment", "full_model"))
+        time_years(jld2_dir; cfg=create_experiment_config(experiment),
+            ctrl=ctrl, scnr=scnr, reps=something(reps, 1))
     end
 end
