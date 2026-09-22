@@ -6,6 +6,9 @@ Manifest.toml
 *.jl.cov
 *.jl.*.cov
 *.jl.mem
+__pycache__/
+out/
+era5_raw/
 
 # Model data (see DATA_README.md) and dataset release archives
 /Data/
