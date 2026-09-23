@@ -136,6 +136,67 @@ function load_solar_series(path::AbstractString; reference::Union{Real,Nothing}=
 end
 
 """
+    load_aerosol_series(path::AbstractString) -> AerosolSeries
+
+Loads a stratospheric optical-depth record for `AerosolScenario(series=...)`
+from a JLD2 file with the entries `format_version` (1), `years` (ascending
+decimal years), `lat` (ascending band-centre latitudes), `aod` (a matrix of
+size `(length(lat), length(years))`) and optionally `source`. An `reff`
+(effective radius) entry, written by the converter for later use, is ignored.
+Published records are converted to this layout by
+`tools/convert_aerosol_to_jld2.jl`. Values are
+interpolated linearly onto the model latitudes, holding the end values beyond
+the outermost centre. Used in the model, the record is linearly interpolated in
+time and is zero outside its first and last year, so a record that ends with a
+non-zero value stops abruptly. Loading warns when the last year's largest
+optical depth exceeds `SERIES_END_WARN_AOD`, naming the file, the year and the
+value. The record is never altered; there is deliberately no option to fade it
+out.
+"""
+function load_aerosol_series(path::AbstractString)
+    isfile(path) || error("Aerosol series file not found: $path")
+    years, lat, aod, source = jldopen(path) do file
+        for key in ("format_version", "years", "lat", "aod")
+            haskey(file, key) ||
+                error("Aerosol series file $path is missing the `$key` entry; " *
+                      "regenerate it with tools/convert_aerosol_to_jld2.jl")
+        end
+        file["format_version"] == AEROSOL_SERIES_FORMAT ||
+            error("Aerosol series file $path has format_version $(file["format_version"]); " *
+                  "this version reads $AEROSOL_SERIES_FORMAT")
+        (Float64.(file["years"]), Float64.(file["lat"]), Float64.(file["aod"]),
+         haskey(file, "source") ? String(file["source"]) : "")
+    end
+    isempty(years) && error("Aerosol series file $path contains no years")
+    size(aod) == (length(lat), length(years)) ||
+        error("Aerosol series file $path: `aod` has size $(size(aod)), expected " *
+              "$((length(lat), length(years))) (latitudes by years)")
+    _strictly_ascending(years) || error("Aerosol series file $path: years must be strictly ascending")
+    _strictly_ascending(lat) || error("Aerosol series file $path: latitudes must be strictly ascending")
+    all(isfinite, aod) || error("Aerosol series file $path: `aod` contains non-finite values")
+    out = Matrix{Float32}(undef, ydim, length(years))
+    for k in eachindex(years), j in 1:ydim
+        out[j, k] = Float32(_interp_lat(lat, @view(aod[:, k]), Float64(lat_grid[j])))
+    end
+    last_aod = maximum(@view aod[:, end])
+    last_aod > SERIES_END_WARN_AOD &&
+        @warn "Aerosol series $path ends at year $(years[end]) with optical depth " *
+              "$last_aod; the record is zero after its last year, so the dimming stops abruptly"
+    return AerosolSeries(years, out, source)
+end
+
+_strictly_ascending(v) = all(i -> v[i] < v[i + 1], firstindex(v):lastindex(v) - 1)
+
+# Linear interpolation in `xs` (ascending), holding the end values beyond it.
+function _interp_lat(xs, ys, x)
+    x <= first(xs) && return first(ys)
+    x >= last(xs) && return last(ys)
+    k = searchsortedlast(xs, x)
+    f = (x - xs[k]) / (xs[k + 1] - xs[k])
+    return (1 - f) * ys[k] + f * ys[k + 1]
+end
+
+"""
 Load flux corrections from the combined `climatology/flux_corrections.jld2`
 into `fields` (zeros per-field if the file or an individual key is missing).
 """

@@ -262,3 +262,88 @@ end
     GREBClimate.aerosol_transmission!(m, buf, nh, 2000.42)
     @test (@allocated GREBClimate.aerosol_transmission!(m, buf, nh, 2000.42)) == 0
 end
+
+function _write_aerosol(path; years, lat, aod, source = "test", version = 1, drop = ())
+    GREBClimate.jldopen(path, "w") do f
+        "format_version" in drop || (f["format_version"] = version)
+        "years" in drop || (f["years"] = years)
+        "lat" in drop || (f["lat"] = lat)
+        "aod" in drop || (f["aod"] = aod)
+        f["source"] = source
+    end
+    return path
+end
+
+@testset "load_aerosol_series interpolates in time and latitude, and is zero outside the record" begin
+    with_tempdir() do dir
+        path = _write_aerosol(joinpath(dir, "aod.jld2"); years = [1991.0, 1992.0],
+                              lat = [-60.0, 0.0, 60.0], aod = [0.0 0.2; 0.0 0.1; 0.0 0.2],
+                              source = "unit test")
+        # This record ends at 0.2, so loading it warns about the abrupt end.
+        series = @test_logs (:warn, r"aod\.jld2.*1992.*0\.2") load_aerosol_series(path)
+        @test series.source == "unit test"
+        sc = AerosolScenario(series = series)
+
+        aod = zeros(Float32, Y)
+        GREBClimate.aerosol_optical_depth!(aod, sc, 1991.5)      # halfway in time
+        @test (@allocated GREBClimate.aerosol_optical_depth!(aod, sc, 1991.5)) == 0
+        for j in 1:Y
+            phi = Float64(GREBClimate.lat_grid[j])
+            band = phi <= -60 ? 0.2 : phi >= 60 ? 0.2 :
+                   phi <= 0 ? 0.2 + (0.1 - 0.2) * (phi + 60) / 60 :
+                              0.1 + (0.2 - 0.1) * phi / 60
+            @test aod[j] ≈ 0.5 * band rtol = 1e-5
+        end
+
+        GREBClimate.aerosol_optical_depth!(aod, sc, 1990.0)
+        @test all(iszero, aod)
+        GREBClimate.aerosol_optical_depth!(aod, sc, 1993.0)
+        @test all(iszero, aod)
+
+        # A series and an eruption over the same period are summed, exactly.
+        # This double counts if the series already contains that eruption; the
+        # docstring says so and it is the user's responsibility.
+        e = Eruption(1991.5, :tropical; peak_aod = 0.1)
+        both = AerosolScenario(series = series, eruptions = [e])
+        only_e = AerosolScenario(eruptions = [e])
+        a_series, a_e, a_both = (zeros(Float32, Y) for _ in 1:3)
+        GREBClimate.aerosol_optical_depth!(a_series, sc, 1991.7)
+        GREBClimate.aerosol_optical_depth!(a_e, only_e, 1991.7)
+        GREBClimate.aerosol_optical_depth!(a_both, both, 1991.7)
+        @test a_both ≈ a_series .+ a_e
+
+        # Exact data years: the first year returns its row, the last year
+        # returns its row, and just past the last year the record is zero.
+        aod0 = zeros(Float32, Y)
+        GREBClimate.aerosol_optical_depth!(aod0, sc, 1991.0)
+        @test all(iszero, aod0)
+        aodN = zeros(Float32, Y)
+        GREBClimate.aerosol_optical_depth!(aodN, sc, 1992.0)
+        @test aodN == series.aod[:, 2]
+        GREBClimate.aerosol_optical_depth!(aodN, sc, 1992.0 + 1e-9)
+        @test all(iszero, aodN)
+
+        # A record that fades to (near) zero loads silently; one that ends
+        # above the threshold warns, naming the file, the last year and the
+        # last value. The record is never altered.
+        fades = _write_aerosol(joinpath(dir, "fades.jld2"); years = [1991.0, 1992.0, 1993.0],
+                               lat = [-60.0, 0.0, 60.0],
+                               aod = [0.0 0.2 0.0; 0.0 0.1 0.0; 0.0 0.2 0.001])
+        faded = @test_logs load_aerosol_series(fades)
+        @test faded.aod[1, end] == 0.0f0
+
+        good = (years = [1991.0, 1992.0], lat = [-60.0, 0.0, 60.0], aod = zeros(3, 2))
+        for (name, kw) in (
+                ("nokey.jld2",     (; good..., drop = ("aod",))),
+                ("version.jld2",   (; good..., version = 2)),
+                ("noversion.jld2", (; good..., drop = ("format_version",))),
+                ("shape.jld2",     (; good..., aod = zeros(3, 3))),
+                ("unsorted.jld2",  (; good..., years = [1992.0, 1991.0])),
+                ("latorder.jld2",  (; good..., lat = [60.0, 0.0, -60.0])),
+                ("nan.jld2",       (; good..., aod = [0.0 0.0; NaN 0.0; 0.0 0.0])),
+                ("empty.jld2",     (; years = Float64[], lat = [-60.0, 0.0, 60.0], aod = zeros(3, 0))))
+            @test_throws ErrorException load_aerosol_series(_write_aerosol(joinpath(dir, name); kw...))
+        end
+        @test_throws ErrorException load_aerosol_series(joinpath(dir, "missing.jld2"))
+    end
+end

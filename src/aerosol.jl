@@ -100,8 +100,29 @@ struct SustainedInjection
 end
 
 """
-    AerosolScenario(; eruptions=[], injections=[], tau_rise=0.21, tau_decay=1.0,
-                    ssa=1.0, asymmetry=0.7, mu0=0.5)
+    AerosolSeries
+
+A published optical-depth record already interpolated onto the model latitudes:
+`years` (ascending decimal years), `aod` of size `(ydim, length(years))` so one
+year's column is contiguous, and `source`, the provenance string stored in the
+file. Build one with [`load_aerosol_series`](@ref).
+"""
+struct AerosolSeries
+    years::Vector{Float64}
+    aod::Matrix{Float32}
+    source::String
+end
+
+# Loading warns when the last year's largest optical depth exceeds this. Chosen
+# as a small fraction of a Pinatubo-scale peak (about 0.15); adjustable.
+const SERIES_END_WARN_AOD = 0.005
+
+# Schema version of the JLD2 file `load_aerosol_series` reads.
+const AEROSOL_SERIES_FORMAT = 1
+
+"""
+    AerosolScenario(; eruptions=[], injections=[], series=nothing, tau_rise=0.21,
+                    tau_decay=1.0, ssa=1.0, asymmetry=0.7, mu0=0.5)
 
 Stratospheric aerosol add-on for `cfg.aerosol`. It composes with any
 experiment and dims the shortwave per latitude. Optical depth follows two
@@ -113,6 +134,15 @@ timescales apply to every injection class, although high-latitude eruptions
 decay faster. `ssa`, `asymmetry` and `mu0` set the delta-Eddington
 transmission.
 
+`series` adds a published optical-depth record (see
+[`load_aerosol_series`](@ref)), summed with the modelled eruptions. If the
+record already contains an eruption you also list, it is counted twice. The
+record is zero outside its first and last year, so a record that ends with a
+non-zero value stops abruptly. Published records include the background
+aerosol of quiet years (optical depth of about 0.002 to 0.009), which the
+control run does not have, so a series run's anomaly contains that small
+offset as well as the eruptions.
+
 Applies to the scenario run only; the control run is never dimmed, so
 anomalies are relative to an aerosol-free control. Not represented: the
 longwave effect of the aerosol, its ozone chemistry, growth of particle size
@@ -122,6 +152,7 @@ the 8-12 micron window, and stratospheric heating.
 struct AerosolScenario
     eruptions::Vector{Eruption}
     injections::Vector{SustainedInjection}
+    series::Union{Nothing,AerosolSeries}
     tau_rise::Float64
     tau_decay::Float64
     ssa::Float64
@@ -130,15 +161,15 @@ struct AerosolScenario
 end
 
 function AerosolScenario(; eruptions=Eruption[], injections=SustainedInjection[],
-        tau_rise::Real=0.21, tau_decay::Real=1.0, ssa::Real=1.0,
-        asymmetry::Real=0.7, mu0::Real=0.5)
+        series::Union{Nothing,AerosolSeries}=nothing, tau_rise::Real=0.21,
+        tau_decay::Real=1.0, ssa::Real=1.0, asymmetry::Real=0.7, mu0::Real=0.5)
     0 < tau_rise < tau_decay ||
         throw(ArgumentError("need 0 < tau_rise < tau_decay (years), got $tau_rise and $tau_decay"))
     0 <= ssa <= 1 || throw(ArgumentError("ssa must be in [0, 1], got $ssa"))
     0 <= asymmetry < 1 || throw(ArgumentError("asymmetry must be in [0, 1), got $asymmetry"))
     0 < mu0 <= 1 || throw(ArgumentError("mu0 must be in (0, 1], got $mu0"))
     return AerosolScenario(collect(Eruption, eruptions), collect(SustainedInjection, injections),
-        Float64(tau_rise), Float64(tau_decay), Float64(ssa), Float64(asymmetry), Float64(mu0))
+        series, Float64(tau_rise), Float64(tau_decay), Float64(ssa), Float64(asymmetry), Float64(mu0))
 end
 
 # - Two-reservoir chain (times in years) ──────────────────────────────────
@@ -179,6 +210,22 @@ function aerosol_optical_depth!(aod::Vector{Float32}, sc::AerosolScenario, t::Re
         isfinite(s.stop_year) && (u -= chain_step(t - s.stop_year, tr, td))
         u == 0.0 && continue
         aod .+= (s.target_aod * u) .* _CLASS_PROFILES[s.cls]
+    end
+    sc.series === nothing || _add_series!(aod, sc.series, t)
+    return aod
+end
+
+# Adds the record at decimal year `t`, linear in time between records and zero
+# outside the first and last year.
+function _add_series!(aod::Vector{Float32}, s::AerosolSeries, t::Real)
+    yrs = s.years
+    (t < first(yrs) || t > last(yrs)) && return aod
+    k = searchsortedlast(yrs, t)
+    if k == length(yrs)
+        aod .+= @view s.aod[:, k]
+    else
+        frac = (t - yrs[k]) / (yrs[k + 1] - yrs[k])
+        aod .+= (1 - frac) .* @view(s.aod[:, k]) .+ frac .* @view(s.aod[:, k + 1])
     end
     return aod
 end
