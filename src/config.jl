@@ -70,6 +70,10 @@ Base.@kwdef mutable struct PhysicsConfig
     # (same format as the IPCC scenario files), loaded into `co2_scenario`
     # at scenario start.
     custom_co2_path::String = ""
+
+    # Solar series add-on: year => multiplier on the shortwave forcing,
+    # composable with any experiment (see `load_solar_series`). Empty = off.
+    solar_scenario::Dict{Int,Float32} = Dict{Int,Float32}()
 end
 
 """

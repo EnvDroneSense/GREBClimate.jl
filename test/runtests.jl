@@ -18,6 +18,7 @@ const SHARD = [
     ("test_output.jl",     "light"),
     ("test_physics.jl",    "light"),
     ("test_io.jl",         "light"),
+    ("test_aerosol.jl",    "light"),
     ("test_invariants.jl", "light"),
     ("test_threading.jl",  "light"),
     ("test_model.jl",      "heavy"),

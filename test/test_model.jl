@@ -401,3 +401,25 @@ end
         rm(tmpdir_anom; recursive = true, force = true)
     end
 end
+
+# A 1-year control + 1-year scenario run on synthetic fields with a non-trivial
+# shortwave climatology, so a change in the shortwave multiplier is visible.
+function _addon_run(configure)
+    f = synthetic_fields()
+    for k in 1:N, j in 1:Y
+        f.sw_solar[j, k] = 340.0f0 * cosd(GREBClimate.lat_grid[j]) + 1.0f0
+    end
+    cfg = create_experiment_config(:full_model)
+    configure(cfg)
+    quiet() do
+        greb_model!(RunSpec(), cfg; jld2_dir = "", fields = f, allow_uninitialized = true)
+    end
+end
+
+@testset "shortwave add-ons reach SWradiation! through greb_model!" begin
+    base = _addon_run(cfg -> nothing)
+    solar = _addon_run(cfg -> cfg.solar_scenario = Dict(1950 => 0.99f0))
+    @test all(isfinite, solar.scnr[6].sw)
+    @test gmean(solar.scnr[6].sw) < gmean(base.scnr[6].sw)
+    @test_throws ErrorException _addon_run(cfg -> cfg.solar_scenario = Dict(1949 => 0.99f0))
+end

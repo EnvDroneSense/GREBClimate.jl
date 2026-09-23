@@ -101,6 +101,41 @@ function load_custom_co2_scenario(path::String)
 end
 
 """
+    load_solar_series(path; reference=nothing) -> Dict{Int,Float32}
+
+Load a `year TSI` table from a plain-text file (blank lines and `#` skipped)
+for `cfg.solar_scenario`. Values are divided by `reference`, defaulting to the
+table mean, so the multiplier averages 1 and the control climate is unchanged.
+Pass `reference` (W/m2) to normalise against a solar constant instead.
+Composes with any experiment; does not replace the built-in solar experiments.
+"""
+function load_solar_series(path::AbstractString; reference::Union{Real,Nothing}=nothing)
+    isfile(path) || error("Solar series file not found: $path")
+    raw = Dict{Int,Float64}()
+    open(path) do io
+        for line in eachline(io)
+            stripped = strip(line)
+            (isempty(stripped) || startswith(stripped, "#")) && continue
+            cols = split(stripped)
+            length(cols) >= 2 ||
+                error("Malformed line in solar series file $path: \"$line\" (expected \"year TSI\")")
+            yr = parse(Int, cols[1])
+            haskey(raw, yr) && error("Solar series file $path lists year $yr more than once")
+            raw[yr] = parse(Float64, cols[2])
+        end
+    end
+    isempty(raw) && error("Solar series file $path contains no data lines")
+    # A missing year would otherwise surface as an error in the middle of a run.
+    yrs = sort!(collect(keys(raw)))
+    for (a, b) in zip(yrs, yrs[2:end])
+        b == a + 1 || error("Solar series $path has a gap: $a is followed by $b")
+    end
+    ref = reference === nothing ? sum(values(raw)) / length(raw) : Float64(reference)
+    ref > 0 || error("Solar series reference must be positive, got $ref")
+    return Dict{Int,Float32}(yr => Float32(v / ref) for (yr, v) in raw)
+end
+
+"""
 Load flux corrections from the combined `climatology/flux_corrections.jld2`
 into `fields` (zeros per-field if the file or an individual key is missing).
 """
