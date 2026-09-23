@@ -445,7 +445,7 @@ function greb_model!(run::RunSpec, cfg::PhysicsConfig;
         forcing_result = forcing(it, year, cfg, fields, ice_forcing; nstep_yr=nstep_yr)
         CO2 = forcing_result.CO2
         state.sw_solar_forcing .= forcing_result.sw_solar_forcing
-        apply_shortwave_addons!(state.sw_solar_forcing, cfg, year, it)
+        apply_shortwave_addons!(state, cfg, year, it)
 
         # Forced‑boundary experiments: overwrite Ts with climatology
         if is_forced_boundary

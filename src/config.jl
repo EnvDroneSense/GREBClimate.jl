@@ -74,6 +74,9 @@ Base.@kwdef mutable struct PhysicsConfig
     # Solar series add-on: year => multiplier on the shortwave forcing,
     # composable with any experiment (see `load_solar_series`). Empty = off.
     solar_scenario::Dict{Int,Float32} = Dict{Int,Float32}()
+
+    # Stratospheric aerosol add-on (see `AerosolScenario`); `nothing` = off.
+    aerosol::Union{Nothing,AerosolScenario} = nothing
 end
 
 """

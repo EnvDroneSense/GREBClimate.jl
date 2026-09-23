@@ -241,7 +241,8 @@ end
     ModelState
 
 Per-run mutable state that isn't climatology: the per-latitude runtime
-solar-forcing multiplier (`SWradiation!` reads it) and the surface-temperature accumulator
+solar-forcing multiplier (`SWradiation!` reads it), scratch for the aerosol
+optical depth (`apply_shortwave_addons!` writes it), and the surface-temperature accumulator
 behind the annual progress line (`diagnostics!` reads/writes it). One instance
 per `greb_model!` run.
 
@@ -252,11 +253,12 @@ holds a readable annual mean once the call returns. Model output is the
 """
 mutable struct ModelState
     sw_solar_forcing::Vector{Float32}   # per-latitude shortwave multiplier (ydim) used by SWradiation!
+    aod::Vector{Float32}                # aerosol optical depth scratch (ydim), see apply_shortwave_addons!
     Tsmn::Matrix{Float32}               # surface-temperature accumulator for the progress line
 end
 
 function ModelState()
-    ModelState(ones(Float32, ydim), zeros(Float32, xdim, ydim))
+    ModelState(ones(Float32, ydim), zeros(Float32, ydim), zeros(Float32, xdim, ydim))
 end
 
 """

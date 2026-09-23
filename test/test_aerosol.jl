@@ -30,15 +30,51 @@ end
 
 @testset "apply_shortwave_addons! is an exact no-op unconfigured and applies the solar table otherwise" begin
     cfg = create_experiment_config(:full_model)
-    mult = ones(Float32, Y)
-    GREBClimate.apply_shortwave_addons!(mult, cfg, 1950, 1)
-    @test all(==(1.0f0), mult)
+    state = ModelState()
+    @test length(state.aod) == Y
+    GREBClimate.apply_shortwave_addons!(state, cfg, 1950, 1)
+    @test all(==(1.0f0), state.sw_solar_forcing)
 
     cfg.solar_scenario = Dict(1950 => 0.998f0)
-    GREBClimate.apply_shortwave_addons!(mult, cfg, 1950, 1)
-    @test all(==(0.998f0), mult)
-    @test_throws ErrorException GREBClimate.apply_shortwave_addons!(mult, cfg, 1951, 1)
-    @test_throws ErrorException GREBClimate.apply_shortwave_addons!(mult, cfg, 1950.5, 1)
+    GREBClimate.apply_shortwave_addons!(state, cfg, 1950, 1)
+    @test all(==(0.998f0), state.sw_solar_forcing)
+    @test_throws ErrorException GREBClimate.apply_shortwave_addons!(state, cfg, 1951, 1)
+    @test_throws ErrorException GREBClimate.apply_shortwave_addons!(state, cfg, 1950.5, 1)
+end
+
+@testset "apply_shortwave_addons! applies the aerosol and composes exactly with the solar table and solar experiments" begin
+    cfg = create_experiment_config(:full_model)
+    @test cfg.aerosol === nothing
+    state = ModelState()
+    cfg.aerosol = AerosolScenario()
+    GREBClimate.apply_shortwave_addons!(state, cfg, 2000, 1)
+    @test all(==(1.0f0), state.sw_solar_forcing)          # empty scenario: exact no-op
+
+    cfg.aerosol = AerosolScenario(eruptions = [Eruption(2000.0, :tropical; peak_aod = 0.1)])
+    # step 150 of the year is t = 2000 + 149/730
+    GREBClimate.apply_shortwave_addons!(state, cfg, 2000, 150)
+    only_aero = copy(state.sw_solar_forcing)
+    @test all(<(1.0f0), only_aero)
+
+    # Solar first, then aerosol; the product is exact.
+    cfg.solar_scenario = Dict(2000 => 0.99f0)
+    state.sw_solar_forcing .= 1.0f0
+    GREBClimate.apply_shortwave_addons!(state, cfg, 2000, 150)
+    @test state.sw_solar_forcing == 0.99f0 .* only_aero
+
+    # Composes the same way with an experiment that already modulates the
+    # multiplier: model.jl broadcasts forcing()'s scalar into the vector,
+    # then the add-ons multiply into it.
+    cyc = create_experiment_config(:solar_cycle_11yr)
+    cyc.aerosol = cfg.aerosol
+    scalar = forcing(150, 2000, cyc, ClimateFields(), zeros(Float64, X, Y, 1)).sw_solar_forcing
+    state.sw_solar_forcing .= scalar
+    GREBClimate.apply_shortwave_addons!(state, cyc, 2000, 150)
+    @test state.sw_solar_forcing == scalar .* only_aero
+
+    # The per-timestep path allocates nothing.
+    GREBClimate.apply_shortwave_addons!(state, cfg, 2000, 150)
+    @test (@allocated GREBClimate.apply_shortwave_addons!(state, cfg, 2000, 150)) == 0
 end
 
 const _W = cosd.(Float64.(GREBClimate.lat_grid))
