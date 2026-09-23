@@ -14,6 +14,17 @@ julia --project=. tools/convert_greb_to_jld2.jl <input_dir> [output_dir]   # def
 julia --project=. tools/package_dataset.jl greb_input_data greb_input_data-v1.tar.gz
 ```
 
+## Generating new input data (ERA5)
+
+`tools/fetch_era5_data.py` builds an ERA5 climatology from the Copernicus
+Climate Data Store and writes it in the `.bin` format the converter reads.
+It requires your own [CDS API access](https://cds.climate.copernicus.eu/how-to-api).
+
+```bash
+python -m pip install cdsapi netCDF4 numpy
+python tools/fetch_era5_data.py --start-year 1991 --end-year 2020 --out-dir era5_raw
+julia --project=. tools/convert_greb_to_jld2.jl era5_raw greb_input_data_era5
+
 The converter reads the `.bin` files (and matching `.ctl` files, if present)
 **flat** from the input directory:
 

@@ -1,34 +1,23 @@
 ### Convert GREB binary files to JLD2 (JuliaIO/JLD2.jl) files ###
 #
-# MAINTAINER TOOL. Users of the package do not need to run this - they get the
-# prepared `.jld2` bundle directly (see README.md's "Getting the data"). This
-# script is how that bundle is produced.
+# MAINTAINER TOOL - users get the prepared `.jld2` bundle directly (see
+# README.md).
 #
-# Converts the raw GREB `.bin` input files (see DATA_README.md for the
-# expected layout: files flat in the input dir, with solar-forcing scenarios
-# in an optional `solar_forcing_scenarios/` subdirectory) into the `.jld2` dataset
-# that `load_greb_jld2!`/`GREBClimate.read_jld2` read (see README.md's "Input Data"
-# section for the resulting directory structure).
+# Converts the raw GREB `.bin` files (layout in DATA_README.md) into the
+# `.jld2` dataset read by `load_greb_jld2!`/`GREBClimate.read_jld2`.
 #
-# Each field is written as its own `.jld2` file with keys "data"
-# (Array{Float32}), "dim_names", and optionally "coords" (e.g. the actual
-# eccentricity/obliquity value behind a stacked scenario slice) and "ctl"
-# (the original GrADS .ctl text, if present).
+# Each field becomes its own `.jld2` file with keys "data" (Array{Float32})
+# and "dim_names", plus optional "coords" and "ctl".
 #
-# Solar scenario families (eccentricity, obliquity) are discovered by
-# globbing `greb.solar.<prefix>.<N>.bin` and sorting numerically rather than
-# assuming a fixed stride, since the real files aren't evenly spaced.
-#
-# CO₂ scenario text files (`ipcc.scenario.<key>.forcing*.txt` - RCPs, SSPs,
-# and the historical CO2/emission/population file) are parsed into
-# `year => CO2` lookup tables and combined into a single
-# `scenario/ipcc_scenarios.jld2`, keyed by `<key>` (e.g. "rcp85", "ssp585").
+# Solar scenario families (eccentricity, obliquity) are discovered by globbing
+# `greb.solar.<prefix>.<N>.bin` and sorted numerically. CO₂ scenario text
+# files (`ipcc.scenario.<key>.forcing*.txt`) are parsed into `year => CO2`
+# tables and combined into `scenario/ipcc_scenarios.jld2`.
 #
 # Usage:
 #   julia --project=. tools/convert_greb_to_jld2.jl [input_dir] [output_dir] [--all]
-#   # defaults: input_dir  = Data              (see DATA_README.md)
-#   #           output_dir = greb_input_data   (see README.md)
-#   # --all: also convert fields the model never reads (see MODEL_FIELD_NAMES)
+#   # defaults: input_dir = Data, output_dir = greb_input_data
+#   # --all: also convert fields the model never reads
 
 using JLD2
 

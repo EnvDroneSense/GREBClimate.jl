@@ -14,14 +14,24 @@ all against the real dataset, post-JIT-warmup:
 | `stages` | Per-timestep breakdown: times each of `tendencies!`'s stages (`circulation!` for `Ta`/`q`, `SWradiation!`, `LWradiation!`, `hydro!`, `deep_ocean!`) individually and reports each one's share of the total. |
 | `threads` | Runs `year` in separate `-t N` subprocesses (thread count is fixed at Julia startup) and reports relative speedup vs. `-t 1`. |
 | `alloc` | Reports bytes allocated by one `tendencies!` call - a regression guard for the zero-allocation hot path. Budget is **256 bytes** (`benchmark/run_benchmarks.jl:205`, enforced in `test/test_invariants.jl:58`). |
+| `years` | Wall-clock time for a `--ctrl=N`-year control run followed by a `--scnr=N`-year scenario run (default 10/10). For long-run cost/stability, not just one year. `--experiment=NAME` picks the config (default `full_model`, which holds CO2 flat through the scenario phase regardless of `scnr` - use `a1b_scenario` or another CO2-trajectory experiment to see a forced multi-year trend, not just cost). |
 
 The model runs natively in `Float32` throughout (climatology, workspace
-buffers, model state - see the ClimaModel vault, `03-findings/performance.md` §2.3); current baseline
-on this machine is **~0.6-0.75s/simulated year at `-t 2`** (down from the
-pre-`Float32` ~1.1-1.2s/year); a 2026-08-21 run measured 0.63s mean
-(0.56-0.71s across 3 reps). Treat any reading far outside that band as
-worth double-checking against the noise sources below before reporting it
-as a real regression.
+buffers, model state - see the ClimaModel vault, `03-findings/performance.md` §2.3).
+**The baseline band on this machine depends on background load - there are
+now two recorded regimes, not one:**
+
+| Regime | `year` at `-t 2` | Recorded |
+|---|---|---|
+| Normal background load | **~0.6-0.75s/simulated year** | 2026-08-21, 0.63s mean (0.56-0.71s across 3 reps) |
+| Background processes deliberately closed | **~0.27-0.43s/simulated year** | 2026-09-22, 0.31s mean (0.256-0.434s across 9 runs) |
+
+Check which regime the machine is actually in (`tasklist` for what's
+running) before judging a reading against either band - a ~0.6s reading is
+normal under load and a false "regression" if the machine was quiet for the
+2026-08-21 baseline's assumptions, and a ~0.3s reading is not a code
+speedup if load was simply lighter than usual. Pre-`Float32` (both
+regimes N/A, that baseline predates this split) the model ran ~1.1-1.2s/year.
 
 **Default to `-t 2`, not `-t 3`.** This reverses older guidance in this
 repo (and in git history of this file) - `-t 3` used to be the recommended
@@ -41,18 +51,26 @@ low-variance choice.
      its own subprocesses at each thread count, so run it with any `-t`;
      the outer process's thread count doesn't matter for this mode).
    - "Did this change add allocations to the hot path" → `alloc`.
+   - "How does this behave/cost over many simulated years, not just one" →
+     `years`.
 
    ```bash
    julia --project=. -t 2 benchmark/run_benchmarks.jl year
    julia --project=. -t 1 benchmark/run_benchmarks.jl stages
    julia --project=. -t 1 benchmark/run_benchmarks.jl threads
    julia --project=. -t 1 benchmark/run_benchmarks.jl alloc
+   julia --project=. -t 2 benchmark/run_benchmarks.jl years --ctrl=10 --scnr=100
    ```
 
    Pass a JLD2 data directory as the next positional argument if it isn't
    at the default `../greb_input_data` location, or set `GREB_DATA`. The
    legacy single-argument call form (`... run_benchmarks.jl <dir>`, no mode)
    still works and defaults to `year`.
+
+   `years`' `--ctrl=N`/`--scnr=N`/`--experiment=NAME` flags can appear
+   anywhere in the arguments, but the positional `[jld2_dir] [reps]` slots
+   still follow the same convention as every other mode - reps cannot be
+   given without a dir either, flags or not.
 
 2. **Before trusting a slow or surprising `year`/`threads` reading**, rule
    out known sources of noise on this machine - don't report a single
@@ -106,6 +124,17 @@ low-variance choice.
    this grid size regardless. Compare *relative* speedup, not just absolute
    numbers - absolute baselines drift with machine load, but the relative
    improvement from a real code change should hold up.
+
+   **Re-measured 2026-09-22 on a deliberately quiet machine: the `-t 2`
+   win itself shrinks, not just the absolute baseline.** Three sweeps gave
+   `-t 2` a mean of 1.13× (range 1.01-1.26×) - narrower than 08-21's
+   1.14-1.54× and, in the worst sweep, within noise of no benefit at all.
+   `-t 3`/`-t 4` were flat-to-negative in every sweep (0.87-1.00×), so `-t 2`
+   remains the best of the four counts and the recommendation is unchanged,
+   but do not expect the older ~1.3-1.5× figures on a quiet machine -
+   see `03-findings/performance.md`'s 2026-09-22 section for the working
+   hypothesis (smaller serial baseline -> thread-spawn overhead is a bigger
+   fraction of a smaller budget) and full numbers.
 
 4. Report mean/min/max (for `year`/`threads`) or the per-stage table (for
    `stages`) or the byte count (for `alloc`), and call out plainly if noise
