@@ -57,9 +57,14 @@ function SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, c
 
     # 4. albedo + shortwave flux.
     sw_solar = fields.sw_solar
-    multiplier = state.sw_solar_forcing * 0.01f0 * S0_var
+    # The scaled multiplier is formed outside the @turbo loop: inside it the
+    # compiler may regroup the product and change the last bit.
+    sw_mult = ws.sw_mult_buf
+    @inbounds for j in 1:ydim
+        sw_mult[j] = state.sw_solar_forcing[j] * 0.01f0 * S0_var
+    end
     @turbo for j in 1:ydim
-        sf = sw_solar[j, ityr] * multiplier
+        sf = sw_solar[j, ityr] * sw_mult[j]
         for i in 1:xdim
             aa = cld[i, j, ityr] * a_cloud
             a_atmos[i, j] = aa

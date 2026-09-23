@@ -62,6 +62,7 @@ Base.@kwdef mutable struct CirculationWorkspace
     albedo_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # combined albedo (surface + atmosphere)
     a_atmos_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # atmospheric albedo
     sw_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # net shortwave flux
+    sw_mult_buf::Vector{Float32} = zeros(Float32, ydim)  # per-latitude shortwave multiplier, scaled
 
     # time_loop
     precip_out::Matrix{Float32} = zeros(Float32, xdim, ydim)  # precipitation output
@@ -239,8 +240,8 @@ end
 """
     ModelState
 
-Per-run mutable state that isn't climatology: the runtime solar-forcing
-multiplier (`SWradiation!` reads it) and the surface-temperature accumulator
+Per-run mutable state that isn't climatology: the per-latitude runtime
+solar-forcing multiplier (`SWradiation!` reads it) and the surface-temperature accumulator
 behind the annual progress line (`diagnostics!` reads/writes it). One instance
 per `greb_model!` run.
 
@@ -250,12 +251,12 @@ holds a readable annual mean once the call returns. Model output is the
 `Vector{MonthlyRecord}` that [`greb_model!`](@ref) returns.
 """
 mutable struct ModelState
-    sw_solar_forcing::Float32   # runtime solar multiplier used by SWradiation!
-    Tsmn::Matrix{Float32}       # surface-temperature accumulator for the progress line
+    sw_solar_forcing::Vector{Float32}   # per-latitude shortwave multiplier (ydim) used by SWradiation!
+    Tsmn::Matrix{Float32}               # surface-temperature accumulator for the progress line
 end
 
 function ModelState()
-    ModelState(1.0f0, zeros(Float32, xdim, ydim))
+    ModelState(ones(Float32, ydim), zeros(Float32, xdim, ydim))
 end
 
 """

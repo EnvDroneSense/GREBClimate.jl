@@ -374,7 +374,7 @@ function greb_model!(run::RunSpec, cfg::PhysicsConfig;
     Ta = copy(Ta_ini)
     To = copy(To_ini);
     q = copy(q_ini)
-    state.sw_solar_forcing = 1.0f0
+    state.sw_solar_forcing .= 1.0f0
     mon = 1;
     year = 1970;
     irec = 0
@@ -432,7 +432,7 @@ function greb_model!(run::RunSpec, cfg::PhysicsConfig;
     mon = 1;
     irec = 0
 
-    state.sw_solar_forcing = 1.0f0
+    state.sw_solar_forcing .= 1.0f0
     reset!(acc)  # Use accumulator reset
 
     scnr_output = MonthlyRecord[]
@@ -444,7 +444,7 @@ function greb_model!(run::RunSpec, cfg::PhysicsConfig;
         # Obtain forcing (CO2 and solar multiplier)
         forcing_result = forcing(it, year, cfg, fields, ice_forcing; nstep_yr=nstep_yr)
         CO2 = forcing_result.CO2
-        state.sw_solar_forcing = forcing_result.sw_solar_forcing
+        state.sw_solar_forcing .= forcing_result.sw_solar_forcing
 
         # Forced‑boundary experiments: overwrite Ts with climatology
         if is_forced_boundary

@@ -206,3 +206,22 @@ end
         end
     end
 end
+
+@testset "SWradiation! applies state.sw_solar_forcing per latitude, bit-identical to the scalar form" begin
+    f = synthetic_fields()
+    for k in 1:N, j in 1:Y
+        f.sw_solar[j, k] = 340.0f0 * cosd(GREBClimate.lat_grid[j]) + 1.0f0
+    end
+    @test ModelState().sw_solar_forcing == ones(Float32, Y)
+
+    for mult in (fill(1.0f0, Y), fill(0.973f0, Y), Float32[1.0f0 - 0.005f0 * j for j in 1:Y])
+        state = ModelState()
+        state.sw_solar_forcing .= mult
+        out = SWradiation!(fill(285.0f0, X, Y), f, state, TimeState(1, 1),
+                           create_experiment_config(:full_model), CirculationWorkspace())
+        for j in 1:Y, i in 1:X
+            sf = f.sw_solar[j, 1] * (mult[j] * 0.01f0 * GREBClimate.S0_var)
+            @test out.SW[i, j] == sf * (1.0f0 - out.albedo[i, j])
+        end
+    end
+end
