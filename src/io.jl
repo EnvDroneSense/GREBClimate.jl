@@ -135,9 +135,10 @@ function load_solar_series(path::AbstractString; reference::Union{Real,Nothing}=
     return Dict{Int,Float32}(yr => Float32(v / ref) for (yr, v) in raw)
 end
 
-# Forcing-series standard: the one JLD2 layout for time-varying inputs (spec in
-# the vault, 07-standards/forcing-series-format). Times are decimal years on
-# the model's own calendar, so the model never converts dates.
+# Forcing-series standard: the one JLD2 layout for time-varying inputs (required
+# keys and checks in `_read_forcing_series` below; converters in tools/forcing/).
+# Times are decimal years on the model's own calendar, so the model never
+# converts dates.
 const FORCING_SERIES_FORMAT = 2
 const FORCING_CALENDAR = "greb_365"
 

@@ -15,8 +15,8 @@ Usage:
     julia --project=. tools/dataset/convert_greb_to_jld2.jl era5_greb greb_input_data_era5
 
 Diagnostic fields (cloud_cover, t700, t1000, rh700) are fetched as raw netCDF
-but not converted or written as GREB inputs; they support a separate
-cloud-feedback experiment tracked in the vault, not this script.
+but not converted or written as GREB inputs; they are for a separate
+cloud-feedback experiment and are not used by this script.
 """
 
 import argparse
@@ -183,7 +183,7 @@ def main():
     print("\nDone. Convert with:")
     print(f"  julia --project=. tools/dataset/convert_greb_to_jld2.jl {args.out_dir} <jld2-out-dir>")
     print("Wiring dataset=:era5 into GREBClimate.jl itself (flux-correction "
-          "re-derivation, loading code) is a separate step - see the vault.")
+          "re-derivation, loading code) is a separate step, not done by this script.")
 
 
 if __name__ == "__main__":

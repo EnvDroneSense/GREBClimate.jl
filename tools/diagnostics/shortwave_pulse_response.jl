@@ -8,7 +8,7 @@
 # global-mean surface temperature response per W/m2, its timing and recovery,
 # land and ocean separately, and the mean mixed-layer depth that sets the
 # ocean's heat capacity. Separates GREB's response to a known forcing from the
-# forcing the aerosol add-on produces; see the vault note volcanic-overcooling.
+# forcing the aerosol add-on produces.
 #
 # Usage:
 #   julia --project=. tools/diagnostics/shortwave_pulse_response.jl

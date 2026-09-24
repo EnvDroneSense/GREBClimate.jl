@@ -15,7 +15,7 @@
 #   shape error   RMS difference of the peak-normalised global-mean curves
 #
 # The record's mean over the 12 months before the eruption is subtracted.
-# Katmai is also compared with Stothers (1996) Table 6. Vault: aerosol-parameter-plan.
+# Katmai is also compared with Stothers (1996) Table 6.
 #
 # Usage:
 #   julia --project=. tools/diagnostics/aerosol_profile_check.jl

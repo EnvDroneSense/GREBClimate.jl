@@ -5,8 +5,8 @@
 # Reads one of the zonal-mean files published at
 # https://data.giss.nasa.gov/modelforce/strataer/ (Sato-Lacis, CMIP6, CMIP7,
 # GloSSAC; all share one layout: 24 latitude bands, monthly steps, `tau` and
-# `reff` at 550 nm) and writes a forcing-series file (standard in the vault,
-# 07-standards/forcing-series-format) that `load_aerosol_series` reads:
+# `reff` at 550 nm) and writes a forcing-series file (the layout that
+# `_read_forcing_series` in src/io.jl checks) that `load_aerosol_series` reads:
 #
 #   format_version  Int              2
 #   kind            String           "aerosol_aod"
