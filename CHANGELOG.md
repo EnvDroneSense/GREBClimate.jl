@@ -88,9 +88,11 @@ First release registered in the Julia General registry.
   (`cfg.solar_scenario`, `load_solar_series`) and a stratospheric aerosol
   (`cfg.aerosol = AerosolScenario(...)`) from volcanic eruptions, sustained
   geoengineering injections with an optional stop year, or a published
-  optical-depth record (`load_aerosol_series`). The aerosol dims sunlight per
-  latitude through a delta-Eddington layer, calibrated to −30 W/m² per unit
-  optical depth. Off by default; default runs are bit-identical. Against
+  optical-depth record (`load_aerosol_series`). Records are read from a
+  standard forcing-series JLD2 format whose times are on the model's 365-day
+  calendar, so converters, not the model, translate dates. The aerosol dims
+  sunlight per latitude through a delta-Eddington layer, calibrated to
+  −30 W/m² per unit optical depth. Off by default; default runs are bit-identical. Against
   observed temperatures it cools about twice as strongly as observed; see the
   model overview.
 - **Plotting toolbox** (`viz/`): maps, global-mean time series, seasonal cycle,
@@ -120,7 +122,8 @@ First release registered in the Julia General registry.
   files no code reads. Results are unchanged.
 - `forcing` is pure: the dynamic regional-CO₂ masks are built once per run.
 - Source split from one 2,245-line file into topical files; tests split into
-  one file per subject.
+  one file per subject. The model's backbone (constants, config, state,
+  tendencies, output, postprocess, model) now lives in `src/core/`.
 
 ### Fixed
 

@@ -18,17 +18,20 @@ julia --project=. -e 'using Pkg; Pkg.instantiate()'
 GREBClimate.jl/
 ├── src/                        # the package (module GREBClimate)
 │   ├── GREBClimate.jl          # module shell + include order
-│   ├── constants.jl            # grid/physical constants
-│   ├── config.jl               # PhysicsConfig, RunSpec, experiment presets
-│   ├── state.jl                # ClimateFields, ModelState, workspaces
-│   ├── data.jl                 # greb_data_dir(): dataset location + DataDep
-│   ├── io.jl                   # JLD2 loaders
+│   ├── core/                   # the model's backbone
+│   │   ├── constants.jl        # grid/physical constants
+│   │   ├── config.jl           # PhysicsConfig, RunSpec, experiment presets
+│   │   ├── state.jl            # ClimateFields, ModelState, workspaces
+│   │   ├── tendencies.jl       # per-timestep physics pipeline, forcing()
+│   │   ├── output.jl           # diagnostics!/output!/time_loop!
+│   │   ├── postprocess.jl      # monthly climatology/anomalies
+│   │   └── model.jl            # init_model!/qflux_correction!/greb_model!
 │   ├── physics/                # radiation.jl, hydrology.jl, ocean.jl
 │   ├── circulation.jl          # diffusion/advection/convergence
-│   ├── tendencies.jl           # per-timestep physics pipeline, forcing()
-│   ├── output.jl               # diagnostics!/output!/time_loop!
-│   ├── postprocess.jl          # monthly climatology/anomalies
-│   └── model.jl                # init_model!/qflux_correction!/greb_model!
+│   ├── aerosol.jl              # stratospheric aerosol add-on
+│   ├── shortwave_addons.jl     # applies the solar and aerosol add-ons
+│   ├── data.jl                 # greb_data_dir(): dataset location + DataDep
+│   └── io.jl                   # JLD2 and text loaders, forcing-series reader
 ├── test/                       # one file per subject; runtests.jl lists them
 ├── benchmark/run_benchmarks.jl # timing/allocation suite
 ├── docs/                       # Documenter site

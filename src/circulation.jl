@@ -1,5 +1,5 @@
 # ── Ghost-cell helpers ───────────────────────────────────────────────
-# Ghosted buffer layout and why it exists: see `nghost` in `constants.jl`.
+# Ghosted buffer layout and why it exists: see `nghost` in `core/constants.jl`.
 
 "Refresh the wrap-around ghost rows of a `(xghost, ydim)` buffer."
 @inline function refresh_ghosts!(P::AbstractMatrix{Float32})

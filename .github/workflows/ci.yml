@@ -33,7 +33,7 @@ jobs:
         env:
           GREB_TEST_SHARD: ${{ matrix.shard }}
           # The model only runs circulation!(Ta)/circulation!(q) concurrently
-          # when nthreads() > 1 (src/tendencies.jl). Thread count is fixed at
+          # when nthreads() > 1 (src/core/tendencies.jl). Thread count is fixed at
           # startup, so a 1-thread test process never reaches that branch.
           # Pkg.test's subprocess inherits this.
           JULIA_NUM_THREADS: '2'
