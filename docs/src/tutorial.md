@@ -79,7 +79,7 @@ cfg.aerosol = AerosolScenario(
 Years are on the model clock: the scenario run starts at 1950 for most
 experiments and at 1850 for `:historical_co2`. A published optical-depth record
 can replace or join the eruptions; convert it once with
-`tools/convert_aerosol_to_jld2.jl`, then pass
+`tools/forcing/convert_aerosol_to_jld2.jl`, then pass
 `AerosolScenario(series = load_aerosol_series("aerosol.jld2"))`. The
 [Model overview](@ref) lists what the aerosol does and does not represent.
 

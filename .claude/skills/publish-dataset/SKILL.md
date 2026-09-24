@@ -23,7 +23,7 @@ a machine with no local copy:
 ### 1. Build
 
 ```bash
-julia --project=. tools/package_dataset.jl greb_input_data greb_input_data-v1.tar.gz
+julia --project=. tools/dataset/package_dataset.jl greb_input_data greb_input_data-v1.tar.gz
 ```
 
 It validates the tree against the converter's `MODEL_FIELD_NAMES` allowlist
@@ -112,7 +112,7 @@ container, or accept the URL check plus the constants test.
 
 ## Related
 
-- `tools/convert_greb_to_jld2.jl` — builds `greb_input_data/` from raw `.bin`.
+- `tools/dataset/convert_greb_to_jld2.jl` — builds `greb_input_data/` from raw `.bin`.
   Pass `--all` only to inspect extra fields, never to build a release tree.
 - The ClimaModel vault, `03-findings/datadeps-context.md` — measured sizes, why `.tar.gz` and not
   `.tar.xz`, and the split-bundle option that was deliberately deferred.

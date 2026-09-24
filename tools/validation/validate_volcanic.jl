@@ -4,7 +4,7 @@
 # converted aerosol records and the validation data in Data/:
 #
 #   Data/aerosol/aerosol_Sato-Lacis.jld2, aerosol_GloSSAC.v2.24.jld2
-#       tools/convert_aerosol_to_jld2.jl on the GISS tau_reff_*.nc files
+#       tools/forcing/convert_aerosol_to_jld2.jl on the GISS tau_reff_*.nc files
 #   Data/validation/GLB.Ts+dSST.csv
 #       https://data.giss.nasa.gov/gistemp/tabledata_v4/GLB.Ts+dSST.csv
 #   Data/validation/mei_v1_table.html
@@ -21,15 +21,13 @@
 #    removed, and the model response) to Data/validation/volcanic_timeseries.csv.
 #
 # Usage:
-#   julia --project=. tools/validate_volcanic.jl
+#   julia --project=. tools/validation/validate_volcanic.jl
 
 using GREBClimate
 using LinearAlgebra
 using Printf
 
-const REPO = normpath(joinpath(@__DIR__, ".."))
-const DATA_DIR = something(greb_data_dir(; allow_download=false),
-                           joinpath(REPO, "greb_input_data"))
+include(joinpath(@__DIR__, "..", "common.jl"))
 const AEROSOL_DIR = joinpath(REPO, "Data", "aerosol")
 const VALIDATION_DIR = joinpath(REPO, "Data", "validation")
 

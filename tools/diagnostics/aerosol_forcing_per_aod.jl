@@ -12,16 +12,14 @@
 # the aerosol kernel spec in the vault.
 #
 # Usage:
-#   julia --project=. tools/aerosol_forcing_per_aod.jl
+#   julia --project=. tools/diagnostics/aerosol_forcing_per_aod.jl
 
 using GREBClimate
 using Printf
 
 const REFERENCE = -30.0      # W/m2 per unit optical depth
 
-const DATA_DIR = something(greb_data_dir(; allow_download=false),
-                           joinpath(@__DIR__, "..", "greb_input_data"))
-isdir(DATA_DIR) || error("dataset not found at $DATA_DIR")
+include(joinpath(@__DIR__, "..", "common.jl"))
 
 # Annual, area-weighted global means of the net shortwave, the incoming
 # shortwave and the combined albedo, with the multiplier set to `mult`.

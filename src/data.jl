@@ -14,7 +14,7 @@ const DATA_DEP_NAME = "GREB-input-data"
 Release tag and asset name for the published dataset bundle.
 
 The bundle is built from a validated `greb_input_data/` tree with
-`tools/package_dataset.jl`, which also prints the SHA256 below.
+`tools/dataset/package_dataset.jl`, which also prints the SHA256 below.
 """
 const DATA_RELEASE_TAG = "data-v1"
 const DATA_ARCHIVE_NAME = "greb_input_data-v1.tar.gz"
@@ -25,7 +25,7 @@ const DATA_URL = "https://github.com/EnvDroneSense/GREBClimate.jl/releases/downl
 """
 SHA256 of `DATA_ARCHIVE_NAME`, 370563584 bytes.
 
-Reproducible: `tools/package_dataset.jl` builds the archive with sorted entries,
+Reproducible: `tools/dataset/package_dataset.jl` builds the archive with sorted entries,
 zeroed owner/group, **pinned entry timestamps** and `gzip -n`, so the archive
 depends only on the dataset's contents. Regenerating the `.jld2` tree from the
 raw `.bin` files and repackaging reproduces this exact hash.

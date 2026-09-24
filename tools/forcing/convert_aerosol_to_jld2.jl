@@ -32,7 +32,7 @@
 # stacking then makes it visible alongside the project.
 #
 # Usage:
-#   julia --project=. tools/convert_aerosol_to_jld2.jl input.nc output.jld2
+#   julia --project=. tools/forcing/convert_aerosol_to_jld2.jl input.nc output.jld2
 
 using NCDatasets
 using JLD2
@@ -83,6 +83,6 @@ function convert_aerosol(input::AbstractString, output::AbstractString)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    length(ARGS) == 2 || error("usage: julia --project=. tools/convert_aerosol_to_jld2.jl input.nc output.jld2")
+    length(ARGS) == 2 || error("usage: julia --project=. tools/forcing/convert_aerosol_to_jld2.jl input.nc output.jld2")
     convert_aerosol(ARGS[1], ARGS[2])
 end

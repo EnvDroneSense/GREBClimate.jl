@@ -1,7 +1,7 @@
 """Fetch an ERA5 monthly climatology and write GREB .bin files.
 
 Writes flat 32-bit little-endian, no-header, Fortran-order (lon x lat x time)
-binaries in the layout tools/convert_greb_to_jld2.jl reads. Field/level choices
+binaries in the layout tools/dataset/convert_greb_to_jld2.jl reads. Field/level choices
 were validated against the repo's existing erainterim.*.clim climatology.
 
 Requires: cdsapi, netCDF4, numpy, and a configured ~/.cdsapirc
@@ -12,7 +12,7 @@ Usage:
     python -m pip install cdsapi netCDF4 numpy
     python tools/fetch_era5_data.py [--start-year 1991] [--end-year 2020] \\
         [--raw-dir era5_raw] [--out-dir era5_greb]
-    julia --project=. tools/convert_greb_to_jld2.jl era5_greb greb_input_data_era5
+    julia --project=. tools/dataset/convert_greb_to_jld2.jl era5_greb greb_input_data_era5
 
 Diagnostic fields (cloud_cover, t700, t1000, rh700) are fetched as raw netCDF
 but not converted or written as GREB inputs; they support a separate
@@ -181,7 +181,7 @@ def main():
     write_bin(os.path.join(args.out_dir, f"era5.omega_std.vertmean.{period}.clim.bin"), omega_std_greb)
 
     print("\nDone. Convert with:")
-    print(f"  julia --project=. tools/convert_greb_to_jld2.jl {args.out_dir} <jld2-out-dir>")
+    print(f"  julia --project=. tools/dataset/convert_greb_to_jld2.jl {args.out_dir} <jld2-out-dir>")
     print("Wiring dataset=:era5 into GREBClimate.jl itself (flux-correction "
           "re-derivation, loading code) is a separate step - see the vault.")
 

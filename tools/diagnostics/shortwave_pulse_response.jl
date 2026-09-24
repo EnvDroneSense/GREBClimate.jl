@@ -11,16 +11,14 @@
 # forcing the aerosol add-on produces; see the vault note volcanic-overcooling.
 #
 # Usage:
-#   julia --project=. tools/shortwave_pulse_response.jl
+#   julia --project=. tools/diagnostics/shortwave_pulse_response.jl
 
 using GREBClimate
 using Printf
 
-const REPO = normpath(joinpath(@__DIR__, ".."))
-const DATA_DIR = something(greb_data_dir(; allow_download=false),
-                           joinpath(REPO, "greb_input_data"))
+include(joinpath(@__DIR__, "..", "common.jl"))
 const FORCING = 3.0          # W/m2, about the Pinatubo peak effective forcing
-const NET_SW = 233.8         # control global-mean absorbed shortwave (tools/aerosol_forcing_per_aod.jl)
+const NET_SW = 233.8         # control global-mean absorbed shortwave (tools/diagnostics/aerosol_forcing_per_aod.jl)
 const YEARS = 30
 const START = 1951           # forcing year; the scenario starts in 1950
 

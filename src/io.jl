@@ -1,7 +1,7 @@
 """
     read_jld2(filepath::String)
 
-Read a `.jld2` field file written by `tools/convert_greb_to_jld2.jl`.
+Read a `.jld2` field file written by `tools/dataset/convert_greb_to_jld2.jl`.
 
 # Returns
 - named tuple `(data, dim_names, coords, ctl)` where:
@@ -67,7 +67,7 @@ Loads a `year => CO2` (ppm-equivalent) lookup table for an IPCC scenario
 function load_co2_scenario_jld2(jld2_dir::String, scenario::Symbol)
     filepath = joinpath(jld2_dir, "scenario", "ipcc_scenarios.jld2")
     isfile(filepath) ||
-        error("Scenario file not found: $filepath (run tools/convert_greb_to_jld2.jl)")
+        error("Scenario file not found: $filepath (run tools/dataset/convert_greb_to_jld2.jl)")
     scenarios = jldopen(filepath, "r") do file
         file["scenarios"]
     end
@@ -179,7 +179,7 @@ end
 
 Loads a stratospheric optical-depth record for `AerosolScenario(series=...)`
 from a forcing-series file of kind `aerosol_aod` (units `1`, per latitude),
-as written by `tools/convert_aerosol_to_jld2.jl`. Values are interpolated
+as written by `tools/forcing/convert_aerosol_to_jld2.jl`. Values are interpolated
 linearly onto the model latitudes (end values held) and, during the run, in
 time. The record is zero outside its first and last time and is never
 altered, so loading warns when it ends above `SERIES_END_WARN_AOD`: the
@@ -245,7 +245,7 @@ end
 function _load_anomaly_field!(climatology_dir::String, filename::String, target::AbstractArray)
     filepath = joinpath(climatology_dir, filename)
     isfile(filepath) ||
-        error("Anomaly forcing file not found: $filepath (run tools/convert_greb_to_jld2.jl)")
+        error("Anomaly forcing file not found: $filepath (run tools/dataset/convert_greb_to_jld2.jl)")
     target .= read_jld2(filepath).data
 end
 
