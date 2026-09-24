@@ -80,9 +80,12 @@ Compared with observed temperatures (GISTEMP, with trend, ENSO and the annual
 cycle removed), the model cools about twice as strongly as observed after
 Agung (1963), El Chichón (1982) and Pinatubo (1991), and recovers more slowly.
 The ratio is similar for all three, so comparisons between aerosol scenarios
-are meaningful, but the absolute cooling is too large. Whether the excess lies
-in the forcing or in the model's response to it is not yet known. The
-comparison script is `tools/validate_volcanic.jl`.
+are meaningful, but the absolute cooling is too large. Most of the excess is
+GREB's own response rather than the aerosol forcing: a one-year dimming of the
+sunlight by 1 W/m² cools the model by about 0.17 K, against roughly 0.07 to
+0.11 K in the observed record, so other short forcings over-respond as well.
+The scripts are `tools/validate_volcanic.jl` and
+`tools/shortwave_pulse_response.jl`.
 
 ## A run
 

@@ -148,6 +148,41 @@ function report(label, y, mei, M, rows, events)
     return (lag=best, fit=f)
 end
 
+# Foster and Rahmstorf (2011) form: temperature per unit of lagged global-mean
+# Sato-Lacis optical depth, 1979-2010, for the observations (with trend, MEI and
+# annual cycle, all lags fitted) and for the model response. Their GISS fit
+# gives a volcanic signal range of 0.35 K over this period, a check that this
+# regression reproduces theirs.
+function fr_check(y, mei, response, series)
+    w = cosd.(Float64.(GREBClimate.lat_grid))
+    sc = AerosolScenario(series=series)
+    buf = zeros(Float32, ydim)
+    aod = [(GREBClimate.aerosol_optical_depth!(buf, sc, decimal_year(m)); sum(buf .* w) / sum(w))
+           for m in eachindex(y)]
+    rows = month_index(1979, 1):month_index(2010, 12)
+    lagged(v, lag) = reshape([m > lag ? v[m - lag] : 0.0 for m in eachindex(v)], :, 1)
+
+    obs = argmin(r -> r.fit.rss,
+                 [(lag_e=le, lag_v=lv, fit=fit(y, mei, lagged(aod, lv), rows, le))
+                  for le in 0:24, lv in 0:24])
+    c_obs = obs.fit.beta[end]
+    function simple(lv)
+        X = [ones(length(rows)) lagged(aod, lv)[rows]]
+        b = X \ response[rows]
+        return (lag=lv, c=b[2], rss=sum(abs2, response[rows] - X * b))
+    end
+    mod = argmin(r -> r.rss, simple.(0:24))
+    range_obs = c_obs * (maximum(aod[rows .- obs.lag_v]) - minimum(aod[rows .- obs.lag_v]))
+    @printf("\nFoster-Rahmstorf form, 1979-2010, Sato-Lacis global-mean optical depth\n")
+    @printf("  observed: %.2f K per unit optical depth (+/- %.2f), AOD lag %d, MEI lag %d; signal range %.2f K\n",
+            c_obs, 2 * obs.fit.se[end], obs.lag_v, obs.lag_e, abs(range_obs))
+    @printf("  model:    %.2f K per unit optical depth, lag %d; ratio model/observed %.2f\n",
+            mod.c, mod.lag, mod.c / c_obs)
+    for f in (30.0, 23.0, 20.0)
+        @printf("  at -%.0f W/m2 per unit optical depth: observed %.3f K per W/m2\n", f, -c_obs / f)
+    end
+end
+
 # ── Main ─────────────────────────────────────────────────────────────────
 
 function main()
@@ -188,6 +223,8 @@ function main()
     later = ERUPTIONS[2:3]                               # GloSSAC starts in 1979
     M_glossac = event_regressors(resp["glossac"], later)
     report("GloSSAC v2.24", y, mei, M_glossac, month_index(1981, 1):last_m, later)
+
+    fr_check(y, mei, resp["sato"], sato)
 
     # Time series: observations with everything but the eruption terms removed.
     f = s.fit
