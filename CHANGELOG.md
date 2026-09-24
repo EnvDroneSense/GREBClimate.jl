@@ -52,6 +52,9 @@ First release registered in the Julia General registry.
 - Removed: the `:a1b_enhanced` experiment (identical to `:a1b_scenario`),
   `ModelState`'s ten write-only annual-mean fields, `MonthlyAccumulator.count`
   and the unused `ε` constant.
+- `ModelState.sw_solar_forcing` is a `Vector{Float32}` with one value per
+  latitude row instead of a `Float32`. Code that read it as a scalar must index
+  it; code that assigned it must use `.=`.
 
 ### Changes to model results
 
@@ -81,6 +84,15 @@ First release registered in the Julia General registry.
   (1850-2017) and a user-supplied CO₂ trajectory (`:custom_co2`).
 - **Deconstruction experiments** `:decon_mean_climate` and `:decon_2xco2`,
   switching individual processes off.
+- **Shortwave add-ons** for any experiment's scenario run: a solar record
+  (`cfg.solar_scenario`, `load_solar_series`) and a stratospheric aerosol
+  (`cfg.aerosol = AerosolScenario(...)`) from volcanic eruptions, sustained
+  geoengineering injections with an optional stop year, or a published
+  optical-depth record (`load_aerosol_series`). The aerosol dims sunlight per
+  latitude through a delta-Eddington layer, calibrated to −30 W/m² per unit
+  optical depth. Off by default; default runs are bit-identical. Against
+  observed temperatures it cools about twice as strongly as observed; see the
+  model overview.
 - **Plotting toolbox** (`viz/`): maps, global-mean time series, seasonal cycle,
   Hovmöller diagram and animations, plus a simplified Pluto explorer notebook.
   `julia viz/setup.jl` sets up its environment.
@@ -91,7 +103,11 @@ First release registered in the Julia General registry.
 - Documentation site (tutorial, input data, model overview, plots, physics
   switches, API) with doctests, and `CONTRIBUTING.md`.
 - Maintainer tools: `tools/package_dataset.jl` builds the dataset archive and
-  its SHA256; the `.bin` converter only converts fields the model reads.
+  its SHA256; the `.bin` converter only converts fields the model reads;
+  `tools/convert_aerosol_to_jld2.jl` converts the GISS stratospheric-aerosol
+  NetCDF files; `tools/aerosol_forcing_per_aod.jl` measures the aerosol
+  calibration; `tools/validate_volcanic.jl` compares the aerosol response with
+  GISTEMP.
 - CI on Julia 1.10 and current, in two test shards, with code coverage,
   Aqua.jl package checks, per-kernel allocation and type-stability tests, and a
   single- vs multi-threaded bit-identity test. TagBot and CompatHelper automate
@@ -111,6 +127,7 @@ First release registered in the Julia General registry.
 - The README quick start discarded the loaded data and ran on a zero
   climatology (a −40 °C world) while reporting success.
 - `seaice!` returned a `Union` type; it now returns `nothing`.
+- `load_custom_co2_scenario` left the file open when a line was malformed.
 - 19 of 36 exported functions had docstrings detached from their definitions.
 - `tools/convert_greb_to_jld2.jl` defaulted to a non-existent `Data/input`.
 - Stale references in the documentation: an old notebook name, the Julia
