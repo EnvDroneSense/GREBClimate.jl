@@ -31,14 +31,22 @@ end
 # (2013). The tropical ones are `AerosolScenario`'s `tau_rise` and `tau_decay`.
 const _EXTRATROPICAL_TAU = (rise = 0.082, decay = 0.8)
 
-# Tropical shape, from the four equal-area bands of Crowley and Unterman
-# (2013): 1 in the low-latitude bands (centres 15 degrees), 0.8 in the
-# high-latitude bands (centres 60 degrees), linear between, constant beyond.
+# Tropical shape: (latitude, value) at the centres of the 0-15, 15-30, 30-45,
+# 45-60 and 60-90 degree bands, linear between, constant beyond. Fitted to
+# Pinatubo: each band's optical depth summed over the 36 months after the
+# eruption, relative to 0-15 degrees, averaged over Sato-Lacis, GloSSAC and both
+# hemispheres, is 1, 0.75, 0.67, 0.69 and 0.61; 30-60 is pooled so the shape
+# falls monotonically. Tools: tools/diagnostics/aerosol_profile_check.jl.
+const _TROPICAL_NODES = ((7.5, 1.0), (22.5, 0.68), (37.5, 0.65), (52.5, 0.65), (75.0, 0.55))
+
 function _tropical_shape(phi::Real)
     a = abs(phi)
-    a <= 15 && return 1.0
-    a >= 60 && return 0.8
-    return 1.0 - 0.2 * (a - 15) / 45
+    a <= first(_TROPICAL_NODES)[1] && return first(_TROPICAL_NODES)[2]
+    for k in 2:length(_TROPICAL_NODES)
+        (a1, v1), (a0, v0) = _TROPICAL_NODES[k], _TROPICAL_NODES[k - 1]
+        a < a1 && return v0 + (v1 - v0) * (a - a0) / (a1 - a0)
+    end
+    return last(_TROPICAL_NODES)[2]
 end
 
 _check_class(cls::Symbol) = cls in AEROSOL_CLASSES ||

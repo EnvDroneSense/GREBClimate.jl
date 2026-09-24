@@ -9,6 +9,8 @@
 # compares it with the record on the model's 48 latitude rows:
 #
 #   band ratio    each band's peak optical depth over the largest band's
+#   total ratio   the same for the optical depth summed over the first 36 months
+#                 (the target of the tropical profile: plan task 8)
 #   peak month    months from the eruption date to each band's maximum
 #   1/e months    months from each band's maximum until it falls to 1/e of it
 #                 (both left blank for bands below 5 percent of the largest)
@@ -21,7 +23,7 @@
 #
 # Katmai is also compared with Stothers (1996) Table 6, the reference for the
 # extratropical classes; see `STOTHERS_KATMAI`.
-# Plan: aerosol-parameter-plan (vault), tasks 1 and 1b.
+# Plan: aerosol-parameter-plan (vault), tasks 1, 1b and 8.
 #
 # Usage:
 #   julia --project=. tools/diagnostics/aerosol_profile_check.jl
@@ -30,7 +32,7 @@ using GREBClimate
 using Printf
 
 const AEROSOL_DIR = normpath(joinpath(@__DIR__, "..", "..", "Data", "aerosol"))
-const SHAPE_MONTHS = 36          # months used for the shape error
+const SHAPE_MONTHS = 36          # months used for the shape error and the total ratio
 const LAT = Float64.(GREBClimate.lat_grid)
 const W = cosd.(LAT)
 
@@ -115,13 +117,15 @@ end
 function metrics(aod, months)
     series = [[area_mean(aod[:, k], r) for k in axes(aod, 2)] for r in ROWS]
     ratio = maximum.(series) ./ maximum(maximum.(series))
+    sums = [sum(s[1:min(SHAPE_MONTHS, length(s))]) for s in series]
+    total = sums ./ maximum(sums)
     visible = ratio .>= 0.05
     peak_month = [v ? months[argmax(s)] : nothing for (s, v) in zip(series, visible)]
     efold = [v ? efold_months(s, months) : nothing for (s, v) in zip(series, visible)]
     gm = [area_mean(aod[:, k], eachindex(LAT)) for k in axes(aod, 2)]
     nh, sh = (sum(area_mean(aod[:, k], h) for k in axes(aod, 2)) for h in (NH, SH))
     nhsh = nh > 0 && sh >= 0 ? nh / sh : NaN    # undefined when a hemisphere is below background
-    return (ratio=ratio, peak_month=peak_month, efold=efold, gm=gm,
+    return (ratio=ratio, total=total, peak_month=peak_month, efold=efold, gm=gm,
             gm_peak=months[argmax(gm)], nhsh=nhsh)
 end
 
@@ -142,12 +146,13 @@ function report(e, cls, recname, series)
     @printf("\n%s (%.2f), class %s, record %s, %d months: global-mean peak %.4f; NH/SH record %.2f, model %.2f; shape error %.3f\n",
             e.name, e.date, cls, recname, e.window, peak, r.nhsh, m.nhsh, shape)
     haskey(e, :note) && println("  ($(e.note))")
-    println("  band       ratio rec   mod   peak month rec   mod   1/e months rec   mod")
+    println("  band       ratio rec   mod   total rec   mod   peak month rec   mod   1/e months rec   mod")
     for (i, b) in enumerate(BAND_NAMES)
-        @printf("  %-8s       %5.2f %5.2f              %s %s              %s %s\n", b, r.ratio[i], m.ratio[i],
+        @printf("  %-8s       %5.2f %5.2f       %5.2f %5.2f              %s %s              %s %s\n", b,
+                r.ratio[i], m.ratio[i], r.total[i], m.total[i],
                 cell(r.peak_month[i]), cell(m.peak_month[i]), cell(r.efold[i]), cell(m.efold[i]))
     end
-    @printf("  %-8s                                %s %s\n", "global", cell(r.gm_peak), cell(m.gm_peak))
+    @printf("  %-8s                                                %s %s\n", "global", cell(r.gm_peak), cell(m.gm_peak))
 end
 
 # Katmai against Stothers (1996) Table 6, on its two bands. Ratios and times

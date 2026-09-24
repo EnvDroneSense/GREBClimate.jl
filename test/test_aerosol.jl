@@ -123,14 +123,17 @@ end
     @test trop ≈ reverse(trop)
     @test trop[Y ÷ 2] == maximum(trop)
     @test issorted(trop[1:Y ÷ 2])
-    # Crowley and Unterman (2013): high-latitude values are about 80% of the tropical ones.
-    @test trop[1] / trop[Y ÷ 2] ≈ 0.8
+    # Pinatubo, 36-month totals: 0.75 of the 0-15 degree band at 15-30, 0.61 at 60-90.
+    lat = Float64.(GREBClimate.lat_grid)
+    band(lo, hi) = (r = findall(φ -> lo <= abs(φ) < hi, lat); sum(trop[r] .* _W[r]) / sum(_W[r]))
+    @test band(15, 30) / band(0, 15) ≈ 0.75 atol = 0.02
+    @test band(60, 90) / band(0, 15) ≈ 0.61 atol = 0.02
+    @test all(GREBClimate._tropical_shape(a) == v for (a, v) in GREBClimate._TROPICAL_NODES)
     nh = GREBClimate._CLASS_PROFILES[:nh_extratropical]
     sh = GREBClimate._CLASS_PROFILES[:sh_extratropical]
     @test nh ≈ reverse(sh)
     # Stothers (1996), Katmai: none equatorward of 30 N, 0.57 of the 45-60 N value
     # at the 30-45 N band centre, constant poleward.
-    lat = Float64.(GREBClimate.lat_grid)
     @test all(iszero, nh[lat .<= 30])
     @test issorted(nh)
     @test GREBClimate._extratropical_shape(37.5) / GREBClimate._extratropical_shape(52.5) ≈ 0.57
