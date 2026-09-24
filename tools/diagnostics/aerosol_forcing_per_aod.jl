@@ -9,7 +9,9 @@
 # uncalibrated (`tau_scale` 1) and once with the default `tau_scale`. The result
 # is compared with the literature value of about -30 W/m2 per unit optical depth
 # (Sato et al. 1993, citing Lacis et al. 1992); see the calibration section of
-# the aerosol kernel spec in the vault.
+# the aerosol kernel spec in the vault. To calibrate other `ssa`, `asymmetry` or
+# `mu0`, set them in `AerosolScenario()` in `main`; the matching `tau_scale` is
+# 30 over the magnitude of the uncalibrated dSW/tau at optical depth 0.01.
 #
 # Usage:
 #   julia --project=. tools/diagnostics/aerosol_forcing_per_aod.jl

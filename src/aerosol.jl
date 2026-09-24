@@ -177,7 +177,11 @@ present in `series`, it counts twice.
 Transmission is delta-Eddington with `ssa`, `asymmetry` and `mu0`, applied to
 `tau_scale` times the optical depth. The default `tau_scale` calibrates GREB's
 global-mean shortwave change to about -30 W/m2 per unit optical depth (Sato et
-al. 1993, citing Lacis et al. 1992). Aerosol longwave effects, stratospheric
+al. 1993, citing Lacis et al. 1992) for the default `ssa`, `asymmetry` and
+`mu0`. Changing those without recalibrating `tau_scale`
+(`tools/diagnostics/aerosol_forcing_per_aod.jl`) changes the dimming; after
+recalibrating, `asymmetry` 0.6-0.8 and `mu0` 0.3-0.7 move it by at most 1.5%
+up to an optical depth of 0.5. Aerosol longwave effects, stratospheric
 heating, ozone chemistry and particle growth are not represented.
 """
 struct AerosolScenario
