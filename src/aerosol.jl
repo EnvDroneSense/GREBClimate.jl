@@ -1,6 +1,6 @@
 # Stratospheric aerosol add-on: eruptions, sustained injections and published
 # records -> optical depth -> per-latitude shortwave transmission. Included
-# before config.jl, whose PhysicsConfig holds an AerosolScenario.
+# before core/config.jl, whose PhysicsConfig holds an AerosolScenario.
 
 "Injection classes: where the aerosol is placed latitudinally."
 const AEROSOL_CLASSES = (:tropical, :nh_extratropical, :sh_extratropical)
@@ -103,9 +103,9 @@ end
     AerosolSeries
 
 A published optical-depth record already interpolated onto the model latitudes:
-`years` (ascending decimal years), `aod` of size `(ydim, length(years))` so one
-year's column is contiguous, and `source`, the provenance string stored in the
-file. Build one with [`load_aerosol_series`](@ref).
+`years` (ascending decimal years on the model calendar), `aod` of size
+`(ydim, length(years))` so one time's column is contiguous, and `source`, the
+provenance string stored in the file. Build one with [`load_aerosol_series`](@ref).
 """
 struct AerosolSeries
     years::Vector{Float64}
@@ -116,9 +116,6 @@ end
 # `load_aerosol_series` warns when a record ends above this optical depth
 # (a small fraction of Pinatubo's global-mean peak of about 0.15).
 const SERIES_END_WARN_AOD = 0.005
-
-# Schema version of the JLD2 file `load_aerosol_series` reads.
-const AEROSOL_SERIES_FORMAT = 1
 
 """
     AerosolScenario(; eruptions=[], injections=[], series=nothing, tau_rise=0.21,

@@ -1,19 +1,27 @@
-### Convert a GISS stratospheric aerosol NetCDF file to the JLD2 series format ###
+### Convert a GISS stratospheric aerosol NetCDF file to the forcing-series format ###
 #
 # MAINTAINER TOOL - not part of the package.
 #
 # Reads one of the zonal-mean files published at
 # https://data.giss.nasa.gov/modelforce/strataer/ (Sato-Lacis, CMIP6, CMIP7,
 # GloSSAC; all share one layout: 24 latitude bands, monthly steps, `tau` and
-# `reff` at 550 nm) and writes the file `load_aerosol_series` reads:
+# `reff` at 550 nm) and writes a forcing-series file (standard in the vault,
+# 07-standards/forcing-series-format) that `load_aerosol_series` reads:
 #
-#   format_version  Int              1
-#   years           Vector{Float64}  decimal years of the month midpoints
+#   format_version  Int              2
+#   kind            String           "aerosol_aod"
+#   calendar        String           "greb_365"
+#   time            Vector{Float64}  model decimal years of each month's midpoint
 #   lat             Vector{Float64}  band centres, degrees north, ascending
-#   aod             Matrix{Float64}  stratospheric optical depth at 550 nm (lat x years)
-#   reff            Matrix{Float64}  effective particle radius, micron (lat x years);
-#                                    stored for later use, not read by the model yet
+#   values          Matrix{Float64}  stratospheric optical depth at 550 nm (lat x time)
+#   units           String           "1"
 #   source          String           input file name and its provenance attributes
+#   reff            Matrix{Float64}  extra: effective particle radius, micron (lat x time);
+#                                    stored for later use, not read by the model yet
+#
+# Each month is placed at the midpoint of the same month on the model's
+# 365-day calendar, so model and record months line up exactly and no date
+# conversion happens in the model.
 #
 # Months with no data at all are dropped from the end of the record (the
 # Sato-Lacis file pads 2013-2022 with fill values). A gap anywhere else is an
@@ -30,10 +38,14 @@ using NCDatasets
 using JLD2
 using Dates
 
-const FORMAT_VERSION = 1
+const FORMAT_VERSION = 2
+const MONTH_DAYS = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)   # the model's 365-day calendar
 
-decimal_year(t::DateTime) =
-    year(t) + (dayofyear(t) - 1 + hour(t) / 24) / daysinyear(t)
+# Model decimal year of the midpoint of the month containing `t`.
+function model_month_midpoint(t)
+    m = month(t)
+    return year(t) + (sum(MONTH_DAYS[1:m-1]; init=0) + MONTH_DAYS[m] / 2) / 365
+end
 
 function convert_aerosol(input::AbstractString, output::AbstractString)
     lat, months, tau, reff, attrs = NCDataset(input) do ds
@@ -54,11 +66,14 @@ function convert_aerosol(input::AbstractString, output::AbstractString)
 
     jldopen(output, "w") do f
         f["format_version"] = FORMAT_VERSION
-        f["years"] = decimal_year.(months[keep])
+        f["kind"] = "aerosol_aod"
+        f["calendar"] = "greb_365"
+        f["time"] = model_month_midpoint.(months[keep])
         f["lat"] = lat
-        f["aod"] = Float64.(tau[:, keep])
-        f["reff"] = Float64.(reff[:, keep])
+        f["values"] = Float64.(tau[:, keep])
+        f["units"] = "1"
         f["source"] = source
+        f["reff"] = Float64.(reff[:, keep])
     end
     println("wrote $output: $(length(keep)) months, ",
             "$(Dates.format(months[first(keep)], "yyyy-mm")) to $(Dates.format(months[last(keep)], "yyyy-mm")), ",

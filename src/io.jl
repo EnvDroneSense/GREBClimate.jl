@@ -135,39 +135,59 @@ function load_solar_series(path::AbstractString; reference::Union{Real,Nothing}=
     return Dict{Int,Float32}(yr => Float32(v / ref) for (yr, v) in raw)
 end
 
+# Forcing-series standard: the one JLD2 layout for time-varying inputs (spec in
+# the vault, 07-standards/forcing-series-format). Times are decimal years on
+# the model's own calendar, so the model never converts dates.
+const FORCING_SERIES_FORMAT = 2
+const FORCING_CALENDAR = "greb_365"
+
+# Reads and validates a forcing-series file of `kind` with `units`. Returns
+# `(time, lat, values, source)`; `lat` is `nothing` for a global series, in
+# which case `values` is a vector over time instead of a latitude-by-time matrix.
+function _read_forcing_series(path, kind, units)
+    isfile(path) || error("Forcing series file not found: $path")
+    fix = "regenerate it with the converter in tools/"
+    time, lat, values, source = jldopen(path) do file
+        for key in ("format_version", "kind", "calendar", "time", "values", "units")
+            haskey(file, key) || error("Forcing series file $path is missing `$key`; $fix")
+        end
+        v = file["format_version"]
+        v == FORCING_SERIES_FORMAT ||
+            error("Forcing series file $path has format_version $v; this version reads " *
+                  "$FORCING_SERIES_FORMAT; $fix")
+        file["kind"] == kind || error("Forcing series file $path holds `$(file["kind"])`, not `$kind`")
+        file["calendar"] == FORCING_CALENDAR ||
+            error("Forcing series file $path uses calendar `$(file["calendar"])`, not `$FORCING_CALENDAR`")
+        file["units"] == units ||
+            error("Forcing series file $path has units `$(file["units"])`, expected `$units`")
+        (Float64.(file["time"]), haskey(file, "lat") ? Float64.(file["lat"]) : nothing,
+         Float64.(file["values"]), haskey(file, "source") ? String(file["source"]) : "")
+    end
+    isempty(time) && error("Forcing series file $path contains no times")
+    _strictly_ascending(time) || error("Forcing series file $path: `time` must be strictly ascending")
+    expected = lat === nothing ? (length(time),) : (length(lat), length(time))
+    size(values) == expected ||
+        error("Forcing series file $path: `values` has size $(size(values)), expected $expected")
+    lat === nothing || _strictly_ascending(lat) ||
+        error("Forcing series file $path: `lat` must be strictly ascending")
+    all(isfinite, values) || error("Forcing series file $path: `values` contains non-finite entries")
+    return time, lat, values, source
+end
+
 """
     load_aerosol_series(path::AbstractString) -> AerosolSeries
 
 Loads a stratospheric optical-depth record for `AerosolScenario(series=...)`
-from a JLD2 file written by `tools/convert_aerosol_to_jld2.jl`: `format_version`
-(1), ascending decimal `years`, ascending band-centre `lat`, `aod` of size
-`(length(lat), length(years))` and optionally `source`; an `reff` entry is
-ignored. Values are interpolated linearly onto the model latitudes (end values
-held) and, during the run, in time. The record is zero outside its first and
-last year and is never altered, so loading warns when it ends above
-`SERIES_END_WARN_AOD`: the dimming would stop abruptly.
+from a forcing-series file of kind `aerosol_aod` (units `1`, per latitude),
+as written by `tools/convert_aerosol_to_jld2.jl`. Values are interpolated
+linearly onto the model latitudes (end values held) and, during the run, in
+time. The record is zero outside its first and last time and is never
+altered, so loading warns when it ends above `SERIES_END_WARN_AOD`: the
+dimming would stop abruptly.
 """
 function load_aerosol_series(path::AbstractString)
-    isfile(path) || error("Aerosol series file not found: $path")
-    years, lat, aod, source = jldopen(path) do file
-        for key in ("format_version", "years", "lat", "aod")
-            haskey(file, key) ||
-                error("Aerosol series file $path is missing the `$key` entry; " *
-                      "regenerate it with tools/convert_aerosol_to_jld2.jl")
-        end
-        file["format_version"] == AEROSOL_SERIES_FORMAT ||
-            error("Aerosol series file $path has format_version $(file["format_version"]); " *
-                  "this version reads $AEROSOL_SERIES_FORMAT")
-        (Float64.(file["years"]), Float64.(file["lat"]), Float64.(file["aod"]),
-         haskey(file, "source") ? String(file["source"]) : "")
-    end
-    isempty(years) && error("Aerosol series file $path contains no years")
-    size(aod) == (length(lat), length(years)) ||
-        error("Aerosol series file $path: `aod` has size $(size(aod)), expected " *
-              "$((length(lat), length(years))) (latitudes by years)")
-    _strictly_ascending(years) || error("Aerosol series file $path: years must be strictly ascending")
-    _strictly_ascending(lat) || error("Aerosol series file $path: latitudes must be strictly ascending")
-    all(isfinite, aod) || error("Aerosol series file $path: `aod` contains non-finite values")
+    years, lat, aod, source = _read_forcing_series(path, "aerosol_aod", "1")
+    lat === nothing && error("Aerosol series file $path has no `lat`; aerosol records are zonal")
     out = Matrix{Float32}(undef, ydim, length(years))
     for k in eachindex(years), j in 1:ydim
         out[j, k] = Float32(_interp_lat(lat, @view(aod[:, k]), Float64(lat_grid[j])))

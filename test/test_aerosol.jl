@@ -62,7 +62,7 @@ end
     @test state.sw_solar_forcing == 0.99f0 .* only_aero
 
     # Composes the same way with an experiment that already modulates the
-    # multiplier: model.jl broadcasts forcing()'s scalar into the vector,
+    # multiplier: core/model.jl broadcasts forcing()'s scalar into the vector,
     # then the add-ons multiply into it.
     cyc = create_experiment_config(:solar_cycle_11yr)
     cyc.aerosol = cfg.aerosol
@@ -260,13 +260,15 @@ end
     @test_throws ArgumentError AerosolScenario(tau_scale = NaN)
 end
 
-function _write_aerosol(path; years, lat, aod, source = "test", version = 1, drop = ())
+# Writes a forcing-series file of kind `aerosol_aod`; keywords override or `drop` entries.
+function _write_aerosol(path; years, lat, aod, source = "test", version = 2, kind = "aerosol_aod",
+                        calendar = "greb_365", units = "1", drop = ())
+    entries = ("format_version" => version, "kind" => kind, "calendar" => calendar,
+               "time" => years, "lat" => lat, "values" => aod, "units" => units, "source" => source)
     GREBClimate.jldopen(path, "w") do f
-        "format_version" in drop || (f["format_version"] = version)
-        "years" in drop || (f["years"] = years)
-        "lat" in drop || (f["lat"] = lat)
-        "aod" in drop || (f["aod"] = aod)
-        f["source"] = source
+        for (k, v) in entries
+            k in drop || (f[k] = v)
+        end
     end
     return path
 end
@@ -326,9 +328,13 @@ end
 
         good = (years = [1991.0, 1992.0], lat = [-60.0, 0.0, 60.0], aod = zeros(3, 2))
         for (name, kw) in (
-                ("nokey.jld2",     (; good..., drop = ("aod",))),
-                ("version.jld2",   (; good..., version = 2)),
+                ("nokey.jld2",     (; good..., drop = ("values",))),
+                ("version.jld2",   (; good..., version = 1)),
                 ("noversion.jld2", (; good..., drop = ("format_version",))),
+                ("kind.jld2",      (; good..., kind = "tsi")),
+                ("calendar.jld2",  (; good..., calendar = "gregorian")),
+                ("units.jld2",     (; good..., units = "W/m2")),
+                ("nolat.jld2",     (; good..., drop = ("lat",), aod = zeros(2))),
                 ("shape.jld2",     (; good..., aod = zeros(3, 3))),
                 ("unsorted.jld2",  (; good..., years = [1992.0, 1991.0])),
                 ("latorder.jld2",  (; good..., lat = [60.0, 0.0, -60.0])),
