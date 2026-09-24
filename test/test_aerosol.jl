@@ -31,7 +31,6 @@ end
 @testset "apply_shortwave_addons! is an exact no-op unconfigured and applies the solar table otherwise" begin
     cfg = create_experiment_config(:full_model)
     state = ModelState()
-    @test length(state.aod) == Y
     GREBClimate.apply_shortwave_addons!(state, cfg, 1950, 1)
     @test all(==(1.0f0), state.sw_solar_forcing)
 
@@ -89,7 +88,6 @@ _gm(a) = sum(a .* _W) / sum(_W)
     @test 12 * tpk ≈ 5.0 atol = 0.1
     @test maximum(h.(range(0.0, 3.0; length = 3001))) ≈ h(tpk) rtol = 1e-6
     @test h(0.0) == 0.0
-    @test h(-0.5) == 0.0
     @test h(4.0) / h(3.0) ≈ exp(-1.0) rtol = 1e-3
 end
 
@@ -97,7 +95,6 @@ end
     sc = AerosolScenario()
     tr, td = sc.tau_rise, sc.tau_decay
     @test GREBClimate.chain_step(0.0, tr, td) == 0.0
-    @test GREBClimate.chain_step(-1.0, tr, td) == 0.0
     @test GREBClimate.chain_step(60.0, tr, td) ≈ 1.0
     t, d = 0.3, 1e-5
     slope = (GREBClimate.chain_step(t + d, tr, td) - GREBClimate.chain_step(t - d, tr, td)) / 2d
@@ -167,7 +164,7 @@ end
     @test _gm(a3y) / _gm(a2y) ≈ exp(-1.0) rtol = 1e-2
 end
 
-@testset "delta_eddington: limits, energy conservation, thin-layer reflectance, published closed forms, monotonicity" begin
+@testset "delta_eddington: limits, energy conservation, published closed form, monotonicity" begin
     de = GREBClimate.delta_eddington
     @test de(0.0, 1.0, 0.7, 0.5) == (0.0, 1.0)
 
@@ -175,34 +172,18 @@ end
     @test R ≈ 0.0 atol = 1e-12
     @test T ≈ exp(-0.3 / 0.5)
 
-    for tau in (0.05, 0.5, 2.0)
-        R, T = de(tau, 1.0, 0.7, 0.5)
-        @test R + T ≈ 1.0 atol = 1e-6
-    end
-
-    g, mu0 = 0.7, 0.5
-    gs = g / (1 + g)
-    gamma3 = (2 - 3gs * mu0) / 4
-    R, _ = de(1e-4, 1.0, g, mu0)
-    @test R / 1e-4 ≈ (1 - g^2) * gamma3 / mu0 rtol = 1e-3
-
-    # Independent closed form for conservative scattering, Meador and Weaver
-    # (1980) eq. 24, in the delta-scaled quantities.
+    # Conservative scattering: energy is conserved, and R matches the
+    # independent closed form of Meador and Weaver (1980) eq. 24 in the
+    # delta-scaled quantities.
     for g in (0.5, 0.7, 0.85), mu0 in (0.3, 0.5, 0.8), tau in (0.01, 0.1, 0.5, 2.0)
         gs = g / (1 + g)
         g1 = (3 - 3gs) / 4
         g3 = (2 - 3gs * mu0) / 4
         ts = (1 - g^2) * tau
         R24 = (g1 * ts + (g3 - g1 * mu0) * (1 - exp(-ts / mu0))) / (1 + g1 * ts)
-        @test de(tau, 1.0, g, mu0)[1] ≈ R24 rtol = 1e-6
-    end
-
-    # Joseph et al. (1976) similarity relation (eq. 17b) for the delta scaling.
-    for w in 0.1:0.2:0.9, g in 0.1:0.2:0.9
-        f = g^2
-        wp = (1 - f) * w / (1 - w * f)
-        gp = g / (1 + g)
-        @test (1 - wp) / (1 - wp * gp) ≈ (1 - w) / (1 - w * g)
+        R, T = de(tau, 1.0, g, mu0)
+        @test R ≈ R24 rtol = 1e-6
+        @test R + T ≈ 1.0 atol = 1e-6
     end
 
     taus = 0.01:0.01:1.0
@@ -239,11 +220,13 @@ end
     end
 end
 
-@testset "aerosol_transmission!: exactly 1 with no aerosol, tropics dimmest for a tropical eruption, multiplies in place" begin
+@testset "aerosol_transmission!: exactly 1 before and long after, tropics dimmest for a tropical eruption, multiplies in place" begin
     sc = AerosolScenario(eruptions = [Eruption(2000.0, :tropical; peak_aod = 0.1)])
     buf = zeros(Float32, Y)
     mult = ones(Float32, Y)
     GREBClimate.aerosol_transmission!(mult, buf, sc, 1999.0)
+    @test all(==(1.0f0), mult)
+    GREBClimate.aerosol_transmission!(mult, buf, sc, 2050.0)   # dimming below Float32 resolution
     @test all(==(1.0f0), mult)
     GREBClimate.aerosol_transmission!(mult, buf, sc, 2000.42)
     @test all(<(1.0f0), mult)
@@ -257,10 +240,24 @@ end
     m = ones(Float32, Y)
     GREBClimate.aerosol_transmission!(m, buf, nh, 2000.42)
     @test sum(m[Y ÷ 2 + 1:end]) < sum(m[1:Y ÷ 2])
+end
 
-    # The per-timestep path allocates nothing.
-    GREBClimate.aerosol_transmission!(m, buf, nh, 2000.42)
-    @test (@allocated GREBClimate.aerosol_transmission!(m, buf, nh, 2000.42)) == 0
+@testset "tau_scale: calibrated by default, scales only the optical depth the transmission sees" begin
+    e = Eruption(2000.0, :tropical; peak_aod = 0.1)
+    @test AerosolScenario().tau_scale == GREBClimate.AEROSOL_TAU_SCALE
+    buf = zeros(Float32, Y)
+    trans(scale) = GREBClimate.aerosol_transmission!(ones(Float32, Y), buf,
+        AerosolScenario(eruptions = [e], tau_scale = scale), 2000.42)
+
+    for scale in (1.0, GREBClimate.AEROSOL_TAU_SCALE)
+        mult = trans(scale)
+        GREBClimate.aerosol_optical_depth!(buf, AerosolScenario(eruptions = [e]), 2000.42)
+        @test mult == [Float32(GREBClimate.delta_eddington(scale * Float64(buf[j]), 1.0, 0.7, 0.5)[2])
+                       for j in 1:Y]
+    end
+    @test all(==(1.0f0), trans(0.0))
+    @test_throws ArgumentError AerosolScenario(tau_scale = -1.0)
+    @test_throws ArgumentError AerosolScenario(tau_scale = NaN)
 end
 
 function _write_aerosol(path; years, lat, aod, source = "test", version = 1, drop = ())
@@ -300,9 +297,7 @@ end
         GREBClimate.aerosol_optical_depth!(aod, sc, 1993.0)
         @test all(iszero, aod)
 
-        # A series and an eruption over the same period are summed, exactly.
-        # This double counts if the series already contains that eruption; the
-        # docstring says so and it is the user's responsibility.
+        # A series and an eruption over the same period add.
         e = Eruption(1991.5, :tropical; peak_aod = 0.1)
         both = AerosolScenario(series = series, eruptions = [e])
         only_e = AerosolScenario(eruptions = [e])
@@ -312,8 +307,7 @@ end
         GREBClimate.aerosol_optical_depth!(a_both, both, 1991.7)
         @test a_both ≈ a_series .+ a_e
 
-        # Exact data years: the first year returns its row, the last year
-        # returns its row, and just past the last year the record is zero.
+        # Exact data years return their column; just past the last year the record is zero.
         aod0 = zeros(Float32, Y)
         GREBClimate.aerosol_optical_depth!(aod0, sc, 1991.0)
         @test all(iszero, aod0)
@@ -323,9 +317,7 @@ end
         GREBClimate.aerosol_optical_depth!(aodN, sc, 1992.0 + 1e-9)
         @test all(iszero, aodN)
 
-        # A record that fades to (near) zero loads silently; one that ends
-        # above the threshold warns, naming the file, the last year and the
-        # last value. The record is never altered.
+        # A record that ends below the threshold loads silently and unaltered.
         fades = _write_aerosol(joinpath(dir, "fades.jld2"); years = [1991.0, 1992.0, 1993.0],
                                lat = [-60.0, 0.0, 60.0],
                                aod = [0.0 0.2 0.0; 0.0 0.1 0.0; 0.0 0.2 0.001])

@@ -1,7 +1,6 @@
-# Stratospheric aerosol add-on: eruptions and sustained injection -> optical
-# depth -> per-latitude shortwave transmission. Included after constants.jl
-# (needs `lat_grid`, `ydim`) and before config.jl (PhysicsConfig will hold an
-# AerosolScenario).
+# Stratospheric aerosol add-on: eruptions, sustained injections and published
+# records -> optical depth -> per-latitude shortwave transmission. Included
+# before config.jl, whose PhysicsConfig holds an AerosolScenario.
 
 "Injection classes: where the aerosol is placed latitudinally."
 const AEROSOL_CLASSES = (:tropical, :nh_extratropical, :sh_extratropical)
@@ -10,6 +9,10 @@ const AEROSOL_CLASSES = (:tropical, :nh_extratropical, :sh_extratropical)
 # Crowley and Unterman (2013) and a Pinatubo injection of 9 Tg S (Toohey and
 # Sigl 2017); the plausible range is 0.015 to 0.020.
 const AOD_PER_TG_S = 0.015
+
+# Default `tau_scale`: 30 / 82.1, from tools/aerosol_forcing_per_aod.jl (see
+# `AerosolScenario`).
+const AEROSOL_TAU_SCALE = 0.365
 
 # Extratropical shapes: (centre latitude, gaussian half-width) in degrees.
 # Provisional; no source values were found for them.
@@ -42,22 +45,19 @@ function _class_profile(cls::Symbol)
     return w ./ (sum(w .* c) / sum(c))
 end
 
-# Built once at load and never written afterwards, so concurrent reads are safe.
-# The add-ons run on the main thread in any case; only `circulation!` spawns.
+# Latitude profile per class, scaled to an area-weighted mean of 1. Read-only.
 const _CLASS_PROFILES = Dict{Symbol,Vector{Float64}}(cls => _class_profile(cls) for cls in AEROSOL_CLASSES)
 
 """
-    Eruption(year, cls; tg_s=nothing, peak_aod=nothing)
+    Eruption(year, cls; tg_s=nothing, peak_aod=nothing, aod_per_tg_s=0.015)
 
 One volcanic injection at decimal `year` on the model clock (the scenario run
 starts at 1950 for most experiments). `cls` is `:tropical`,
 `:nh_extratropical` or `:sh_extratropical`. Give exactly one of `tg_s`
-(injected sulfur, Tg S, converted with a linear scaling) or `peak_aod`
-(global-mean peak visible optical depth, used as is). The linear mass scaling
-holds for most eruptions and ignores the loss of efficiency above roughly
-Pinatubo-sized peaks. The `:tropical` class spreads the aerosol into both
-hemispheres, which suits Pinatubo but not hemispherically asymmetric tropical
-eruptions such as Agung or El Chichon.
+(injected sulfur, Tg S, times `aod_per_tg_s`) or `peak_aod` (global-mean peak
+optical depth at 550 nm). The linear mass scaling overestimates eruptions much
+larger than Pinatubo. `:tropical` spreads the aerosol into both hemispheres,
+which suits Pinatubo but not asymmetric eruptions such as Agung or El Chichon.
 """
 struct Eruption
     year::Float64
@@ -113,8 +113,8 @@ struct AerosolSeries
     source::String
 end
 
-# Loading warns when the last year's largest optical depth exceeds this. Chosen
-# as a small fraction of a Pinatubo-scale peak (about 0.15); adjustable.
+# `load_aerosol_series` warns when a record ends above this optical depth
+# (a small fraction of Pinatubo's global-mean peak of about 0.15).
 const SERIES_END_WARN_AOD = 0.005
 
 # Schema version of the JLD2 file `load_aerosol_series` reads.
@@ -122,32 +122,28 @@ const AEROSOL_SERIES_FORMAT = 1
 
 """
     AerosolScenario(; eruptions=[], injections=[], series=nothing, tau_rise=0.21,
-                    tau_decay=1.0, ssa=1.0, asymmetry=0.7, mu0=0.5)
+                    tau_decay=1.0, ssa=1.0, asymmetry=0.7, mu0=0.5,
+                    tau_scale=0.365)
 
-Stratospheric aerosol add-on for `cfg.aerosol`. It composes with any
-experiment and dims the shortwave per latitude. Optical depth follows two
-linear reservoirs (rise timescale `tau_rise`, decay timescale `tau_decay`,
-both in years; the defaults put the peak five months after injection and
-decay with an e-folding time of one year, as for the tropical Pinatubo
-aerosol); contributions from separate eruptions and injections add. The same
-timescales apply to every injection class, although high-latitude eruptions
-decay faster. `ssa`, `asymmetry` and `mu0` set the delta-Eddington
-transmission.
+Stratospheric aerosol add-on for `cfg.aerosol`: dims the shortwave per
+latitude in the scenario run of any experiment. The control run is never
+dimmed, so anomalies are relative to an aerosol-free control.
 
-`series` adds a published optical-depth record (see
-[`load_aerosol_series`](@ref)), summed with the modelled eruptions. If the
-record already contains an eruption you also list, it is counted twice. The
-record is zero outside its first and last year, so a record that ends with a
-non-zero value stops abruptly. Published records include the background
-aerosol of quiet years (optical depth of about 0.002 to 0.009), which the
-control run does not have, so a series run's anomaly contains that small
-offset as well as the eruptions.
+Optical depth follows two linear reservoirs with timescales `tau_rise` and
+`tau_decay` (years). The defaults peak five months after injection and decay
+with an e-folding time of one year, as for Pinatubo; every class uses them,
+although high-latitude aerosol decays faster. Eruptions, injections and
+`series` (a published record, see [`load_aerosol_series`](@ref)) add, so an
+eruption listed and also present in the record counts twice. Published records
+include the quiet-year background (optical depth 0.002 to 0.009), which the
+control does not have.
 
-Applies to the scenario run only; the control run is never dimmed, so
-anomalies are relative to an aerosol-free control. Not represented: the
-longwave effect of the aerosol, its ozone chemistry, growth of particle size
-over the eruption's lifetime (`ssa` and `asymmetry` are fixed), absorption in
-the 8-12 micron window, and stratospheric heating.
+The transmission is delta-Eddington with `ssa`, `asymmetry` and `mu0`, applied
+to `tau_scale` times the optical depth. `tau_scale` is an empirical
+calibration: the default brings GREB's global-mean shortwave change to
+-30 W/m2 per unit optical depth (Sato et al. 1993, citing Lacis et al. 1992),
+from -82 W/m2 at `tau_scale = 1`. Not represented: the aerosol's longwave
+effect, stratospheric heating, ozone chemistry and particle growth.
 """
 struct AerosolScenario
     eruptions::Vector{Eruption}
@@ -158,21 +154,25 @@ struct AerosolScenario
     ssa::Float64
     asymmetry::Float64
     mu0::Float64
+    tau_scale::Float64
 end
 
 function AerosolScenario(; eruptions=Eruption[], injections=SustainedInjection[],
         series::Union{Nothing,AerosolSeries}=nothing, tau_rise::Real=0.21,
-        tau_decay::Real=1.0, ssa::Real=1.0, asymmetry::Real=0.7, mu0::Real=0.5)
+        tau_decay::Real=1.0, ssa::Real=1.0, asymmetry::Real=0.7, mu0::Real=0.5,
+        tau_scale::Real=AEROSOL_TAU_SCALE)
     0 < tau_rise < tau_decay ||
         throw(ArgumentError("need 0 < tau_rise < tau_decay (years), got $tau_rise and $tau_decay"))
     0 <= ssa <= 1 || throw(ArgumentError("ssa must be in [0, 1], got $ssa"))
     0 <= asymmetry < 1 || throw(ArgumentError("asymmetry must be in [0, 1), got $asymmetry"))
     0 < mu0 <= 1 || throw(ArgumentError("mu0 must be in (0, 1], got $mu0"))
+    0 <= tau_scale < Inf || throw(ArgumentError("tau_scale must be finite and >= 0, got $tau_scale"))
     return AerosolScenario(collect(Eruption, eruptions), collect(SustainedInjection, injections),
-        series, Float64(tau_rise), Float64(tau_decay), Float64(ssa), Float64(asymmetry), Float64(mu0))
+        series, Float64(tau_rise), Float64(tau_decay), Float64(ssa), Float64(asymmetry), Float64(mu0),
+        Float64(tau_scale))
 end
 
-# - Two-reservoir chain (times in years) ──────────────────────────────────
+# ── Two-reservoir chain (times in years) ─────────────────────────────────
 
 "Response of the aerosol reservoir to a unit mass injected at t = 0."
 function chain_impulse(t, tr, td)
@@ -193,8 +193,8 @@ end
     aerosol_optical_depth!(aod::Vector{Float32}, sc::AerosolScenario, t) -> aod
 
 Fills `aod` (length `ydim`) with the optical depth at decimal year `t`: the sum
-over eruptions and sustained injections, each spread by its class profile.
-Pure function of `t`; nothing persists between calls, and nothing is allocated.
+of the eruptions and injections, each spread by its class profile, and the
+series. Depends only on `t`; allocates nothing.
 """
 function aerosol_optical_depth!(aod::Vector{Float32}, sc::AerosolScenario, t::Real)
     fill!(aod, 0.0f0)
@@ -230,7 +230,7 @@ function _add_series!(aod::Vector{Float32}, s::AerosolSeries, t::Real)
     return aod
 end
 
-# - Delta-Eddington transmission ──────────────────────────────────────────
+# ── Delta-Eddington transmission ─────────────────────────────────────────
 # Joseph, Wiscombe and Weinman (1976): the Eddington two-stream solution with
 # delta-scaled parameters. Closed forms: Meador and Weaver (1980), eqs. 14-18
 # and Table 1.
@@ -277,14 +277,14 @@ end
     aerosol_transmission!(mult::Vector{Float32}, aod::Vector{Float32}, sc::AerosolScenario, t) -> mult
 
 Multiplies `mult` (length `ydim`) by the aerosol shortwave transmission at
-decimal year `t`, using `aod` (length `ydim`) as scratch for the optical depth
-so nothing is allocated per timestep. Rows with zero optical depth are left
-untouched, so the multiplier is bit-identical outside an eruption.
+decimal year `t` (of `sc.tau_scale` times the optical depth), using `aod`
+(length `ydim`) as scratch. Rows with zero optical depth are left untouched,
+so the multiplier is bit-identical when no aerosol is present.
 """
 function aerosol_transmission!(mult::Vector{Float32}, aod::Vector{Float32}, sc::AerosolScenario, t::Real)
     aerosol_optical_depth!(aod, sc, t)
     for j in 1:ydim
-        tau = Float64(aod[j])
+        tau = sc.tau_scale * Float64(aod[j])
         tau == 0.0 && continue
         mult[j] *= Float32(delta_eddington(tau, sc.ssa, sc.asymmetry, sc.mu0)[2])
     end

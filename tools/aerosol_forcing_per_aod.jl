@@ -5,8 +5,9 @@
 # Applies a latitude-uniform optical depth through the delta-Eddington
 # transmission (the defaults of `AerosolScenario`) and reports the change in
 # annual, global-mean net shortwave from `SWradiation!`, evaluated on the
-# surface-temperature climatology at every timestep of the year. The result is
-# compared with the literature value of about -30 W/m2 per unit optical depth
+# surface-temperature climatology at every timestep of the year, once
+# uncalibrated (`tau_scale` 1) and once with the default `tau_scale`. The result
+# is compared with the literature value of about -30 W/m2 per unit optical depth
 # (Sato et al. 1993, citing Lacis et al. 1992); see the calibration section of
 # the aerosol kernel spec in the vault.
 #
@@ -54,13 +55,16 @@ function main()
     base = global_means(fields, cfg, ones(Float32, ydim))
     @printf("control: net SW %.1f W/m2, incoming %.1f W/m2, albedo %.3f\n",
             base.sw, base.incoming, base.albedo)
-    @printf("transmission: ssa %.2f, g %.2f, mu0 %.2f\n\n", sc.ssa, sc.asymmetry, sc.mu0)
-    println("optical depth  R/tau   dSW [W/m2]  dSW/tau [W/m2]  ratio to reference")
-    for tau in (0.01, 0.05, 0.1, 0.2, 0.5)
-        R, T = GREBClimate.delta_eddington(tau, sc.ssa, sc.asymmetry, sc.mu0)
-        d = global_means(fields, cfg, fill(Float32(T), ydim)).sw - base.sw
-        @printf("%-13.2f  %.3f   %-10.3f  %-14.1f  %.2f\n",
-                tau, R / tau, d, d / tau, d / tau / REFERENCE)
+    @printf("transmission: ssa %.2f, g %.2f, mu0 %.2f\n", sc.ssa, sc.asymmetry, sc.mu0)
+    for scale in (1.0, sc.tau_scale)
+        @printf("\ntau_scale %.3f%s\n", scale, scale == 1.0 ? " (uncalibrated)" : " (default)")
+        println("optical depth  R/tau   dSW [W/m2]  dSW/tau [W/m2]  ratio to reference")
+        for tau in (0.01, 0.05, 0.1, 0.2, 0.5)
+            R, T = GREBClimate.delta_eddington(scale * tau, sc.ssa, sc.asymmetry, sc.mu0)
+            d = global_means(fields, cfg, fill(Float32(T), ydim)).sw - base.sw
+            @printf("%-13.2f  %.3f   %-10.3f  %-14.1f  %.2f\n",
+                    tau, R / tau, d, d / tau, d / tau / REFERENCE)
+        end
     end
 end
 
