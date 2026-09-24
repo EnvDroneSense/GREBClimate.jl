@@ -128,7 +128,13 @@ end
     nh = GREBClimate._CLASS_PROFILES[:nh_extratropical]
     sh = GREBClimate._CLASS_PROFILES[:sh_extratropical]
     @test nh ≈ reverse(sh)
-    @test sum(nh[Y ÷ 2 + 1:end]) > sum(nh[1:Y ÷ 2])
+    # Stothers (1996), Katmai: none equatorward of 30 N, 0.57 of the 45-60 N value
+    # at the 30-45 N band centre, constant poleward.
+    lat = Float64.(GREBClimate.lat_grid)
+    @test all(iszero, nh[lat .<= 30])
+    @test issorted(nh)
+    @test GREBClimate._extratropical_shape(37.5) / GREBClimate._extratropical_shape(52.5) ≈ 0.57
+    @test all(==(maximum(nh)), nh[lat .>= 52.5])
 end
 
 @testset "aerosol_optical_depth!: global-mean peak, superposition, zero before, sustained injection" begin
@@ -137,7 +143,7 @@ end
     for cls in GREBClimate.AEROSOL_CLASSES
         sc = AerosolScenario(eruptions = [Eruption(2000.0, cls; peak_aod = 0.1)])
         aod = zeros(Float32, Y)
-        GREBClimate.aerosol_optical_depth!(aod, sc, 2000.0 + GREBClimate.chain_peak_time(tr, td))
+        GREBClimate.aerosol_optical_depth!(aod, sc, 2000.0 + GREBClimate.chain_peak_time(sc.chains[cls][1:2]...))
         @test _gm(aod) ≈ 0.1 rtol = 1e-5
         GREBClimate.aerosol_optical_depth!(aod, sc, 1999.0)
         @test all(iszero, aod)
@@ -162,6 +168,31 @@ end
     GREBClimate.aerosol_optical_depth!(a2y, sc, 2022.0)
     GREBClimate.aerosol_optical_depth!(a3y, sc, 2023.0)
     @test _gm(a3y) / _gm(a2y) ≈ exp(-1.0) rtol = 1e-2
+end
+
+@testset "per-class timescales: extratropical from Stothers (1996), tropical settable, no allocation" begin
+    sc = AerosolScenario(tau_rise = 0.15, tau_decay = 1.2)
+    @test sc.chains.tropical[1:2] == (0.15, 1.2)
+    for cls in (:nh_extratropical, :sh_extratropical)
+        tr, td, _ = sc.chains[cls]
+        # Katmai: e-folding decay 0.8 yr, peak within about two to three months.
+        @test (tr, td) == (0.082, 0.8)
+        @test 12 * GREBClimate.chain_peak_time(tr, td) ≈ 2.5 atol = 0.05
+        @test sc.chains[cls] == AerosolScenario().chains[cls]
+    end
+
+    # a sustained extratropical injection decays with the extratropical timescale
+    inj = AerosolScenario(injections = [SustainedInjection(2000.0, 2010.0, :nh_extratropical, 0.05)])
+    a1, a2 = zeros(Float32, Y), zeros(Float32, Y)
+    GREBClimate.aerosol_optical_depth!(a1, inj, 2012.0)
+    GREBClimate.aerosol_optical_depth!(a2, inj, 2012.8)
+    @test _gm(a2) / _gm(a1) ≈ exp(-1.0) rtol = 1e-3
+
+    mixed = AerosolScenario(eruptions = [Eruption(2000.0, :tropical; peak_aod = 0.1),
+                                         Eruption(2000.2, :sh_extratropical; peak_aod = 0.05)],
+                            injections = [SustainedInjection(2000.0, 2003.0, :nh_extratropical, 0.02)])
+    GREBClimate.aerosol_optical_depth!(a1, mixed, 2001.0)
+    @test (@allocated GREBClimate.aerosol_optical_depth!(a1, mixed, 2001.0)) == 0
 end
 
 @testset "delta_eddington: limits, energy conservation, published closed form, monotonicity" begin

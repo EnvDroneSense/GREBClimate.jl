@@ -92,9 +92,11 @@ First release registered in the Julia General registry.
   standard forcing-series JLD2 format whose times are on the model's 365-day
   calendar, so converters, not the model, translate dates. The aerosol dims
   sunlight per latitude through a delta-Eddington layer, calibrated to
-  −30 W/m² per unit optical depth. Off by default; default runs are bit-identical. Against
-  observed temperatures it cools about twice as strongly as observed; see the
-  model overview.
+  −30 W/m² per unit optical depth. Extratropical eruptions follow Katmai
+  (Stothers 1996): aerosol only poleward of 30° in their hemisphere, a peak
+  after 2.5 months and a 0.8-year decay. Off by default; default runs are
+  bit-identical. Against observed temperatures it cools about twice as strongly
+  as observed; see the model overview.
 - **Plotting toolbox** (`viz/`): maps, global-mean time series, seasonal cycle,
   Hovmöller diagram and animations, plus a simplified Pluto explorer notebook.
   `julia viz/setup.jl` sets up its environment.
@@ -104,12 +106,12 @@ First release registered in the Julia General registry.
   `CirculationWorkspace` and `MonthlyAccumulator`.
 - Documentation site (tutorial, input data, model overview, plots, physics
   switches, API) with doctests, and `CONTRIBUTING.md`.
-- Maintainer tools: `tools/package_dataset.jl` builds the dataset archive and
-  its SHA256; the `.bin` converter only converts fields the model reads;
-  `tools/convert_aerosol_to_jld2.jl` converts the GISS stratospheric-aerosol
-  NetCDF files; `tools/aerosol_forcing_per_aod.jl` measures the aerosol
-  calibration; `tools/validate_volcanic.jl` compares the aerosol response with
-  GISTEMP.
+- Maintainer tools in `tools/`, grouped by purpose (`dataset/`, `forcing/`,
+  `diagnostics/`, `validation/`; see `tools/README.md`): the dataset archive
+  and its SHA256; a `.bin` converter that only converts fields the model reads;
+  a converter for the GISS stratospheric-aerosol NetCDF files; the aerosol
+  calibration and shortwave-pulse diagnostics; and a comparison of the volcanic
+  response with GISTEMP.
 - CI on Julia 1.10 and current, in two test shards, with code coverage,
   Aqua.jl package checks, per-kernel allocation and type-stability tests, and a
   single- vs multi-threaded bit-identity test. TagBot and CompatHelper automate
@@ -132,7 +134,7 @@ First release registered in the Julia General registry.
 - `seaice!` returned a `Union` type; it now returns `nothing`.
 - `load_custom_co2_scenario` left the file open when a line was malformed.
 - 19 of 36 exported functions had docstrings detached from their definitions.
-- `tools/convert_greb_to_jld2.jl` defaulted to a non-existent `Data/input`.
+- `tools/dataset/convert_greb_to_jld2.jl` defaulted to a non-existent `Data/input`.
 - Stale references in the documentation: an old notebook name, the Julia
   version and a benchmark file that never existed.
 

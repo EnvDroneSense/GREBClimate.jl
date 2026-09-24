@@ -10,16 +10,26 @@ const AEROSOL_CLASSES = (:tropical, :nh_extratropical, :sh_extratropical)
 # Sigl 2017); the plausible range is 0.015 to 0.020.
 const AOD_PER_TG_S = 0.015
 
-# Default `tau_scale`: 30 / 82.1, from tools/aerosol_forcing_per_aod.jl (see
-# `AerosolScenario`).
+# Default `tau_scale`: 30 / 82.1, from
+# tools/diagnostics/aerosol_forcing_per_aod.jl (see `AerosolScenario`).
 const AEROSOL_TAU_SCALE = 0.365
 
-# Extratropical shapes: (centre latitude, gaussian half-width) in degrees.
-# Provisional; no source values were found for them.
-const _AEROSOL_EXTRATROPICAL_SHAPE = (
-    nh_extratropical = (50.0, 30.0),
-    sh_extratropical = (-50.0, 30.0),
-)
+# Extratropical shape, `a` degrees from the equator in the eruption's
+# hemisphere, from Stothers (1996) for Katmai: none equatorward of 30 degrees,
+# 0.13 / 0.23 = 0.57 at the 30-45 band centre, 1 from the 45-60 band centre
+# poleward (his polar values were assumed, not measured), linear between.
+function _extratropical_shape(a::Real)
+    a <= 30 && return 0.0
+    a < 37.5 && return 0.57 * (a - 30) / 7.5
+    a < 52.5 && return 0.57 + 0.43 * (a - 37.5) / 15
+    return 1.0
+end
+
+# Extratropical timescales (years). Decay: the e-folding time measured after
+# Katmai, 0.8 +/- 0.1 yr (Stothers 1996). Rise: a peak at 2.5 months, between
+# Stothers' "within two months" and the 100-day ramp of Crowley and Unterman
+# (2013). The tropical ones are `AerosolScenario`'s `tau_rise` and `tau_decay`.
+const _EXTRATROPICAL_TAU = (rise = 0.082, decay = 0.8)
 
 # Tropical shape, from the four equal-area bands of Crowley and Unterman
 # (2013): 1 in the low-latitude bands (centres 15 degrees), 0.8 in the
@@ -38,8 +48,8 @@ function _class_profile(cls::Symbol)
     w = if cls === :tropical
         [_tropical_shape(Float64(phi)) for phi in lat_grid]
     else
-        (phi0, sigma) = _AEROSOL_EXTRATROPICAL_SHAPE[cls]
-        [exp(-((Float64(phi) - phi0) / sigma)^2) for phi in lat_grid]
+        h = cls === :nh_extratropical ? 1.0 : -1.0
+        [_extratropical_shape(h * Float64(phi)) for phi in lat_grid]
     end
     c = [cosd(Float64(phi)) for phi in lat_grid]
     return w ./ (sum(w .* c) / sum(c))
@@ -58,6 +68,7 @@ starts at 1950 for most experiments). `cls` is `:tropical`,
 optical depth at 550 nm). The linear mass scaling overestimates eruptions much
 larger than Pinatubo. `:tropical` spreads the aerosol into both hemispheres,
 which suits Pinatubo but not asymmetric eruptions such as Agung or El Chichon.
+The extratropical classes keep it poleward of 30 degrees in one hemisphere.
 """
 struct Eruption
     year::Float64
@@ -82,8 +93,8 @@ end
 
 Holds the global-mean optical depth at `target_aod` between `start_year` and
 `stop_year` (use `Inf` for no stop). The optical depth rises and, after the
-stop, decays with the scenario's `tau_rise` and `tau_decay`; choosing a stop
-year inside the run gives a termination shock.
+stop, decays with the timescales of its class (see [`AerosolScenario`](@ref));
+choosing a stop year inside the run gives a termination shock.
 """
 struct SustainedInjection
     start_year::Float64
@@ -123,24 +134,23 @@ const SERIES_END_WARN_AOD = 0.005
                     tau_scale=0.365)
 
 Stratospheric aerosol add-on for `cfg.aerosol`: dims the shortwave per
-latitude in the scenario run of any experiment. The control run is never
-dimmed, so anomalies are relative to an aerosol-free control.
+latitude in the scenario run, so anomalies are relative to an aerosol-free
+control.
 
-Optical depth follows two linear reservoirs with timescales `tau_rise` and
-`tau_decay` (years). The defaults peak five months after injection and decay
-with an e-folding time of one year, as for Pinatubo; every class uses them,
-although high-latitude aerosol decays faster. Eruptions, injections and
-`series` (a published record, see [`load_aerosol_series`](@ref)) add, so an
-eruption listed and also present in the record counts twice. Published records
-include the quiet-year background (optical depth 0.002 to 0.009), which the
-control does not have.
+Optical depth is the sum of `eruptions`, `injections` and `series`, each spread
+by its injection latitude profile. Eruptions and injections follow two linear
+reservoirs. For `:tropical`, the timescales are `tau_rise` and `tau_decay`
+(years; the defaults peak at five months and decay in a year, as Pinatubo did).
+The extratropical classes peak at 2.5 months and decay in 0.8 years (Katmai,
+Stothers 1996); `tau_rise` and `tau_decay` do not change them. `series` is a
+published record (see [`load_aerosol_series`](@ref)); if an eruption is also
+present in `series`, it counts twice.
 
-The transmission is delta-Eddington with `ssa`, `asymmetry` and `mu0`, applied
-to `tau_scale` times the optical depth. `tau_scale` is an empirical
-calibration: the default brings GREB's global-mean shortwave change to
--30 W/m2 per unit optical depth (Sato et al. 1993, citing Lacis et al. 1992),
-from -82 W/m2 at `tau_scale = 1`. Not represented: the aerosol's longwave
-effect, stratospheric heating, ozone chemistry and particle growth.
+Transmission is delta-Eddington with `ssa`, `asymmetry` and `mu0`, applied to
+`tau_scale` times the optical depth. The default `tau_scale` calibrates GREB's
+global-mean shortwave change to about -30 W/m2 per unit optical depth (Sato et
+al. 1993, citing Lacis et al. 1992). Aerosol longwave effects, stratospheric
+heating, ozone chemistry and particle growth are not represented.
 """
 struct AerosolScenario
     eruptions::Vector{Eruption}
@@ -152,6 +162,17 @@ struct AerosolScenario
     asymmetry::Float64
     mu0::Float64
     tau_scale::Float64
+    # Per class: (rise, decay, 1 / pulse peak), derived from the fields above.
+    chains::NamedTuple{AEROSOL_CLASSES,NTuple{length(AEROSOL_CLASSES),NTuple{3,Float64}}}
+end
+
+function AerosolScenario(eruptions, injections, series, tau_rise, tau_decay, ssa, asymmetry, mu0, tau_scale)
+    chain(tr, td) = (tr, td, 1 / chain_impulse(chain_peak_time(tr, td), tr, td))
+    chains = map(AEROSOL_CLASSES) do cls
+        cls === :tropical ? chain(tau_rise, tau_decay) : chain(_EXTRATROPICAL_TAU.rise, _EXTRATROPICAL_TAU.decay)
+    end
+    return AerosolScenario(eruptions, injections, series, tau_rise, tau_decay, ssa, asymmetry, mu0,
+                           tau_scale, NamedTuple{AEROSOL_CLASSES}(chains))
 end
 
 function AerosolScenario(; eruptions=Eruption[], injections=SustainedInjection[],
@@ -195,14 +216,14 @@ series. Depends only on `t`; allocates nothing.
 """
 function aerosol_optical_depth!(aod::Vector{Float32}, sc::AerosolScenario, t::Real)
     fill!(aod, 0.0f0)
-    tr, td = sc.tau_rise, sc.tau_decay
-    inv_peak = 1 / chain_impulse(chain_peak_time(tr, td), tr, td)  # scales each pulse to a peak of 1
     for e in sc.eruptions
+        tr, td, inv_peak = sc.chains[e.cls]    # inv_peak scales the pulse to a peak of 1
         a = e.peak_aod * inv_peak * chain_impulse(t - e.year, tr, td)
         a == 0.0 && continue
         aod .+= a .* _CLASS_PROFILES[e.cls]
     end
     for s in sc.injections
+        tr, td, _ = sc.chains[s.cls]
         u = chain_step(t - s.start_year, tr, td)
         isfinite(s.stop_year) && (u -= chain_step(t - s.stop_year, tr, td))
         u == 0.0 && continue

@@ -65,8 +65,8 @@ through three steps:
 
 | Step | Method | Main assumptions |
 |:-----|:-------|:-----------------|
-| Optical depth in time | Two linear reservoirs: peak 5 months after injection, e-folding decay of 1 year | Tropical Pinatubo values, used for every injection class |
-| Optical depth in latitude | Fixed profile per class: tropical, northern or southern extratropical | Tropical spreads into both hemispheres; high latitudes keep 80% of the tropical value |
+| Optical depth in time | Two linear reservoirs: tropical peak 5 months after injection and e-folding decay of 1 year; extratropical 2.5 months and 0.8 years | Tropical values from Pinatubo, settable; extratropical from Katmai (Stothers, 1996) |
+| Optical depth in latitude | Fixed profile per class: tropical, northern or southern extratropical | Tropical spreads into both hemispheres; high latitudes keep 80% of the tropical value. Extratropical stays poleward of 30° in one hemisphere (Stothers, 1996) |
 | Shortwave transmission | Delta-Eddington layer (Joseph et al., 1976) at a fixed zenith angle, on a calibrated optical depth | Calibrated to −30 W/m² per unit optical depth (Sato et al., 1993); uncalibrated, the layer gives −82 W/m² |
 
 The layer is a multiplier on incoming sunlight: it does not reflect light
@@ -84,8 +84,8 @@ are meaningful, but the absolute cooling is too large. Most of the excess is
 GREB's own response rather than the aerosol forcing: a one-year dimming of the
 sunlight by 1 W/m² cools the model by about 0.17 K, against roughly 0.07 to
 0.11 K in the observed record, so other short forcings over-respond as well.
-The scripts are `tools/validate_volcanic.jl` and
-`tools/shortwave_pulse_response.jl`.
+The scripts are `tools/validation/validate_volcanic.jl` and
+`tools/diagnostics/shortwave_pulse_response.jl`.
 
 ## A run
 
