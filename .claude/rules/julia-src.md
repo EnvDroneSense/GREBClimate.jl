@@ -7,7 +7,7 @@ paths: ["src/**/*.jl"]
 outweighs everything else in `src/` combined.
 
 Longitude buffers carry `nghost = 3` periodic ghost cells at each end
-(`xghost = xdim + 2*nghost`, `constants.jl:150,152`); `nghost` equals the
+(`xghost = xdim + 2*nghost`, `core/constants.jl:150,152`); `nghost` equals the
 stencil reach, so widening one means widening both.
 
 `CircularArrays.jl` is not an option here: `LoopVectorization.check_args`

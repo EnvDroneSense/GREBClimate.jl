@@ -61,7 +61,7 @@ end
     # The table is hand-written; this is what stops a new kernel slipping past
     # it. "Kernel" means a `!`-named function defined in one of these files.
     kernel_files = ("physics/radiation.jl", "physics/hydrology.jl",
-        "physics/ocean.jl", "circulation.jl", "tendencies.jl")
+        "physics/ocean.jl", "circulation.jl", "core/tendencies.jl")
     defined_in_kernel_file(fn) = any(methods(fn)) do m
         path = replace(String(m.file), '\\' => '/')
         any(kf -> endswith(path, kf), kernel_files)

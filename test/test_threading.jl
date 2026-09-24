@@ -2,7 +2,7 @@
 
 @testset "threaded circulation matches serial (subprocess -t 1 vs -t 2)" begin
     # `tendencies!` runs circulation!(Ta) and circulation!(q) concurrently only
-    # when `Threads.nthreads() > 1` AND `ws_a !== ws_q` (see src/tendencies.jl).
+    # when `Threads.nthreads() > 1` AND `ws_a !== ws_q` (see src/core/tendencies.jl).
     # Thread count is fixed at Julia startup, so a single-threaded `Pkg.test()`
     # can never reach that branch - it went untested until 2026-08-21. Spawning
     # both counts explicitly keeps this honest however the suite is invoked.

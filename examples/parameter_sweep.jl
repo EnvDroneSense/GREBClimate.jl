@@ -25,7 +25,7 @@ examples/parameter_sweep_results.csv.
 
 `result.scnr` holds one `MonthlyRecord` per month and is already an anomaly
 against the control's final-year monthly climatology (`apply_scenario_anomalies`
-in src/postprocess.jl), so no further subtraction happens here. Each anomaly
+in src/core/postprocess.jl), so no further subtraction happens here. Each anomaly
 below is the mean over the scenario's final 12 records, i.e. its final year.
 """
 function parameter_sweep(jld2_dir::AbstractString;
@@ -50,7 +50,7 @@ function parameter_sweep(jld2_dir::AbstractString;
     results = NamedTuple{(:co2, :Ts_anom, :ice_anom, :precip_anom),
                           Tuple{Float64,Float64,Float64,Float64}}[]
 
-    # :custom_co2's scenario clock starts at 1950 (src/model.jl:426) and
+    # :custom_co2's scenario clock starts at 1950 (src/core/model.jl:426) and
     # advances 1 year per step, so the table needs an entry per scenario year.
     years = 1950:(1950 + scnr - 1)
 
