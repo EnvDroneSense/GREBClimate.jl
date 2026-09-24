@@ -6,51 +6,29 @@
 const AEROSOL_CLASSES = (:tropical, :tropical_nh, :tropical_sh, :nh_extratropical, :sh_extratropical)
 const _TROPICAL_CLASSES = (:tropical, :tropical_nh, :tropical_sh)
 
-# Global-mean visible optical depth per Tg S injected. Back-derived from
-# Crowley and Unterman (2013) and a Pinatubo injection of 9 Tg S (Toohey and
-# Sigl 2017); the plausible range is 0.015 to 0.020.
+# Global-mean optical depth per Tg S, back-derived from Crowley and Unterman
+# (2013) and Pinatubo's 9 Tg S (Toohey and Sigl 2017); plausible 0.015-0.020.
 const AOD_PER_TG_S = 0.015
 
-# Default `tau_scale`: 30 / 82.1, from
-# tools/diagnostics/aerosol_forcing_per_aod.jl (see `AerosolScenario`).
+# 30 / 82.1: calibrates to -30 W/m2 per unit optical depth
+# (tools/diagnostics/aerosol_forcing_per_aod.jl).
 const AEROSOL_TAU_SCALE = 0.365
 
-# Extratropical shape, `a` degrees from the equator in the eruption's
-# hemisphere, from Stothers (1996) for Katmai: none equatorward of 30 degrees,
-# 0.13 / 0.23 = 0.57 at the 30-45 band centre, 1 from the 45-60 band centre
-# poleward (his polar values were assumed, not measured), linear between.
-function _extratropical_shape(a::Real)
-    a <= 30 && return 0.0
-    a < 37.5 && return 0.57 * (a - 30) / 7.5
-    a < 52.5 && return 0.57 + 0.43 * (a - 37.5) / 15
-    return 1.0
-end
+# Latitude shapes as (latitude, value) nodes at band centres, linear between,
+# constant beyond; checked by tools/diagnostics/aerosol_profile_check.jl.
+# Tropical: fitted to Pinatubo's 36-month band totals in Sato-Lacis and GloSSAC.
+const _TROPICAL_NODES = ((7.5, 1.0), (22.5, 0.68), (37.5, 0.65), (52.5, 0.65), (75.0, 0.55))
+# One-hemisphere tropical, latitude positive in the eruption's hemisphere:
+# fitted to El Chichon and Agung the same way.
+const _ONE_HEMISPHERE_NODES = ((-22.5, 0.28), (-7.5, 0.62), (7.5, 1.0), (22.5, 1.0), (37.5, 0.75))
+# Extratropical, eruption's hemisphere only: Katmai (Stothers 1996), nothing
+# south of 30 N, 0.13 / 0.23 at 30-45 N; polar value assumed equal to 45-60 N.
+const _EXTRATROPICAL_NODES = ((30.0, 0.0), (37.5, 0.57), (52.5, 1.0))
 
-# Extratropical timescales (years). Decay: the e-folding time measured after
-# Katmai, 0.8 +/- 0.1 yr (Stothers 1996). Rise: a peak at 2.5 months, between
-# Stothers' "within two months" and the 100-day ramp of Crowley and Unterman
-# (2013). The tropical ones are `AerosolScenario`'s `tau_rise` and `tau_decay`.
+# Extratropical (rise, decay) in years: Katmai's 0.8-year decay and a peak at
+# 2.5 months (Stothers 1996). The tropical classes use `tau_rise`/`tau_decay`.
 const _EXTRATROPICAL_TAU = (rise = 0.082, decay = 0.8)
 
-# Tropical shape: (latitude, value) at the centres of the 0-15, 15-30, 30-45,
-# 45-60 and 60-90 degree bands, linear between, constant beyond. Fitted to
-# Pinatubo: each band's optical depth summed over the 36 months after the
-# eruption, relative to 0-15 degrees, averaged over Sato-Lacis, GloSSAC and both
-# hemispheres, is 1, 0.75, 0.67, 0.69 and 0.61; 30-60 is pooled so the shape
-# falls monotonically. Tools: tools/diagnostics/aerosol_profile_check.jl.
-const _TROPICAL_NODES = ((7.5, 1.0), (22.5, 0.68), (37.5, 0.65), (52.5, 0.65), (75.0, 0.55))
-
-# One-hemisphere tropical shape (El Chichon, Agung): (latitude, value), positive
-# in the eruption's hemisphere, linear between, constant beyond. Fitted like the
-# tropical shape, to the 36-month totals of El Chichon (Sato-Lacis, GloSSAC) and
-# Agung (Sato-Lacis): relative to the eruption hemisphere's tropics, 0.79 at its
-# higher latitudes, 0.67 in the opposite tropics and 0.30 beyond (reproduced
-# within 0.04). This follows Crowley and Unterman (2013): the tropics at least
-# 30 percent above the same hemisphere's high latitudes, and the opposite
-# tropics midway between that maximum and the opposite high latitudes.
-const _ONE_HEMISPHERE_NODES = ((-22.5, 0.28), (-7.5, 0.62), (7.5, 1.0), (22.5, 1.0), (37.5, 0.75))
-
-# Piecewise-linear through `nodes`, constant beyond the first and last.
 function _interp(nodes, x::Real)
     x <= first(nodes)[1] && return first(nodes)[2]
     for k in 2:length(nodes)
@@ -61,6 +39,7 @@ function _interp(nodes, x::Real)
 end
 
 _tropical_shape(phi::Real) = _interp(_TROPICAL_NODES, abs(phi))
+_extratropical_shape(a::Real) = _interp(_EXTRATROPICAL_NODES, a)
 
 _check_class(cls::Symbol) = cls in AEROSOL_CLASSES ||
     throw(ArgumentError("unknown injection class :$cls; valid: $AEROSOL_CLASSES"))
@@ -85,16 +64,14 @@ const _CLASS_PROFILES = Dict{Symbol,Vector{Float64}}(cls => _class_profile(cls) 
     Eruption(year, cls; tg_s=nothing, peak_aod=nothing, aod_per_tg_s=0.015)
 
 One volcanic injection at decimal `year` on the model clock (the scenario run
-starts at 1950 for most experiments). `cls` is one of `AEROSOL_CLASSES`:
+starts at 1950 for most experiments). `cls` sets where the aerosol goes:
 
-- `:tropical`: both hemispheres alike, as after Pinatubo;
-- `:tropical_nh`, `:tropical_sh`: a tropical eruption whose aerosol stayed
-  mostly in one hemisphere, as after El Chichon (north) and Agung (south);
+- `:tropical`: both hemispheres, like Pinatubo;
+- `:tropical_nh`, `:tropical_sh`: mostly one hemisphere, like El Chichon, Agung;
 - `:nh_extratropical`, `:sh_extratropical`: poleward of 30 degrees in one
-  hemisphere, as after Katmai (Toohey and Sigl 2017 put the boundary between
-  tropical and extratropical eruptions at 25 degrees).
+  hemisphere, like Katmai (eruptions beyond 25 degrees latitude).
 
-Give exactly one of `tg_s` (injected sulfur, Tg S, times `aod_per_tg_s`) or
+Give exactly one of `tg_s` (injected sulfur in Tg S, times `aod_per_tg_s`) or
 `peak_aod` (global-mean peak optical depth at 550 nm). The linear mass scaling
 overestimates eruptions much larger than Pinatubo.
 """
@@ -152,8 +129,7 @@ struct AerosolSeries
     source::String
 end
 
-# `load_aerosol_series` warns when a record ends above this optical depth
-# (a small fraction of Pinatubo's global-mean peak of about 0.15).
+# `load_aerosol_series` warns when a record ends above this optical depth.
 const SERIES_END_WARN_AOD = 0.005
 
 """
@@ -162,26 +138,20 @@ const SERIES_END_WARN_AOD = 0.005
                     tau_scale=0.365)
 
 Stratospheric aerosol add-on for `cfg.aerosol`: dims the shortwave per
-latitude in the scenario run, so anomalies are relative to an aerosol-free
-control.
+latitude in the scenario run; the control run stays aerosol-free.
 
-Optical depth is the sum of `eruptions`, `injections` and `series`, each spread
-by its injection latitude profile. Eruptions and injections follow two linear
-reservoirs. For the tropical classes, the timescales are `tau_rise` and `tau_decay`
-(years; the defaults peak at five months and decay in a year, as Pinatubo did).
-The extratropical classes peak at 2.5 months and decay in 0.8 years (Katmai,
-Stothers 1996); `tau_rise` and `tau_decay` do not change them. `series` is a
-published record (see [`load_aerosol_series`](@ref)); if an eruption is also
-present in `series`, it counts twice.
+Optical depth is the sum of `eruptions`, `injections` and `series` (a published
+record, see [`load_aerosol_series`](@ref); an eruption also in the record counts
+twice). Eruptions and injections rise and decay through two linear reservoirs:
+for the tropical classes with `tau_rise` and `tau_decay` (years; the defaults
+peak at 5 months and decay in a year, like Pinatubo), for the extratropical
+classes with a 2.5-month peak and a 0.8-year decay (Katmai).
 
-Transmission is delta-Eddington with `ssa`, `asymmetry` and `mu0`, applied to
-`tau_scale` times the optical depth. The default `tau_scale` calibrates GREB's
-global-mean shortwave change to about -30 W/m2 per unit optical depth (Sato et
-al. 1993, citing Lacis et al. 1992) for the default `ssa`, `asymmetry` and
-`mu0`. Changing those without recalibrating `tau_scale`
-(`tools/diagnostics/aerosol_forcing_per_aod.jl`) changes the dimming; after
-recalibrating, `asymmetry` 0.6-0.8 and `mu0` 0.3-0.7 move it by at most 1.5%
-up to an optical depth of 0.5. Aerosol longwave effects, stratospheric
+Transmission is delta-Eddington with `ssa`, `asymmetry` and `mu0` on `tau_scale`
+times the optical depth. The default `tau_scale` gives about -30 W/m2 per unit
+optical depth (Sato et al. 1993) for the default `ssa`, `asymmetry` and `mu0`;
+if you change those, recalibrate it with
+`tools/diagnostics/aerosol_forcing_per_aod.jl`. Longwave effects, stratospheric
 heating, ozone chemistry and particle growth are not represented.
 """
 struct AerosolScenario
@@ -242,9 +212,8 @@ end
 """
     aerosol_optical_depth!(aod::Vector{Float32}, sc::AerosolScenario, t) -> aod
 
-Fills `aod` (length `ydim`) with the optical depth at decimal year `t`: the sum
-of the eruptions and injections, each spread by its class profile, and the
-series. Depends only on `t`; allocates nothing.
+Fills `aod` (length `ydim`) with the optical depth at decimal year `t`.
+Depends only on `t`; allocates nothing.
 """
 function aerosol_optical_depth!(aod::Vector{Float32}, sc::AerosolScenario, t::Real)
     fill!(aod, 0.0f0)
@@ -265,8 +234,7 @@ function aerosol_optical_depth!(aod::Vector{Float32}, sc::AerosolScenario, t::Re
     return aod
 end
 
-# Adds the record at decimal year `t`, linear in time between records and zero
-# outside the first and last year.
+# Adds the record at decimal year `t`, linear in time, zero outside its range.
 function _add_series!(aod::Vector{Float32}, s::AerosolSeries, t::Real)
     yrs = s.years
     (t < first(yrs) || t > last(yrs)) && return aod
@@ -327,9 +295,8 @@ end
     aerosol_transmission!(mult::Vector{Float32}, aod::Vector{Float32}, sc::AerosolScenario, t) -> mult
 
 Multiplies `mult` (length `ydim`) by the aerosol shortwave transmission at
-decimal year `t` (of `sc.tau_scale` times the optical depth), using `aod`
-(length `ydim`) as scratch. Rows with zero optical depth are left untouched,
-so the multiplier is bit-identical when no aerosol is present.
+decimal year `t`, using `aod` as scratch. Rows without aerosol are untouched, so
+the multiplier is bit-identical when no aerosol is present.
 """
 function aerosol_transmission!(mult::Vector{Float32}, aod::Vector{Float32}, sc::AerosolScenario, t::Real)
     aerosol_optical_depth!(aod, sc, t)

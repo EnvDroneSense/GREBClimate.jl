@@ -2,16 +2,11 @@
 #
 # MAINTAINER TOOL - not part of the package. Needs the local dataset.
 #
-# Applies a latitude-uniform optical depth through the delta-Eddington
-# transmission (the defaults of `AerosolScenario`) and reports the change in
-# annual, global-mean net shortwave from `SWradiation!`, evaluated on the
-# surface-temperature climatology at every timestep of the year, once
-# uncalibrated (`tau_scale` 1) and once with the default `tau_scale`. The result
-# is compared with the literature value of about -30 W/m2 per unit optical depth
-# (Sato et al. 1993, citing Lacis et al. 1992); see the calibration section of
-# the aerosol kernel spec in the vault. To calibrate other `ssa`, `asymmetry` or
-# `mu0`, set them in `AerosolScenario()` in `main`; the matching `tau_scale` is
-# 30 over the magnitude of the uncalibrated dSW/tau at optical depth 0.01.
+# Annual global-mean net shortwave change per unit of latitude-uniform optical
+# depth, through `SWradiation!` on the climatology, uncalibrated (`tau_scale` 1)
+# and with the default `tau_scale`, against the reference -30 W/m2 (Sato et al.
+# 1993). For other `ssa`, `asymmetry` or `mu0`, set them in `main`; the matching
+# `tau_scale` is 30 over the uncalibrated |dSW/tau| at optical depth 0.01.
 #
 # Usage:
 #   julia --project=. tools/diagnostics/aerosol_forcing_per_aod.jl

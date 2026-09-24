@@ -61,9 +61,7 @@ end
     GREBClimate.apply_shortwave_addons!(state, cfg, 2000, 150)
     @test state.sw_solar_forcing == 0.99f0 .* only_aero
 
-    # Composes the same way with an experiment that already modulates the
-    # multiplier: core/model.jl broadcasts forcing()'s scalar into the vector,
-    # then the add-ons multiply into it.
+    # Same with an experiment that already modulates the multiplier.
     cyc = create_experiment_config(:solar_cycle_11yr)
     cyc.aerosol = cfg.aerosol
     scalar = forcing(150, 2000, cyc, ClimateFields(), zeros(Float64, X, Y, 1)).sw_solar_forcing
@@ -84,7 +82,7 @@ _gm(a) = sum(a .* _W) / sum(_W)
     tr, td = sc.tau_rise, sc.tau_decay
     h(t) = GREBClimate.chain_impulse(t, tr, td)
     tpk = GREBClimate.chain_peak_time(tr, td)
-    # Crowley and Unterman (2013): the tropical Pinatubo peak came about 5 months after the eruption.
+    # Pinatubo peaked about 5 months after the eruption (Crowley and Unterman 2013).
     @test 12 * tpk ≈ 5.0 atol = 0.1
     @test maximum(h.(range(0.0, 3.0; length = 3001))) ≈ h(tpk) rtol = 1e-6
     @test h(0.0) == 0.0
@@ -132,16 +130,14 @@ end
     nh = GREBClimate._CLASS_PROFILES[:nh_extratropical]
     sh = GREBClimate._CLASS_PROFILES[:sh_extratropical]
     @test nh ≈ reverse(sh)
-    # Stothers (1996), Katmai: none equatorward of 30 N, 0.57 of the 45-60 N value
-    # at the 30-45 N band centre, constant poleward.
+    # Stothers (1996), Katmai: nothing south of 30 N, 0.57 at 37.5 N, flat poleward.
     @test all(iszero, nh[lat .<= 30])
     @test issorted(nh)
     @test GREBClimate._extratropical_shape(37.5) / GREBClimate._extratropical_shape(52.5) ≈ 0.57
     @test all(==(maximum(nh)), nh[lat .>= 52.5])
 
-    # One-hemisphere tropical classes, rules of Crowley and Unterman (2013):
-    # tropics at least 30 percent above the same hemisphere's high latitudes,
-    # opposite tropics midway between that maximum and the opposite high latitudes.
+    # One-hemisphere classes follow Crowley and Unterman (2013): tropical maximum
+    # at least 1.3 times its high latitudes, opposite tropics midway down.
     tn = GREBClimate._CLASS_PROFILES[:tropical_nh]
     ts = GREBClimate._CLASS_PROFILES[:tropical_sh]
     @test tn ≈ reverse(ts)
@@ -256,8 +252,7 @@ end
     mu_sing = 1 / sqrt(g1^2 - g2^2)
     R, T = de(0.2, ssa, g, mu_sing)
     @test isfinite(R) && isfinite(T)
-    # The nudge must not be visible: the result agrees with values a small
-    # distance either side of the singularity (the singularity is removable).
+    # The nudge is invisible: values either side of the singularity agree.
     for eps in (1e-3, -1e-3)
         Re, Te = de(0.2, ssa, g, mu_sing * (1 + eps))
         @test abs(Re - R) < 1e-3

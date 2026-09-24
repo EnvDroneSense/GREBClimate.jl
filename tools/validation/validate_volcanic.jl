@@ -10,15 +10,15 @@
 #   Data/validation/mei_v1_table.html
 #       https://psl.noaa.gov/enso/mei.old/table.html (MEI, 1950-2018)
 #
-# 1. Runs :full_model with and without each aerosol input; the difference in
-#    global-mean surface temperature is the model's volcanic response.
-# 2. Regresses the observed monthly anomaly on a trend, the lagged MEI, a
-#    two-harmonic annual cycle and the model response in a 5-year window after
-#    each eruption (Foster and Rahmstorf 2011, with the model response in
-#    place of optical depth). A coefficient near 1 means the model has the
-#    right magnitude for that event.
-# 3. Writes the time series (observations with trend, ENSO and annual cycle
-#    removed, and the model response) to Data/validation/volcanic_timeseries.csv.
+# 1. The model's volcanic response: :full_model with each aerosol input minus
+#    without.
+# 2. Regresses observed monthly anomalies on a trend, lagged MEI, the annual
+#    cycle and the model response after each eruption (Foster and Rahmstorf
+#    2011); a coefficient near 1 means the right magnitude.
+# 3. Compares each eruption run from its class (Sato-Lacis peak) with the
+#    series-mode run.
+# 4. Writes the adjusted observations and model responses to
+#    Data/validation/volcanic_timeseries.csv.
 #
 # Usage:
 #   julia --project=. tools/validation/validate_volcanic.jl
@@ -40,8 +40,30 @@ const BASELINE = 12                      # months before the eruption used as it
 # (name, year, month) of each eruption
 const ERUPTIONS = (("Agung", 1963, 3), ("El Chichon", 1982, 4), ("Pinatubo", 1991, 6))
 
+# Eruption-mode runs, each with its record peak: (name, model-calendar date, class).
+const PEAK_RUNS = (("Agung", 1963.21, :tropical_sh), ("El Chichon", 1982.26, :tropical_nh),
+                   ("Pinatubo", 1991.45, :tropical))
+
 month_index(year, month) = 12 * (year - FIRST_YEAR) + month
 decimal_year(m) = FIRST_YEAR + (m - 0.5) / 12
+
+# Global-mean peak of a record after `date`, less its mean over the year before.
+function record_peak(series, date)
+    w = cosd.(Float64.(GREBClimate.lat_grid))
+    gm = [sum(series.aod[:, k] .* w) / sum(w) for k in eachindex(series.years)]
+    before = findall(t -> date - 1 <= t < date, series.years)
+    after = findall(t -> date <= t < date + 3, series.years)
+    return maximum(gm[after]) - sum(gm[before]) / length(before)
+end
+
+# Cooling peak (3-month running mean), its month after `m0`, and the sum over 5
+# years, relative to the BASELINE months before `m0` (as `event_regressors`).
+function peak_response(r, m0)
+    d = r .- sum(r[m0 - BASELINE:m0 - 1]) / BASELINE
+    s = [sum(d[m-1:m+1]) / 3 for m in m0:m0 + WINDOW]
+    i = argmin(s)
+    return (peak=s[i], month=i - 1, sum=sum(d[m0:m0 + WINDOW - 1]))
+end
 
 # ── Model runs ───────────────────────────────────────────────────────────
 
@@ -146,11 +168,9 @@ function report(label, y, mei, M, rows, events)
     return (lag=best, fit=f)
 end
 
-# Foster and Rahmstorf (2011) form: temperature per unit of lagged global-mean
-# Sato-Lacis optical depth, 1979-2010, for the observations (with trend, MEI and
-# annual cycle, all lags fitted) and for the model response. Their GISS fit
-# gives a volcanic signal range of 0.35 K over this period, a check that this
-# regression reproduces theirs.
+# Foster and Rahmstorf (2011) form: temperature per unit of lagged Sato-Lacis
+# optical depth, 1979-2010, observed and modelled. Their GISS signal range,
+# 0.35 K, checks that this regression reproduces theirs.
 function fr_check(y, mei, response, series)
     w = cosd.(Float64.(GREBClimate.lat_grid))
     sc = AerosolScenario(series=series)
@@ -188,7 +208,7 @@ function main()
     sato = load_aerosol_series(joinpath(AEROSOL_DIR, "aerosol_Sato-Lacis.jld2"))
     glossac = load_aerosol_series(joinpath(AEROSOL_DIR, "aerosol_GloSSAC.v2.24.jld2"))
 
-    println("running the model (", RUN.scnr, "-year scenario, 6 runs)...")
+    println("running the model (", RUN.scnr, "-year scenario, 9 runs)...")
     base = run_model(fields, nothing)
     resp = Dict(
         "sato" => run_model(fields, AerosolScenario(series=sato)) - base,
@@ -196,6 +216,10 @@ function main()
     for tg in (7, 9, 11)
         resp["mass$tg"] = run_model(fields,
             AerosolScenario(eruptions=[Eruption(1991.45, :tropical; tg_s=tg)])) - base
+    end
+    for (name, date, cls) in PEAK_RUNS
+        resp[name] = run_model(fields,
+            AerosolScenario(eruptions=[Eruption(date, cls; peak_aod=record_peak(sato, date))])) - base
     end
 
     # Mass mode: Pinatubo from the injected sulfur, 7 to 11 Tg S (Toohey and Sigl 2017).
@@ -208,6 +232,14 @@ function main()
         rec = findfirst(x -> x > s[i] / exp(1), s[i:end])
         @printf("  %2d Tg S: peak %.2f K, %d months after the eruption; 1/e recovery %s\n",
                 tg, s[i], i - 1, rec === nothing ? "beyond 5 years" : "after $(rec - 1) more months")
+    end
+
+    println("\nEruption mode (Sato-Lacis peak, own class) against series mode (Sato-Lacis)")
+    for (name, date, cls) in PEAK_RUNS
+        m0 = month_index(floor(Int, date), floor(Int, 12 * (date - floor(date))) + 1)
+        e, r = peak_response(resp[name], m0), peak_response(resp["sato"], m0)
+        @printf("  %-10s :%-12s peak %.3f K after %2d months (series %.3f K after %2d); 5-year sum %.1f K month (series %.1f)\n",
+                name, cls, e.peak, e.month, r.peak, r.month, e.sum, r.sum)
     end
 
     y = load_gistemp(joinpath(VALIDATION_DIR, "GLB.Ts+dSST.csv"))

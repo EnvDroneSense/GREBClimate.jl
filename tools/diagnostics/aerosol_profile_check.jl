@@ -4,26 +4,18 @@
 # records in Data/aerosol/ (tools/forcing/convert_aerosol_to_jld2.jl); no model
 # run and no dataset.
 #
-# For each reference eruption, runs `aerosol_optical_depth!` with the
-# eruption's class, scaled so its global-mean peak equals the record's, and
-# compares it with the record on the model's 48 latitude rows:
+# For each reference eruption, compares `aerosol_optical_depth!` (its class,
+# scaled to the record's global-mean peak) with the record, per latitude band:
 #
-#   band ratio    each band's peak optical depth over the largest band's
-#   total ratio   the same for the optical depth summed over the first 36 months
-#                 (the target of the tropical profile: plan task 8)
-#   peak month    months from the eruption date to each band's maximum
-#   1/e months    months from each band's maximum until it falls to 1/e of it
-#                 (both left blank for bands below 5 percent of the largest)
-#   NH/SH         northern over southern area-mean optical depth, summed over the window
-#   shape error   RMS difference of the global-mean curves, each scaled to a peak of 1
+#   ratio         band peak over the largest band's
+#   total         the same for the sum over the first 36 months
+#   peak month    months from the eruption to the band maximum
+#   1/e months    months from the maximum to 1/e of it (blank below 5 percent)
+#   NH/SH         northern over southern optical depth, summed over the window
+#   shape error   RMS difference of the peak-normalised global-mean curves
 #
-# The record's background (its mean over the 12 months before the eruption, or
-# before `background` where an earlier eruption is still decaying) is subtracted
-# per latitude row, as in tools/validation/validate_volcanic.jl.
-#
-# Katmai is also compared with Stothers (1996) Table 6, the reference for the
-# extratropical classes; see `STOTHERS_KATMAI`.
-# Plan: aerosol-parameter-plan (vault), tasks 1, 1b, 4 and 8.
+# The record's mean over the 12 months before the eruption is subtracted.
+# Katmai is also compared with Stothers (1996) Table 6. Vault: aerosol-parameter-plan.
 #
 # Usage:
 #   julia --project=. tools/diagnostics/aerosol_profile_check.jl
@@ -42,9 +34,8 @@ const BAND_NAMES = [string(lo, "-", hi, h > 0 ? "N" : "S") for h in (1, -1) for 
 const ROWS = [findall(φ -> lo <= h * φ < hi, LAT) for h in (1, -1) for (lo, hi) in BANDS]
 const NH, SH = findall(>(0), LAT), findall(<(0), LAT)
 
-# `window`: months compared, cut short where the next eruption begins.
-# `background`: end of the 12 months used as background (default: the eruption date).
-# `note`: printed with the result.
+# `window` stops before the next eruption; `background` moves the 12-month
+# baseline before an earlier eruption.
 const ERUPTIONS = (
     (name="Pinatubo", date=1991.45, class=:tropical, records=("Sato-Lacis", "GloSSAC.v2.24"), window=48),
     (name="El Chichon", date=1982.26, class=:tropical_nh, records=("Sato-Lacis", "GloSSAC.v2.24"), window=48),
@@ -57,10 +48,8 @@ const ERUPTIONS = (
      background=2008.60, note="report only: as Kasatochi; background taken before Kasatochi"),
 )
 
-# Stothers (1996) Table 6: pyrheliometric optical depth x 1000 after Katmai
-# (58 N, 6 June 1912), June 1912 to September 1914. Blank entries in the table
-# are zero; there are none south of 30 N. The month columns are fixed by the
-# counts: 7 values in 1912 (June to December), 12 in 1913, 9 in 1914.
+# Stothers (1996) Table 6: pyrheliometric optical depth x 1000 after Katmai,
+# June 1912 to September 1914 (7, 12 and 9 monthly values); none south of 30 N.
 const STOTHERS_KATMAI = (
     date = 1912.43,
     start = (1912, 6),
@@ -100,8 +89,8 @@ function efold_months(s, months)
     return j === nothing ? missing : months[i + j - 1] - months[i]
 end
 
-# e-folding time in months from a least-squares fit of log(s) after the maximum,
-# the method Stothers (1996) used; non-positive values are skipped.
+# e-folding time in months, least-squares fit of log(s) after the maximum
+# (Stothers' method); non-positive values skipped.
 function efold_fit(s, months)
     k = [j for j in argmax(s):length(s) if s[j] > 0]
     x, y = months[k], log.(s[k])
@@ -152,8 +141,7 @@ function report(e, cls, recname, series)
 end
 
 # Katmai against Stothers (1996) Table 6, on its two bands. Ratios and times
-# only: pyrheliometric values are not on the same scale as the model's
-# (Stothers: visual = 1.6 x pyrheliometric).
+# only: pyrheliometric values are on a different scale.
 function report_stothers(cls)
     s = STOTHERS_KATMAI
     n = length(s.values[1])
