@@ -87,17 +87,25 @@ and lines starting with `#` are skipped.
 function load_custom_co2_scenario(path::String)
     isfile(path) || error("Custom CO2 scenario file not found: $path")
     table = Dict{Int,Float32}()
+    _each_year_value(path, "custom CO2 scenario", "year CO2") do yr, v
+        table[yr] = parse(Float32, v)
+    end
+    return table
+end
+
+# Calls `f(year, value)` for each `year value` line of a text table, skipping
+# blank lines and `#` comments; `value` is the unparsed second column.
+function _each_year_value(f, path, label, columns)
     open(path) do io
         for line in eachline(io)
             stripped = strip(line)
             (isempty(stripped) || startswith(stripped, "#")) && continue
             cols = split(stripped)
             length(cols) >= 2 ||
-                error("Malformed line in custom CO2 scenario file $path: \"$line\" (expected \"year CO2\")")
-            table[parse(Int, cols[1])] = parse(Float32, cols[2])
+                error("Malformed line in $label file $path: \"$line\" (expected \"$columns\")")
+            f(parse(Int, cols[1]), cols[2])
         end
     end
-    return table
 end
 
 """
@@ -112,17 +120,9 @@ Composes with any experiment; does not replace the built-in solar experiments.
 function load_solar_series(path::AbstractString; reference::Union{Real,Nothing}=nothing)
     isfile(path) || error("Solar series file not found: $path")
     raw = Dict{Int,Float64}()
-    open(path) do io
-        for line in eachline(io)
-            stripped = strip(line)
-            (isempty(stripped) || startswith(stripped, "#")) && continue
-            cols = split(stripped)
-            length(cols) >= 2 ||
-                error("Malformed line in solar series file $path: \"$line\" (expected \"year TSI\")")
-            yr = parse(Int, cols[1])
-            haskey(raw, yr) && error("Solar series file $path lists year $yr more than once")
-            raw[yr] = parse(Float64, cols[2])
-        end
+    _each_year_value(path, "solar series", "year TSI") do yr, v
+        haskey(raw, yr) && error("Solar series file $path lists year $yr more than once")
+        raw[yr] = parse(Float64, v)
     end
     isempty(raw) && error("Solar series file $path contains no data lines")
     # A missing year would otherwise surface as an error in the middle of a run.
@@ -139,19 +139,13 @@ end
     load_aerosol_series(path::AbstractString) -> AerosolSeries
 
 Loads a stratospheric optical-depth record for `AerosolScenario(series=...)`
-from a JLD2 file with the entries `format_version` (1), `years` (ascending
-decimal years), `lat` (ascending band-centre latitudes), `aod` (a matrix of
-size `(length(lat), length(years))`) and optionally `source`. An `reff`
-(effective radius) entry, written by the converter for later use, is ignored.
-Published records are converted to this layout by
-`tools/convert_aerosol_to_jld2.jl`. Values are
-interpolated linearly onto the model latitudes, holding the end values beyond
-the outermost centre. Used in the model, the record is linearly interpolated in
-time and is zero outside its first and last year, so a record that ends with a
-non-zero value stops abruptly. Loading warns when the last year's largest
-optical depth exceeds `SERIES_END_WARN_AOD`, naming the file, the year and the
-value. The record is never altered; there is deliberately no option to fade it
-out.
+from a JLD2 file written by `tools/convert_aerosol_to_jld2.jl`: `format_version`
+(1), ascending decimal `years`, ascending band-centre `lat`, `aod` of size
+`(length(lat), length(years))` and optionally `source`; an `reff` entry is
+ignored. Values are interpolated linearly onto the model latitudes (end values
+held) and, during the run, in time. The record is zero outside its first and
+last year and is never altered, so loading warns when it ends above
+`SERIES_END_WARN_AOD`: the dimming would stop abruptly.
 """
 function load_aerosol_series(path::AbstractString)
     isfile(path) || error("Aerosol series file not found: $path")

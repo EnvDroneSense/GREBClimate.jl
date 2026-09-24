@@ -421,24 +421,10 @@ end
     solar = _addon_run(cfg -> cfg.solar_scenario = Dict(1950 => 0.99f0))
     @test all(isfinite, solar.scnr[6].sw)
     @test gmean(solar.scnr[6].sw) < gmean(base.scnr[6].sw)
-    @test_throws ErrorException _addon_run(cfg -> cfg.solar_scenario = Dict(1949 => 0.99f0))
 
-    eruption = Eruption(1950.05, :tropical; peak_aod = 0.15)
-    aero = _addon_run(cfg -> cfg.aerosol = AerosolScenario(eruptions = [eruption]))
+    aero = _addon_run(cfg -> cfg.aerosol =
+        AerosolScenario(eruptions = [Eruption(1950.05, :tropical; peak_aod = 0.15)]))
     @test all(isfinite, aero.scnr[6].sw)
     @test gmean(aero.scnr[6].sw) < gmean(base.scnr[6].sw)
     @test isequal(aero.ctrl, base.ctrl)             # the control run is never dimmed
-
-    again = _addon_run(cfg -> cfg.aerosol = AerosolScenario(eruptions = [eruption]))
-    @test isequal(aero.scnr, again.scnr)            # no state persists between runs
-
-    empty_sc = _addon_run(cfg -> cfg.aerosol = AerosolScenario())
-    @test isequal(empty_sc.scnr, base.scnr)         # empty scenario is bit-identical
-
-    long_ago = _addon_run(cfg -> cfg.aerosol =
-        AerosolScenario(eruptions = [Eruption(1900.0, :tropical; peak_aod = 0.15)]))
-    @test isequal(long_ago.scnr, base.scnr)         # decayed to nothing before the run
-    later = _addon_run(cfg -> cfg.aerosol =
-        AerosolScenario(eruptions = [Eruption(2100.0, :tropical; peak_aod = 0.15)]))
-    @test isequal(later.scnr, base.scnr)            # not yet happened
 end

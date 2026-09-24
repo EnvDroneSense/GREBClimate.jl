@@ -146,6 +146,8 @@ Scenario parameters rather than physics switches - set via
 | `earth_sun_distance_pct` | `Float64` | `0.0` | Percent change in orbital radius for `:earth_sun_distance` |
 | `co2_scenario` | `Dict{Int,Float64}` | `Dict()` | Year→ppm lookup, auto-populated for IPCC RCP/SSP/historical/custom-CO2 experiments |
 | `custom_co2_path` | `String` | `""` | User-supplied "year CO2" text file path for `:custom_co2` |
+| `solar_scenario` | `Dict{Int,Float32}` | `Dict()` | Year→shortwave multiplier from `load_solar_series`; multiplies with any experiment's solar forcing, scenario run only |
+| `aerosol` | `Union{Nothing,AerosolScenario}` | `nothing` | Stratospheric aerosol (eruptions, injections or a published record); dims the shortwave per latitude in the scenario run only - see the [Model overview](@ref) |
 
 `c_q`, `c_rq`, `c_omega`, and `c_omegastd` also live on `PhysicsConfig` but
 are not meant to be set manually - `set_hydrology_parameters!` derives them

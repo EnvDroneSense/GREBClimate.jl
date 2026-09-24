@@ -1,12 +1,11 @@
 """
     apply_shortwave_addons!(state::ModelState, cfg, year, it) -> state.sw_solar_forcing
 
-Multiply the per-latitude shortwave multiplier `state.sw_solar_forcing` in place
-by the optional add-ons configured on `cfg`, in this order: the solar series
-`cfg.solar_scenario` (a year to multiplier table), then the stratospheric aerosol
-`cfg.aerosol`. Each is skipped when unset, so default runs are bit-identical.
-`year` is the integer scenario year and `it` the scenario timestep, which
-together give the aerosol its sub-year time. Allocates nothing.
+Multiplies the per-latitude shortwave multiplier `state.sw_solar_forcing` in
+place by the add-ons set on `cfg`: the solar series `cfg.solar_scenario`, then
+the aerosol `cfg.aerosol`. Unset add-ons are skipped, so default runs are
+bit-identical. `year` and the scenario timestep `it` give the aerosol its
+decimal year. Allocates nothing.
 """
 function apply_shortwave_addons!(state::ModelState, cfg, year, it)
     mult = state.sw_solar_forcing

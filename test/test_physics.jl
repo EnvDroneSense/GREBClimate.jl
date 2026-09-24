@@ -219,9 +219,7 @@ end
         state.sw_solar_forcing .= mult
         out = SWradiation!(fill(285.0f0, X, Y), f, state, TimeState(1, 1),
                            create_experiment_config(:full_model), CirculationWorkspace())
-        for j in 1:Y, i in 1:X
-            sf = f.sw_solar[j, 1] * (mult[j] * 0.01f0 * GREBClimate.S0_var)
-            @test out.SW[i, j] == sf * (1.0f0 - out.albedo[i, j])
-        end
+        sf = f.sw_solar[:, 1] .* (mult .* 0.01f0 .* GREBClimate.S0_var)
+        @test out.SW == reshape(sf, 1, Y) .* (1.0f0 .- out.albedo)
     end
 end

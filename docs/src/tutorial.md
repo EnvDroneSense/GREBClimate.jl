@@ -61,6 +61,28 @@ cfg = create_experiment_config(:earth_sun_distance; earth_sun_distance_pct = 1.5
 The `log_*` keywords apply only to the two `:decon_*` experiments; passing one
 elsewhere warns.
 
+### Shortwave add-ons
+
+Two optional fields dim or brighten the sunlight of any experiment's scenario
+run; the control run is never changed. A solar record replaces nothing: it
+multiplies with the experiment's own solar forcing.
+
+```julia
+cfg = create_experiment_config(:co2_double)
+cfg.solar_scenario = load_solar_series("tsi.txt")   # "year TSI" per line, one line per year
+cfg.aerosol = AerosolScenario(
+    eruptions  = [Eruption(1991.45, :tropical; tg_s = 9.0)],             # Pinatubo-sized
+    injections = [SustainedInjection(2020.0, 2040.0, :tropical, 0.05)],  # geoengineering, then stop
+)
+```
+
+Years are on the model clock: the scenario run starts at 1950 for most
+experiments and at 1850 for `:historical_co2`. A published optical-depth record
+can replace or join the eruptions; convert it once with
+`tools/convert_aerosol_to_jld2.jl`, then pass
+`AerosolScenario(series = load_aerosol_series("aerosol.jld2"))`. The
+[Model overview](@ref) lists what the aerosol does and does not represent.
+
 ## 3. Run the model
 
 [`greb_model!`](@ref) takes a [`RunSpec`](@ref) (how many years of

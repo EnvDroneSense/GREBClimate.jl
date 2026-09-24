@@ -240,11 +240,10 @@ end
 """
     ModelState
 
-Per-run mutable state that isn't climatology: the per-latitude runtime
-solar-forcing multiplier (`SWradiation!` reads it), scratch for the aerosol
-optical depth (`apply_shortwave_addons!` writes it), and the surface-temperature accumulator
-behind the annual progress line (`diagnostics!` reads/writes it). One instance
-per `greb_model!` run.
+Per-run mutable state that isn't climatology: the per-latitude shortwave
+multiplier (`SWradiation!` reads it), scratch for the aerosol optical depth,
+and the surface-temperature accumulator behind the annual progress line
+(`diagnostics!` reads/writes it). One instance per `greb_model!` run.
 
 This is scratch space for the printed summary, not an output path - `Tsmn` is
 averaged, printed and zeroed within a single `diagnostics!` call, so it never
@@ -252,8 +251,8 @@ holds a readable annual mean once the call returns. Model output is the
 `Vector{MonthlyRecord}` that [`greb_model!`](@ref) returns.
 """
 mutable struct ModelState
-    sw_solar_forcing::Vector{Float32}   # per-latitude shortwave multiplier (ydim) used by SWradiation!
-    aod::Vector{Float32}                # aerosol optical depth scratch (ydim), see apply_shortwave_addons!
+    sw_solar_forcing::Vector{Float32}   # shortwave multiplier per latitude row
+    aod::Vector{Float32}                # aerosol optical depth scratch per latitude row
     Tsmn::Matrix{Float32}               # surface-temperature accumulator for the progress line
 end
 

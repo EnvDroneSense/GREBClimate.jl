@@ -50,6 +50,40 @@ terms, integrates the four prognostic fields, then updates sea ice.
 | Sea ice | [`seaice!`](@ref) | The surface heat capacity where sea ice forms; latent heat of freezing is neglected. |
 | Forcing | [`forcing`](@ref) | The scenario's CO₂ and solar multiplier for the current timestep, per experiment. |
 
+## Shortwave add-ons
+
+The solar multiplier is one value per latitude row. After [`forcing`](@ref)
+sets it, two optional add-ons on the config multiply into it, in the scenario
+run only: a solar record (`cfg.solar_scenario`, from
+[`load_solar_series`](@ref)) and a stratospheric aerosol
+(`cfg.aerosol`, an [`AerosolScenario`](@ref)). Anomalies are therefore relative
+to an undimmed control. Both are off by default and leave default runs
+bit-identical.
+
+The aerosol path runs eruptions, sustained injections or a published record
+through three steps:
+
+| Step | Method | Main assumptions |
+|:-----|:-------|:-----------------|
+| Optical depth in time | Two linear reservoirs: peak 5 months after injection, e-folding decay of 1 year | Tropical Pinatubo values, used for every injection class |
+| Optical depth in latitude | Fixed profile per class: tropical, northern or southern extratropical | Tropical spreads into both hemispheres; high latitudes keep 80% of the tropical value |
+| Shortwave transmission | Delta-Eddington layer (Joseph et al., 1976) at a fixed zenith angle, on a calibrated optical depth | Calibrated to −30 W/m² per unit optical depth (Sato et al., 1993); uncalibrated, the layer gives −82 W/m² |
+
+The layer is a multiplier on incoming sunlight: it does not reflect light
+coming back up from clouds and surface, which is the main reason for the
+calibration. Not represented: the aerosol's longwave effect, stratospheric
+heating, ozone chemistry, particle growth over an eruption, and poleward
+transport, so mid-latitudes peak at the same time as the tropics instead of
+3 to 8 months later. The parameters are provisional.
+
+Compared with observed temperatures (GISTEMP, with trend, ENSO and the annual
+cycle removed), the model cools about twice as strongly as observed after
+Agung (1963), El Chichón (1982) and Pinatubo (1991), and recovers more slowly.
+The ratio is similar for all three, so comparisons between aerosol scenarios
+are meaningful, but the absolute cooling is too large. Whether the excess lies
+in the forcing or in the model's response to it is not yet known. The
+comparison script is `tools/validate_volcanic.jl`.
+
 ## A run
 
 [`greb_model!`](@ref) runs up to three phases, set by [`RunSpec`](@ref):
@@ -72,3 +106,7 @@ and the [Physics Switches](@ref) for the switches each component reads.
   energy balance.
 - Stassen, Dommenget & Loveday (2019), *Geosci. Model Dev.* 12: 425 - the
   hydrological cycle.
+- Joseph, Wiscombe & Weinman (1976), *J. Atmos. Sci.* 33: 2452 - the
+  delta-Eddington approximation.
+- Sato, Hansen, McCormick & Pollack (1993), *J. Geophys. Res.* 98: 22987 -
+  stratospheric aerosol optical depths and their forcing.
