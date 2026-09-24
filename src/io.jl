@@ -174,6 +174,9 @@ function _read_forcing_series(path, kind, units)
     return time, lat, values, source
 end
 
+# `load_aerosol_series` warns when a record ends above this optical depth.
+const SERIES_END_WARN_AOD = 0.005
+
 """
     load_aerosol_series(path::AbstractString) -> AerosolSeries
 
@@ -190,7 +193,7 @@ function load_aerosol_series(path::AbstractString)
     lat === nothing && error("Aerosol series file $path has no `lat`; aerosol records are zonal")
     out = Matrix{Float32}(undef, ydim, length(years))
     for k in eachindex(years), j in 1:ydim
-        out[j, k] = Float32(_interp_lat(lat, @view(aod[:, k]), Float64(lat_grid[j])))
+        out[j, k] = Float32(_interp(lat, @view(aod[:, k]), Float64(lat_grid[j])))
     end
     last_aod = maximum(@view aod[:, end])
     last_aod > SERIES_END_WARN_AOD &&
@@ -200,15 +203,6 @@ function load_aerosol_series(path::AbstractString)
 end
 
 _strictly_ascending(v) = all(i -> v[i] < v[i + 1], firstindex(v):lastindex(v) - 1)
-
-# Linear interpolation in `xs` (ascending), holding the end values beyond it.
-function _interp_lat(xs, ys, x)
-    x <= first(xs) && return first(ys)
-    x >= last(xs) && return last(ys)
-    k = searchsortedlast(xs, x)
-    f = (x - xs[k]) / (xs[k + 1] - xs[k])
-    return (1 - f) * ys[k] + f * ys[k + 1]
-end
 
 """
 Load flux corrections from the combined `climatology/flux_corrections.jld2`

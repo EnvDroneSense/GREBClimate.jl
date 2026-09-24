@@ -37,40 +37,43 @@ const RUN = RunSpec(flux=3, ctrl=5, scnr=LAST_YEAR - FIRST_YEAR + 1)
 const WINDOW = 60                        # months attributed to each eruption
 const BASELINE = 12                      # months before the eruption used as its baseline
 
-# (name, year, month) of each eruption
-const ERUPTIONS = (("Agung", 1963, 3), ("El Chichon", 1982, 4), ("Pinatubo", 1991, 6))
+# `date` is on the model calendar; `class` is used for the eruption-mode runs.
+const ERUPTIONS = (
+    (name="Agung", year=1963, month=3, date=1963.21, class=:tropical_sh),
+    (name="El Chichon", year=1982, month=4, date=1982.26, class=:tropical_nh),
+    (name="Pinatubo", year=1991, month=6, date=1991.45, class=:tropical),
+)
 
-# Eruption-mode runs, each with its record peak: (name, model-calendar date, class).
-const PEAK_RUNS = (("Agung", 1963.21, :tropical_sh), ("El Chichon", 1982.26, :tropical_nh),
-                   ("Pinatubo", 1991.45, :tropical))
+const W = cosd.(Float64.(GREBClimate.lat_grid))
+global_mean(v) = sum(v .* W) / sum(W)
 
 month_index(year, month) = 12 * (year - FIRST_YEAR) + month
+month_index(e) = month_index(e.year, e.month)
 decimal_year(m) = FIRST_YEAR + (m - 0.5) / 12
 
 # Global-mean peak of a record after `date`, less its mean over the year before.
 function record_peak(series, date)
-    w = cosd.(Float64.(GREBClimate.lat_grid))
-    gm = [sum(series.aod[:, k] .* w) / sum(w) for k in eachindex(series.years)]
+    gm = [global_mean(series.aod[:, k]) for k in eachindex(series.years)]
     before = findall(t -> date - 1 <= t < date, series.years)
     after = findall(t -> date <= t < date + 3, series.years)
     return maximum(gm[after]) - sum(gm[before]) / length(before)
 end
 
-# Cooling peak (3-month running mean), its month after `m0`, and the sum over 5
-# years, relative to the BASELINE months before `m0` (as `event_regressors`).
+# Cooling peak (3-month running mean), its month after `m0`, the months from
+# the peak to 1/e of it (`nothing` beyond the window) and the sum over 5 years,
+# relative to the BASELINE months before `m0` (as `event_regressors`).
 function peak_response(r, m0)
     d = r .- sum(r[m0 - BASELINE:m0 - 1]) / BASELINE
     s = [sum(d[m-1:m+1]) / 3 for m in m0:m0 + WINDOW]
     i = argmin(s)
-    return (peak=s[i], month=i - 1, sum=sum(d[m0:m0 + WINDOW - 1]))
+    rec = findfirst(x -> x > s[i] / exp(1), s[i:end])
+    return (peak=s[i], month=i - 1, recovery=rec === nothing ? nothing : rec - 1,
+            sum=sum(d[m0:m0 + WINDOW - 1]))
 end
 
 # ── Model runs ───────────────────────────────────────────────────────────
 
-function global_mean_ts(result)
-    w = cosd.(Float64.(GREBClimate.lat_grid))
-    return [sum(rec.Ts .* reshape(w, 1, :)) / (xdim * sum(w)) for rec in result.scnr]
-end
+global_mean_ts(result) = [sum(rec.Ts .* reshape(W, 1, :)) / (xdim * sum(W)) for rec in result.scnr]
 
 function run_model(fields, aerosol)
     cfg = create_experiment_config(:full_model)
@@ -121,8 +124,8 @@ end
 function event_regressors(response, events)
     n = length(response)
     M = zeros(n, length(events))
-    for (k, (_, yr, mo)) in enumerate(events)
-        m0 = month_index(yr, mo)
+    for (k, e) in enumerate(events)
+        m0 = month_index(e)
         base = sum(response[m0 - BASELINE:m0 - 1]) / BASELINE
         for m in m0:min(n, m0 + WINDOW - 1)
             M[m, k] = response[m] - base
@@ -163,7 +166,7 @@ function report(label, y, mei, M, rows, events)
     for k in 1:ne
         i = length(f.beta) - ne + k
         @printf("  %-12s %5.2f   %5.2f      %5.2f to %5.2f   %5.2f\n",
-                events[k][1], f.beta[i], 2 * f.se[i], ranges[k]..., fq.beta[end - ne + k])
+                events[k].name, f.beta[i], 2 * f.se[i], ranges[k]..., fq.beta[end - ne + k])
     end
     return (lag=best, fit=f)
 end
@@ -172,10 +175,9 @@ end
 # optical depth, 1979-2010, observed and modelled. Their GISS signal range,
 # 0.35 K, checks that this regression reproduces theirs.
 function fr_check(y, mei, response, series)
-    w = cosd.(Float64.(GREBClimate.lat_grid))
     sc = AerosolScenario(series=series)
     buf = zeros(Float32, ydim)
-    aod = [(GREBClimate.aerosol_optical_depth!(buf, sc, decimal_year(m)); sum(buf .* w) / sum(w))
+    aod = [(GREBClimate.aerosol_optical_depth!(buf, sc, decimal_year(m)); global_mean(buf))
            for m in eachindex(y)]
     rows = month_index(1979, 1):month_index(2010, 12)
     lagged(v, lag) = reshape([m > lag ? v[m - lag] : 0.0 for m in eachindex(v)], :, 1)
@@ -217,29 +219,25 @@ function main()
         resp["mass$tg"] = run_model(fields,
             AerosolScenario(eruptions=[Eruption(1991.45, :tropical; tg_s=tg)])) - base
     end
-    for (name, date, cls) in PEAK_RUNS
-        resp[name] = run_model(fields,
-            AerosolScenario(eruptions=[Eruption(date, cls; peak_aod=record_peak(sato, date))])) - base
+    for e in ERUPTIONS
+        resp[e.name] = run_model(fields,
+            AerosolScenario(eruptions=[Eruption(e.date, e.class; peak_aod=record_peak(sato, e.date))])) - base
     end
 
     # Mass mode: Pinatubo from the injected sulfur, 7 to 11 Tg S (Toohey and Sigl 2017).
     println("\nPinatubo, mass mode (3-month running mean of the global-mean response)")
-    m0 = month_index(1991, 6)
     for tg in (7, 9, 11)
-        r = resp["mass$tg"]
-        s = [sum(r[m-1:m+1]) / 3 for m in m0:m0 + WINDOW]
-        i = argmin(s)
-        rec = findfirst(x -> x > s[i] / exp(1), s[i:end])
+        p = peak_response(resp["mass$tg"], month_index(ERUPTIONS[3]))
         @printf("  %2d Tg S: peak %.2f K, %d months after the eruption; 1/e recovery %s\n",
-                tg, s[i], i - 1, rec === nothing ? "beyond 5 years" : "after $(rec - 1) more months")
+                tg, p.peak, p.month, p.recovery === nothing ? "beyond 5 years" : "after $(p.recovery) more months")
     end
 
     println("\nEruption mode (Sato-Lacis peak, own class) against series mode (Sato-Lacis)")
-    for (name, date, cls) in PEAK_RUNS
-        m0 = month_index(floor(Int, date), floor(Int, 12 * (date - floor(date))) + 1)
-        e, r = peak_response(resp[name], m0), peak_response(resp["sato"], m0)
+    for e in ERUPTIONS
+        m0 = month_index(e)
+        p, r = peak_response(resp[e.name], m0), peak_response(resp["sato"], m0)
         @printf("  %-10s :%-12s peak %.3f K after %2d months (series %.3f K after %2d); 5-year sum %.1f K month (series %.1f)\n",
-                name, cls, e.peak, e.month, r.peak, r.month, e.sum, r.sum)
+                e.name, e.class, p.peak, p.month, r.peak, r.month, p.sum, r.sum)
     end
 
     y = load_gistemp(joinpath(VALIDATION_DIR, "GLB.Ts+dSST.csv"))

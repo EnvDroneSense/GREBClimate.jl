@@ -126,14 +126,15 @@ end
     band(lo, hi) = (r = findall(φ -> lo <= abs(φ) < hi, lat); sum(trop[r] .* _W[r]) / sum(_W[r]))
     @test band(15, 30) / band(0, 15) ≈ 0.75 atol = 0.02
     @test band(60, 90) / band(0, 15) ≈ 0.61 atol = 0.02
-    @test all(GREBClimate._tropical_shape(a) == v for (a, v) in GREBClimate._TROPICAL_NODES)
+    @test all(GREBClimate._interp(GREBClimate._TROPICAL_NODES..., a) == v for (a, v) in zip(GREBClimate._TROPICAL_NODES...))
     nh = GREBClimate._CLASS_PROFILES[:nh_extratropical]
     sh = GREBClimate._CLASS_PROFILES[:sh_extratropical]
     @test nh ≈ reverse(sh)
     # Stothers (1996), Katmai: nothing south of 30 N, 0.57 at 37.5 N, flat poleward.
     @test all(iszero, nh[lat .<= 30])
     @test issorted(nh)
-    @test GREBClimate._extratropical_shape(37.5) / GREBClimate._extratropical_shape(52.5) ≈ 0.57
+    xt(a) = GREBClimate._interp(GREBClimate._EXTRATROPICAL_NODES..., a)
+    @test xt(37.5) / xt(52.5) ≈ 0.57
     @test all(==(maximum(nh)), nh[lat .>= 52.5])
 
     # One-hemisphere classes follow Crowley and Unterman (2013): tropical maximum

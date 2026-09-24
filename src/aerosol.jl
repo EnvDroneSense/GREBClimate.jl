@@ -14,51 +14,49 @@ const AOD_PER_TG_S = 0.015
 # (tools/diagnostics/aerosol_forcing_per_aod.jl).
 const AEROSOL_TAU_SCALE = 0.365
 
-# Latitude shapes as (latitude, value) nodes at band centres, linear between,
+# Latitude shapes as (latitudes, values) at band centres, linear between,
 # constant beyond; checked by tools/diagnostics/aerosol_profile_check.jl.
-# Tropical: fitted to Pinatubo's 36-month band totals in Sato-Lacis and GloSSAC.
-const _TROPICAL_NODES = ((7.5, 1.0), (22.5, 0.68), (37.5, 0.65), (52.5, 0.65), (75.0, 0.55))
+# Tropical, by |latitude|: fitted to Pinatubo's 36-month band totals in
+# Sato-Lacis and GloSSAC.
+const _TROPICAL_NODES = ((7.5, 22.5, 37.5, 52.5, 75.0), (1.0, 0.68, 0.65, 0.65, 0.55))
 # One-hemisphere tropical, latitude positive in the eruption's hemisphere:
 # fitted to El Chichon and Agung the same way.
-const _ONE_HEMISPHERE_NODES = ((-22.5, 0.28), (-7.5, 0.62), (7.5, 1.0), (22.5, 1.0), (37.5, 0.75))
+const _ONE_HEMISPHERE_NODES = ((-22.5, -7.5, 7.5, 22.5, 37.5), (0.28, 0.62, 1.0, 1.0, 0.75))
 # Extratropical, eruption's hemisphere only: Katmai (Stothers 1996), nothing
 # south of 30 N, 0.13 / 0.23 at 30-45 N; polar value assumed equal to 45-60 N.
-const _EXTRATROPICAL_NODES = ((30.0, 0.0), (37.5, 0.57), (52.5, 1.0))
+const _EXTRATROPICAL_NODES = ((30.0, 37.5, 52.5), (0.0, 0.57, 1.0))
 
 # Extratropical (rise, decay) in years: Katmai's 0.8-year decay and a peak at
 # 2.5 months (Stothers 1996). The tropical classes use `tau_rise`/`tau_decay`.
 const _EXTRATROPICAL_TAU = (rise = 0.082, decay = 0.8)
 
-function _interp(nodes, x::Real)
-    x <= first(nodes)[1] && return first(nodes)[2]
-    for k in 2:length(nodes)
-        (x1, v1), (x0, v0) = nodes[k], nodes[k - 1]
-        x < x1 && return v0 + (v1 - v0) * (x - x0) / (x1 - x0)
+# Linear interpolation in ascending `xs`, holding the end values beyond it.
+function _interp(xs, ys, x::Real)
+    x <= first(xs) && return first(ys)
+    for k in 2:length(xs)
+        if x < xs[k]
+            f = (x - xs[k - 1]) / (xs[k] - xs[k - 1])
+            return (1 - f) * ys[k - 1] + f * ys[k]
+        end
     end
-    return last(nodes)[2]
+    return last(ys)
 end
-
-_tropical_shape(phi::Real) = _interp(_TROPICAL_NODES, abs(phi))
-_extratropical_shape(a::Real) = _interp(_EXTRATROPICAL_NODES, a)
 
 _check_class(cls::Symbol) = cls in AEROSOL_CLASSES ||
     throw(ArgumentError("unknown injection class :$cls; valid: $AEROSOL_CLASSES"))
 
 function _class_profile(cls::Symbol)
     h = cls in (:tropical_nh, :nh_extratropical) ? 1.0 : -1.0
-    w = if cls === :tropical
-        [_tropical_shape(Float64(phi)) for phi in lat_grid]
-    elseif cls in (:tropical_nh, :tropical_sh)
-        [_interp(_ONE_HEMISPHERE_NODES, h * Float64(phi)) for phi in lat_grid]
-    else
-        [_extratropical_shape(h * Float64(phi)) for phi in lat_grid]
-    end
+    nodes, x = cls === :tropical ? (_TROPICAL_NODES, abs) :
+               cls in _TROPICAL_CLASSES ? (_ONE_HEMISPHERE_NODES, phi -> h * phi) :
+               (_EXTRATROPICAL_NODES, phi -> h * phi)
+    w = [_interp(nodes..., x(Float64(phi))) for phi in lat_grid]
     c = [cosd(Float64(phi)) for phi in lat_grid]
     return w ./ (sum(w .* c) / sum(c))
 end
 
 # Latitude profile per class, scaled to an area-weighted mean of 1. Read-only.
-const _CLASS_PROFILES = Dict{Symbol,Vector{Float64}}(cls => _class_profile(cls) for cls in AEROSOL_CLASSES)
+const _CLASS_PROFILES = NamedTuple{AEROSOL_CLASSES}(map(_class_profile, AEROSOL_CLASSES))
 
 """
     Eruption(year, cls; tg_s=nothing, peak_aod=nothing, aod_per_tg_s=0.015)
@@ -128,9 +126,6 @@ struct AerosolSeries
     aod::Matrix{Float32}
     source::String
 end
-
-# `load_aerosol_series` warns when a record ends above this optical depth.
-const SERIES_END_WARN_AOD = 0.005
 
 """
     AerosolScenario(; eruptions=[], injections=[], series=nothing, tau_rise=0.21,
