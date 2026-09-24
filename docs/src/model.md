@@ -66,7 +66,7 @@ through three steps:
 | Step | Method | Main assumptions |
 |:-----|:-------|:-----------------|
 | Optical depth in time | Two linear reservoirs: tropical peak 5 months after injection and e-folding decay of 1 year; extratropical 2.5 months and 0.8 years | Tropical values from Pinatubo, settable; extratropical from Katmai (Stothers, 1996) |
-| Optical depth in latitude | Fixed profile per class: tropical, northern or southern extratropical | Tropical spreads into both hemispheres, with about 60% of the equatorial value at 60-90° (Pinatubo records). Extratropical stays poleward of 30° in one hemisphere (Stothers, 1996) |
+| Optical depth in latitude | Fixed profile per class: tropical, tropical with one hemisphere favoured, northern or southern extratropical | Tropical spreads into both hemispheres, with about 60% of the equatorial value at 60-90° (Pinatubo records). One-hemisphere tropical puts about 2.3 times more aerosol into its hemisphere (El Chichón, Agung). Extratropical stays poleward of 30° in one hemisphere (Stothers, 1996) |
 | Shortwave transmission | Delta-Eddington layer (Joseph et al., 1976) at a fixed zenith angle, on a calibrated optical depth | Calibrated to −30 W/m² per unit optical depth (Sato et al., 1993); uncalibrated, the layer gives −82 W/m² |
 
 The layer is a multiplier on incoming sunlight: it does not reflect light

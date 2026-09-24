@@ -138,6 +138,17 @@ end
     @test issorted(nh)
     @test GREBClimate._extratropical_shape(37.5) / GREBClimate._extratropical_shape(52.5) ≈ 0.57
     @test all(==(maximum(nh)), nh[lat .>= 52.5])
+
+    # One-hemisphere tropical classes, rules of Crowley and Unterman (2013):
+    # tropics at least 30 percent above the same hemisphere's high latitudes,
+    # opposite tropics midway between that maximum and the opposite high latitudes.
+    tn = GREBClimate._CLASS_PROFILES[:tropical_nh]
+    ts = GREBClimate._CLASS_PROFILES[:tropical_sh]
+    @test tn ≈ reverse(ts)
+    bn(lo, hi) = (r = findall(φ -> lo <= φ < hi, lat); sum(tn[r] .* _W[r]) / sum(_W[r]))
+    @test maximum(tn) >= 1.3 * bn(60, 90)
+    @test bn(-15, 0) ≈ (maximum(tn) + bn(-90, -60)) / 2 rtol = 0.1
+    @test bn(0, 90) / bn(-90, 0) > 1.5
 end
 
 @testset "aerosol_optical_depth!: global-mean peak, superposition, zero before, sustained injection" begin
@@ -175,7 +186,7 @@ end
 
 @testset "per-class timescales: extratropical from Stothers (1996), tropical settable, no allocation" begin
     sc = AerosolScenario(tau_rise = 0.15, tau_decay = 1.2)
-    @test sc.chains.tropical[1:2] == (0.15, 1.2)
+    @test all(sc.chains[c][1:2] == (0.15, 1.2) for c in (:tropical, :tropical_nh, :tropical_sh))
     for cls in (:nh_extratropical, :sh_extratropical)
         tr, td, _ = sc.chains[cls]
         # Katmai: e-folding decay 0.8 yr, peak within about two to three months.

@@ -95,9 +95,11 @@ First release registered in the Julia General registry.
   −30 W/m² per unit optical depth. Extratropical eruptions follow Katmai
   (Stothers 1996): aerosol only poleward of 30° in their hemisphere, a peak
   after 2.5 months and a 0.8-year decay; the tropical latitude profile is
-  fitted to Pinatubo in the Sato-Lacis and GloSSAC records. Off by default;
-  default runs are bit-identical. Against observed temperatures it cools about
-  twice as strongly as observed; see the model overview.
+  fitted to Pinatubo in the Sato-Lacis and GloSSAC records, and
+  `:tropical_nh`/`:tropical_sh` cover tropical eruptions that stayed mostly in
+  one hemisphere (El Chichón, Agung). Off by default; default runs are
+  bit-identical. Against observed temperatures it cools about twice as
+  strongly as observed; see the model overview.
 - **Plotting toolbox** (`viz/`): maps, global-mean time series, seasonal cycle,
   Hovmöller diagram and animations, plus a simplified Pluto explorer notebook.
   `julia viz/setup.jl` sets up its environment.

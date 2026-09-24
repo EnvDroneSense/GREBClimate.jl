@@ -23,7 +23,7 @@
 #
 # Katmai is also compared with Stothers (1996) Table 6, the reference for the
 # extratropical classes; see `STOTHERS_KATMAI`.
-# Plan: aerosol-parameter-plan (vault), tasks 1, 1b and 8.
+# Plan: aerosol-parameter-plan (vault), tasks 1, 1b, 4 and 8.
 #
 # Usage:
 #   julia --project=. tools/diagnostics/aerosol_profile_check.jl
@@ -41,10 +41,6 @@ const BANDS = ((0, 15), (15, 30), (30, 45), (45, 60), (60, 90))
 const BAND_NAMES = [string(lo, "-", hi, h > 0 ? "N" : "S") for h in (1, -1) for (lo, hi) in BANDS]
 const ROWS = [findall(φ -> lo <= h * φ < hi, LAT) for h in (1, -1) for (lo, hi) in BANDS]
 const NH, SH = findall(>(0), LAT), findall(<(0), LAT)
-
-# The class a reference eruption should use, falling back while the class is
-# not yet implemented (one-hemisphere classes: plan task 4).
-class_or_tropical(cls) = cls in GREBClimate.AEROSOL_CLASSES ? cls : :tropical
 
 # `window`: months compared, cut short where the next eruption begins.
 # `background`: end of the 12 months used as background (default: the eruption date).
@@ -186,12 +182,10 @@ function main()
     series = Dict(n => load_aerosol_series(joinpath(AEROSOL_DIR, "aerosol_$n.jld2"))
                   for n in ("Sato-Lacis", "GloSSAC.v2.24"))
     for e in ERUPTIONS
-        cls = class_or_tropical(e.class)
-        cls == e.class || println("\n(note: $(e.name) uses :$cls; :$(e.class) is not implemented yet)")
         for rec in e.records
-            report(e, cls, rec, series[rec])
+            report(e, e.class, rec, series[rec])
         end
-        e.name == "Katmai" && report_stothers(cls)
+        e.name == "Katmai" && report_stothers(e.class)
     end
 end
 

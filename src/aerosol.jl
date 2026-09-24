@@ -3,7 +3,8 @@
 # before core/config.jl, whose PhysicsConfig holds an AerosolScenario.
 
 "Injection classes: where the aerosol is placed latitudinally."
-const AEROSOL_CLASSES = (:tropical, :nh_extratropical, :sh_extratropical)
+const AEROSOL_CLASSES = (:tropical, :tropical_nh, :tropical_sh, :nh_extratropical, :sh_extratropical)
+const _TROPICAL_CLASSES = (:tropical, :tropical_nh, :tropical_sh)
 
 # Global-mean visible optical depth per Tg S injected. Back-derived from
 # Crowley and Unterman (2013) and a Pinatubo injection of 9 Tg S (Toohey and
@@ -39,24 +40,38 @@ const _EXTRATROPICAL_TAU = (rise = 0.082, decay = 0.8)
 # falls monotonically. Tools: tools/diagnostics/aerosol_profile_check.jl.
 const _TROPICAL_NODES = ((7.5, 1.0), (22.5, 0.68), (37.5, 0.65), (52.5, 0.65), (75.0, 0.55))
 
-function _tropical_shape(phi::Real)
-    a = abs(phi)
-    a <= first(_TROPICAL_NODES)[1] && return first(_TROPICAL_NODES)[2]
-    for k in 2:length(_TROPICAL_NODES)
-        (a1, v1), (a0, v0) = _TROPICAL_NODES[k], _TROPICAL_NODES[k - 1]
-        a < a1 && return v0 + (v1 - v0) * (a - a0) / (a1 - a0)
+# One-hemisphere tropical shape (El Chichon, Agung): (latitude, value), positive
+# in the eruption's hemisphere, linear between, constant beyond. Fitted like the
+# tropical shape, to the 36-month totals of El Chichon (Sato-Lacis, GloSSAC) and
+# Agung (Sato-Lacis): relative to the eruption hemisphere's tropics, 0.79 at its
+# higher latitudes, 0.67 in the opposite tropics and 0.30 beyond (reproduced
+# within 0.04). This follows Crowley and Unterman (2013): the tropics at least
+# 30 percent above the same hemisphere's high latitudes, and the opposite
+# tropics midway between that maximum and the opposite high latitudes.
+const _ONE_HEMISPHERE_NODES = ((-22.5, 0.28), (-7.5, 0.62), (7.5, 1.0), (22.5, 1.0), (37.5, 0.75))
+
+# Piecewise-linear through `nodes`, constant beyond the first and last.
+function _interp(nodes, x::Real)
+    x <= first(nodes)[1] && return first(nodes)[2]
+    for k in 2:length(nodes)
+        (x1, v1), (x0, v0) = nodes[k], nodes[k - 1]
+        x < x1 && return v0 + (v1 - v0) * (x - x0) / (x1 - x0)
     end
-    return last(_TROPICAL_NODES)[2]
+    return last(nodes)[2]
 end
+
+_tropical_shape(phi::Real) = _interp(_TROPICAL_NODES, abs(phi))
 
 _check_class(cls::Symbol) = cls in AEROSOL_CLASSES ||
     throw(ArgumentError("unknown injection class :$cls; valid: $AEROSOL_CLASSES"))
 
 function _class_profile(cls::Symbol)
+    h = cls in (:tropical_nh, :nh_extratropical) ? 1.0 : -1.0
     w = if cls === :tropical
         [_tropical_shape(Float64(phi)) for phi in lat_grid]
+    elseif cls in (:tropical_nh, :tropical_sh)
+        [_interp(_ONE_HEMISPHERE_NODES, h * Float64(phi)) for phi in lat_grid]
     else
-        h = cls === :nh_extratropical ? 1.0 : -1.0
         [_extratropical_shape(h * Float64(phi)) for phi in lat_grid]
     end
     c = [cosd(Float64(phi)) for phi in lat_grid]
@@ -70,13 +85,18 @@ const _CLASS_PROFILES = Dict{Symbol,Vector{Float64}}(cls => _class_profile(cls) 
     Eruption(year, cls; tg_s=nothing, peak_aod=nothing, aod_per_tg_s=0.015)
 
 One volcanic injection at decimal `year` on the model clock (the scenario run
-starts at 1950 for most experiments). `cls` is `:tropical`,
-`:nh_extratropical` or `:sh_extratropical`. Give exactly one of `tg_s`
-(injected sulfur, Tg S, times `aod_per_tg_s`) or `peak_aod` (global-mean peak
-optical depth at 550 nm). The linear mass scaling overestimates eruptions much
-larger than Pinatubo. `:tropical` spreads the aerosol into both hemispheres,
-which suits Pinatubo but not asymmetric eruptions such as Agung or El Chichon.
-The extratropical classes keep it poleward of 30 degrees in one hemisphere.
+starts at 1950 for most experiments). `cls` is one of `AEROSOL_CLASSES`:
+
+- `:tropical`: both hemispheres alike, as after Pinatubo;
+- `:tropical_nh`, `:tropical_sh`: a tropical eruption whose aerosol stayed
+  mostly in one hemisphere, as after El Chichon (north) and Agung (south);
+- `:nh_extratropical`, `:sh_extratropical`: poleward of 30 degrees in one
+  hemisphere, as after Katmai (Toohey and Sigl 2017 put the boundary between
+  tropical and extratropical eruptions at 25 degrees).
+
+Give exactly one of `tg_s` (injected sulfur, Tg S, times `aod_per_tg_s`) or
+`peak_aod` (global-mean peak optical depth at 550 nm). The linear mass scaling
+overestimates eruptions much larger than Pinatubo.
 """
 struct Eruption
     year::Float64
@@ -147,7 +167,7 @@ control.
 
 Optical depth is the sum of `eruptions`, `injections` and `series`, each spread
 by its injection latitude profile. Eruptions and injections follow two linear
-reservoirs. For `:tropical`, the timescales are `tau_rise` and `tau_decay`
+reservoirs. For the tropical classes, the timescales are `tau_rise` and `tau_decay`
 (years; the defaults peak at five months and decay in a year, as Pinatubo did).
 The extratropical classes peak at 2.5 months and decay in 0.8 years (Katmai,
 Stothers 1996); `tau_rise` and `tau_decay` do not change them. `series` is a
@@ -177,7 +197,7 @@ end
 function AerosolScenario(eruptions, injections, series, tau_rise, tau_decay, ssa, asymmetry, mu0, tau_scale)
     chain(tr, td) = (tr, td, 1 / chain_impulse(chain_peak_time(tr, td), tr, td))
     chains = map(AEROSOL_CLASSES) do cls
-        cls === :tropical ? chain(tau_rise, tau_decay) : chain(_EXTRATROPICAL_TAU.rise, _EXTRATROPICAL_TAU.decay)
+        cls in _TROPICAL_CLASSES ? chain(tau_rise, tau_decay) : chain(_EXTRATROPICAL_TAU.rise, _EXTRATROPICAL_TAU.decay)
     end
     return AerosolScenario(eruptions, injections, series, tau_rise, tau_decay, ssa, asymmetry, mu0,
                            tau_scale, NamedTuple{AEROSOL_CLASSES}(chains))
