@@ -9,6 +9,8 @@ Notable changes to GREBClimate.jl, following
 
 - The model's backbone (constants, config, state, tendencies, output,
   postprocess, model) now lives in `src/core/`. No API change.
+- Maintainer tools are grouped by purpose; the dataset scripts moved to
+  `tools/dataset/` (see `tools/README.md`).
 
 ## [1.0.1] - 2026-09-29
 

@@ -116,7 +116,7 @@ end
 
 @testset "converter allowlist matches what src/io.jl loads" begin
     repo = normpath(joinpath(@__DIR__, ".."))
-    conv = read(joinpath(repo, "tools", "convert_greb_to_jld2.jl"), String)
+    conv = read(joinpath(repo, "tools", "dataset", "convert_greb_to_jld2.jl"), String)
     io_src = read(joinpath(repo, "src", "io.jl"), String)
 
     # --- the allowlist, as literals inside the MODEL_FIELD_NAMES block ---

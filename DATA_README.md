@@ -10,20 +10,20 @@
 ## Converting
 
 ```bash
-julia --project=. tools/convert_greb_to_jld2.jl <input_dir> [output_dir]   # defaults: Data/, greb_input_data/
-julia --project=. tools/package_dataset.jl greb_input_data greb_input_data-v1.tar.gz
+julia --project=. tools/dataset/convert_greb_to_jld2.jl <input_dir> [output_dir]   # defaults: Data/, greb_input_data/
+julia --project=. tools/dataset/package_dataset.jl greb_input_data greb_input_data-v1.tar.gz
 ```
 
 ## Generating new input data (ERA5)
 
-`tools/fetch_era5_data.py` builds an ERA5 climatology from the Copernicus
+`tools/dataset/fetch_era5_data.py` builds an ERA5 climatology from the Copernicus
 Climate Data Store and writes it in the `.bin` format the converter reads.
 It requires your own [CDS API access](https://cds.climate.copernicus.eu/how-to-api).
 
 ```bash
 python -m pip install cdsapi netCDF4 numpy
-python tools/fetch_era5_data.py --start-year 1991 --end-year 2020 --out-dir era5_raw
-julia --project=. tools/convert_greb_to_jld2.jl era5_raw greb_input_data_era5
+python tools/dataset/fetch_era5_data.py --start-year 1991 --end-year 2020 --out-dir era5_raw
+julia --project=. tools/dataset/convert_greb_to_jld2.jl era5_raw greb_input_data_era5
 
 The converter reads the `.bin` files (and matching `.ctl` files, if present)
 **flat** from the input directory:
@@ -37,7 +37,7 @@ Data/                                  # <input_dir>
 ```
 
 It converts only the fields the model reads - `MODEL_FIELD_NAMES` in
-`tools/convert_greb_to_jld2.jl` is the authoritative list - and warns about any
+`tools/dataset/convert_greb_to_jld2.jl` is the authoritative list - and warns about any
 that are missing. `--all` converts every `.bin` present. `package_dataset.jl`
 checks the result against the same list before building the release archive.
 

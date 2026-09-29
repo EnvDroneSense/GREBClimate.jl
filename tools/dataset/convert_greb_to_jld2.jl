@@ -15,7 +15,7 @@
 # tables and combined into `scenario/ipcc_scenarios.jld2`.
 #
 # Usage:
-#   julia --project=. tools/convert_greb_to_jld2.jl [input_dir] [output_dir] [--all]
+#   julia --project=. tools/dataset/convert_greb_to_jld2.jl [input_dir] [output_dir] [--all]
 #   # defaults: input_dir = Data, output_dir = greb_input_data
 #   # --all: also convert fields the model never reads
 
@@ -450,19 +450,19 @@ function main(input_path::String, output_dir::String)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    input_path = length(ARGS) >= 1 ? ARGS[1] : joinpath(@__DIR__, "..", "Data")
+    input_path = length(ARGS) >= 1 ? ARGS[1] : joinpath(@__DIR__, "..", "..", "Data")
     if !isdir(input_path)
         error("""
               Raw .bin input directory not found: $input_path
 
               Pass it explicitly:
-                  julia --project=. tools/convert_greb_to_jld2.jl <input_dir> [output_dir]
+                  julia --project=. tools/dataset/convert_greb_to_jld2.jl <input_dir> [output_dir]
 
               This is a maintainer tool for regenerating the .jld2 bundle from raw
               GREB .bin files; see DATA_README.md. To *use* the package you only
               need the prepared .jld2 dataset - see README.md, "Getting the data".
               """)
     end
-    output_dir = length(ARGS) >= 2 ? ARGS[2] : joinpath(@__DIR__, "..", "greb_input_data")
+    output_dir = length(ARGS) >= 2 ? ARGS[2] : joinpath(@__DIR__, "..", "..", "greb_input_data")
     main(input_path, output_dir)
 end
