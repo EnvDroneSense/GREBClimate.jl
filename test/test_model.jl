@@ -240,6 +240,14 @@ end
         # The parser is the thing under test - assert it directly.
         @test load_custom_co2_scenario(co2_path) == Dict(1950 => 300.0, 1951 => 301.0)
 
+        # A malformed line must raise without leaving the file open: on
+        # Windows an open handle makes the rm below fail.
+        bad_path = joinpath(dir, "bad_co2.txt")
+        write(bad_path, "1950 300.0\n1951\n")
+        @test_throws ErrorException load_custom_co2_scenario(bad_path)
+        rm(bad_path)
+        @test !isfile(bad_path)
+
         # ...then one run to prove greb_model! reads cfg.custom_co2_path.
         cfg = create_experiment_config(:custom_co2; co2_path = co2_path)
         result = quiet() do
@@ -349,10 +357,10 @@ end
         @test all(==(5.0), fields.omegaclim_anom_cc)
         @test all(==(6.0), fields.wsclim_anom_cc)
 
-        # init_model! applies the anomaly on top of the (here all-zero)
-        # base climatology - Tclim must reflect it, not stay at zero.
+        # The scenario-start step applies the anomaly on top of the (here
+        # all-zero) base climatology - Tclim must reflect it, not stay at zero.
         quiet() do
-            init_model!(cfg, fields)
+            GREBClimate._apply_boundary_anomalies!(cfg, fields)
         end
         @test all(==(2.0), fields.Tclim)
 
@@ -366,6 +374,14 @@ end
             @test all(==(9.0), fields2.vclim_anom_enso)
             @test all(==(10.0), fields2.omegaclim_anom_enso)
             @test all(==(11.0), fields2.wsclim_anom_enso)
+
+            # Both composite files already carry their sign (the La Nina one is
+            # a cold anomaly), so both experiments add them, as the Fortran does.
+            quiet() do
+                GREBClimate._apply_boundary_anomalies!(cfg2, fields2)
+            end
+            @test all(==(7.0), fields2.Tclim)
+            @test all(==(8.0), fields2.uclim)
         end
 
         # Per-field gating: switching a gate off must not touch that

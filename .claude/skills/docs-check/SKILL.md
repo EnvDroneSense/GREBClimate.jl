@@ -48,19 +48,20 @@ on a `:full_model` control run against the real dataset:
 
 | | healthy | ran on a zero climatology |
 |---|---|---|
-| the model's own printed line | `1970  14.43  29.81  3.69` | `1970  -233.15  -233.15  -233.15` |
-| `mean(result.ctrl[1].Ts)` | 276.64 K | 40.0 K |
+| the model's own printed line | `1970  13.82  26.79  4.85` | `1970  -233.15  -233.15  -233.15` |
+| `mean(result.ctrl[1].Ts)` | 276.94 K | 40.0 K |
 
-Both columns changed on 2026-08-22 (`dfc9797`) and the numbers above are the
-post-change ones, re-measured 2026-08-23. `min_T_K` went from 233.15 K (−40 °C,
-a physical floor that was silently clamping real Antarctic/Siberian winter
-cells) to 40 K, a pure numerical-stability floor, and `grav` went 9.80665 →
-9.81. So the healthy annual line moved 14.77 → 14.43, and the degenerate world
-now pins at 40 K rather than 233.15 K. Month 1's array mean is unchanged at
-276.64 — the floor only bites as the year accumulates, which is why a
-single-month check would have missed the shift entirely.
+These are `RunSpec()` numbers with its default `flux = 3` spin-up, measured
+2026-09-29 for v1.0.1. The earlier `flux = 0` default gave `1970  14.43 ...`
+and 276.64 K: without the spin-up the control ran on stored flux corrections
+and drifted warm. A healthy line above 14 °C now means the spin-up did not run.
 
-(The printed 14.43 °C and the 276.64 K array mean are different quantities —
+The degenerate column dates from 2026-08-22 (`dfc9797`), when `min_T_K` went
+from 233.15 K (−40 °C, a physical floor that was silently clamping real
+Antarctic/Siberian winter cells) to 40 K, a pure numerical-stability floor:
+the degenerate world pins at 40 K, not 233.15 K.
+
+(The printed 13.82 °C and the 276.94 K array mean are different quantities —
 the printout is the model's own global/land/ocean summary, the other is an
 unweighted mean over grid cells. Don't try to reconcile them; just compare each
 against its own column.)
@@ -121,7 +122,7 @@ rename, broke the documented docs build for weeks.
 ## Reporting
 
 Say which checks you ran and what they output. "Docs look right" is not a
-result; "ran the quick-start, global-mean Ts 14.43 °C, docs build clean" is.
+result; "ran the quick-start, global-mean Ts 13.82 °C, docs build clean" is.
 
 If a check fails, fix the docs rather than the check — unless the code is what
 is wrong, which happens: the converter's documented default input directory

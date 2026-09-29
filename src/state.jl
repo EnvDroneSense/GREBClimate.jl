@@ -198,10 +198,10 @@ Base.@kwdef mutable struct ClimateFields
     wsclim_anom_cc::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
 
     # Precomputed wind sign splits
-    uclim_m::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # negative u components
-    uclim_p::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # positive u components
-    vclim_m::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # negative v components
-    vclim_p::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # positive v components
+    uclim_m::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # u >= 0 components
+    uclim_p::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # u < 0 components
+    vclim_m::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # v >= 0 components
+    vclim_p::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # v < 0 components
 
     Toclim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # deep ocean temperature [K]
     cldclim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # cloud cover fraction

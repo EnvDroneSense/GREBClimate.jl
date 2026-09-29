@@ -3,12 +3,37 @@
 Notable changes to GREBClimate.jl, following
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [1.0.1] - 2026-09-29
 
 ### Changed
 
 - README and docs install the package with `Pkg.add("GREBClimate")` now that it
   is registered in the General registry.
+
+### Changes to model results
+
+- `RunSpec` defaults to `flux = 3`, the original GREB spin-up. With the old
+  default `flux = 0` the control ran on stored flux corrections that do not fit
+  the default configuration and drifted about +1.7 K over 5 years. Pass
+  `flux = 0` to get the old behaviour.
+- `:lanina` subtracted the ERA-Interim La Niña composite, which is already a
+  cold anomaly, so it produced a warm, El Niño-like Pacific. It is now added,
+  as for `:elnino` and in the Fortran (`log_exp` 241).
+- `:rcp85` ran its control at 280 ppm while its scenario runs at 340 ppm, so
+  the scenario carried a 60 ppm CO2 step on top of the boundary forcing. The
+  control now runs at 340 ppm, as in the Fortran (`log_exp` 230).
+- `:rcp85`, `:elnino` and `:lanina` added their boundary anomalies before the
+  flux-correction spin-up and control run, so the control already carried the
+  forced state and the returned scenario anomaly did not isolate it. They are
+  now added at scenario start, as in the Fortran.
+- `greb_model!` left those anomalies in `fields.Tclim`, `uclim`, `vclim`,
+  `omegaclim` and `wsclim`, so a reused `fields` carried them into the next
+  run and a repeated run added them twice. They are now restored when the run
+  returns.
+
+### Fixed
+
+- `load_custom_co2_scenario` left the file open when a line was malformed.
 
 ## [1.0.0] - 2026-09-26
 

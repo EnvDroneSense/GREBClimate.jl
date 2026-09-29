@@ -87,13 +87,15 @@ and lines starting with `#` are skipped.
 function load_custom_co2_scenario(path::String)
     isfile(path) || error("Custom CO2 scenario file not found: $path")
     table = Dict{Int,Float32}()
-    for line in eachline(path)
-        stripped = strip(line)
-        (isempty(stripped) || startswith(stripped, "#")) && continue
-        cols = split(stripped)
-        length(cols) >= 2 ||
-            error("Malformed line in custom CO2 scenario file $path: \"$line\" (expected \"year CO2\")")
-        table[parse(Int, cols[1])] = parse(Float32, cols[2])
+    open(path) do io
+        for line in eachline(io)
+            stripped = strip(line)
+            (isempty(stripped) || startswith(stripped, "#")) && continue
+            cols = split(stripped)
+            length(cols) >= 2 ||
+                error("Malformed line in custom CO2 scenario file $path: \"$line\" (expected \"year CO2\")")
+            table[parse(Int, cols[1])] = parse(Float32, cols[2])
+        end
     end
     return table
 end

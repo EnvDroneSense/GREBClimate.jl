@@ -3,8 +3,9 @@
 @testset "golden regression: real dataset control+scenario run matches snapshot" begin
     # Tripwire for any refactor touching the physics kernels: a real 1yr
     # control + 1yr scenario run against the actual NCEP dataset,
-    # snapshotted as monthly global-mean Ts/Ta/q. Drift beyond
-    # float-reassociation noise (~1e-12) means real behavior changed.
+    # snapshotted as monthly global-mean Ts/Ta/q. The tolerances (0.01 K,
+    # 1e-5 kg/kg) catch behaviour changes, not bit-level drift, and the
+    # snapshot is a flux = 0 run, so qflux_correction! is not exercised here.
     # Set RUN_GOLDEN=0 to skip this locally. CI skips it too - it has no
     # dataset, so the !isdir(DATA_DIR) branch below always fires there. This
     # guards nothing in CI: a golden break is local-red and CI-green.
@@ -16,7 +17,7 @@
         fields = load_greb_jld2!(DATA_DIR; dataset = :ncep)
         cfg = create_experiment_config(:full_model)
         result = quiet() do
-            greb_model!(RunSpec(), cfg; jld2_dir = DATA_DIR, fields = fields)
+            greb_model!(RunSpec(flux = 0), cfg; jld2_dir = DATA_DIR, fields = fields)
         end
 
         gmean(x) = sum(x) / length(x)

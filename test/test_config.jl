@@ -128,7 +128,10 @@ end
 @testset "CO2 presets: control at 340 ppm, scenario from forcing" begin
     fields = ClimateFields()
     ice = zeros(Float32, X, Y, 12)
-    for (exp, co2) in ((:co2_double, 680), (:co2_quadruple, 1360), (:paleo_231kyr, 200), (:decon_2xco2, 680))
+    # :rcp85 is forced through its boundary conditions, not a CO2 table: the
+    # Fortran (log_exp 230) runs both control and scenario at 340 ppm.
+    for (exp, co2) in ((:co2_double, 680), (:co2_quadruple, 1360), (:paleo_231kyr, 200),
+                       (:decon_2xco2, 680), (:rcp85, 340))
         cfg = create_experiment_config(exp)
         @test quiet(() -> init_model!(cfg, fields)).CO2_ctrl == 340
         @test forcing(1, 1950, cfg, fields, ice).CO2 == co2

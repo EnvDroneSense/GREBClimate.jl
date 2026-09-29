@@ -85,8 +85,8 @@ A run has three phases, set by `RunSpec` in years:
 
 | Phase | What it does |
 |:------|:-------------|
-| `flux` | Spin-up that derives the flux corrections holding the control at the observed climate. With `flux=0` the control drifts. |
-| `ctrl` | Control run at 340 ppm CO₂ (280 ppm for the IPCC scenarios) |
+| `flux` | Spin-up that derives the flux corrections holding the control at the observed climate. Default 3 years; with `flux=0` the control drifts. |
+| `ctrl` | Control run at 340 ppm CO₂ (280 ppm for the IPCC CO₂-table scenarios; `:rcp85` uses 340) |
 | `scnr` | Scenario run under the experiment's forcing |
 
 `result.ctrl` and `result.scnr` are vectors of monthly means, each a `NamedTuple` of 96×48 fields (`Ts, Ta, To, q, albedo, ice, precip, evap, qcrcl, sw, lw, qlat, qsens`). `result.scnr` is an **anomaly** against the control's final year, except for the orbital experiments and runs with `ctrl=0`. The [Tutorial](https://EnvDroneSense.github.io/GREBClimate.jl/dev/tutorial/) covers configuration switches, experiment keywords and reading the results; [`examples/run_greb.jl`](examples/run_greb.jl) is a runnable script.

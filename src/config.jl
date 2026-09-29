@@ -78,18 +78,19 @@ end
 Run durations (in years) for [`greb_model!`](@ref): `flux` (flux-correction
 spin-up), `ctrl` (control run), `scnr` (scenario run). A keyword struct
 instead of three bare positional ints, whose order was easy to swap by
-mistake.
+mistake. The default `flux = 3` is the original GREB spin-up; with `flux = 0`
+the control drifts away from the observed climate.
 
 ```jldoctest
 julia> RunSpec(ctrl = 10, scnr = 30)
-RunSpec(0, 10, 30)
+RunSpec(3, 10, 30)
 
 julia> RunSpec().ctrl, RunSpec().scnr
 (1, 1)
 ```
 """
 Base.@kwdef struct RunSpec
-    flux::Int = 0
+    flux::Int = 3
     ctrl::Int = 1
     scnr::Int = 1
 end

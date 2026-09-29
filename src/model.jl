@@ -80,31 +80,6 @@ function init_model!(cfg::PhysicsConfig, fields::ClimateFields)
         fields.mldclim .= d_ocean       # no deep ocean
     end
 
-    # ── Experiment Handler ───────────────────────────────────
-    # Apply advanced experiment forcing
-    if cfg.experiment == :rcp85
-        @info "Applying CMIP5 RCP8.5 climate change forcing"
-        Tclim .+= fields.Tclim_anom_cc
-        fields.uclim .+= fields.uclim_anom_cc
-        fields.vclim .+= fields.vclim_anom_cc
-        fields.omegaclim .+= fields.omegaclim_anom_cc
-        fields.wsclim .+= fields.wsclim_anom_cc
-    elseif cfg.experiment == :elnino
-        @info "Applying ERA-Interim El Niño forcing"
-        Tclim .+= fields.Tclim_anom_enso
-        fields.uclim .+= fields.uclim_anom_enso
-        fields.vclim .+= fields.vclim_anom_enso
-        fields.omegaclim .+= fields.omegaclim_anom_enso
-        fields.wsclim .+= fields.wsclim_anom_enso
-    elseif cfg.experiment == :lanina
-        @info "Applying ERA-Interim La Niña forcing"
-        Tclim .-= fields.Tclim_anom_enso
-        fields.uclim .-= fields.uclim_anom_enso
-        fields.vclim .-= fields.vclim_anom_enso
-        fields.omegaclim .-= fields.omegaclim_anom_enso
-        fields.wsclim .-= fields.wsclim_anom_enso
-    end
-
     # ── Topography pressure weights ─────
     @. fields.wz_air = exp(-z_topo / z_air)
     @. fields.wz_vapor = exp(-z_topo / z_vapor)
@@ -135,7 +110,8 @@ function init_model!(cfg::PhysicsConfig, fields::ClimateFields)
     # ── Control CO₂ level ───────────────────────────────────────
     CO2_ctrl = cfg.co2_concentration
 
-    if cfg.experiment in (:a1b_scenario, :rcp26, :rcp45, :rcp60, :rcp85, :custom_co2,
+    # :rcp85 is not listed: it is forced through boundary conditions at 340 ppm
+    if cfg.experiment in (:a1b_scenario, :rcp26, :rcp45, :rcp60, :custom_co2,
                           :ssp119, :ssp126, :ssp245, :ssp460, :ssp585, :historical_co2)
         CO2_ctrl = 280.0f0  # IPCC scenarios baseline
     end
@@ -146,6 +122,26 @@ function init_model!(cfg::PhysicsConfig, fields::ClimateFields)
 
     return (Ts_ini=Ts_ini, Ta_ini=Ta_ini, To_ini=To_ini,
         q_ini=q_ini, CO2_ctrl=CO2_ctrl)
+end
+
+# Boundary climatologies that the forced experiments (:rcp85, :elnino,
+# :lanina) perturb at scenario start
+const _BOUNDARY_FIELDS = (:Tclim, :uclim, :vclim, :omegaclim, :wsclim)
+
+function _apply_boundary_anomalies!(cfg::PhysicsConfig, fields::ClimateFields)
+    if cfg.experiment == :rcp85
+        @info "Applying CMIP5 RCP8.5 climate change forcing"
+        suffix = :_anom_cc
+    elseif cfg.experiment in (:elnino, :lanina)
+        @info "Applying ERA-Interim $(cfg.experiment == :elnino ? "El Niño" : "La Niña") forcing"
+        suffix = :_anom_enso
+    else
+        return fields
+    end
+    for name in _BOUNDARY_FIELDS
+        getfield(fields, name) .+= getfield(fields, Symbol(name, suffix))
+    end
+    return fields
 end
 
 """
@@ -290,11 +286,12 @@ Run a GREB flux-correction spin-up (`run.flux` years), control run
 (`run.ctrl` years), and scenario run (`run.scnr` years) for `cfg`.
 
 `fields` holds the loaded climatology/grid/flux-correction state (see
-[`ClimateFields`](@ref), built by [`load_greb_jld2!`](@ref)). Pass the same
-`fields` instance across multiple calls to reuse already-loaded climatology
-instead of reloading it - that's the only case where `co2_part`/`sw_solar`
-mutations from one run could otherwise leak into the next; this function
-resets/restores them per-run regardless.
+[`ClimateFields`](@ref), built by [`load_greb_jld2!`](@ref)). The run mutates
+`fields`: `co2_part`, `sw_solar` and the boundary anomalies of `:rcp85`,
+`:elnino` and `:lanina` are restored afterwards, but the deconstruction and
+sensitivity switches (e.g. `log_clouds_drsp`, `log_topo_drsp`) overwrite
+climatologies for good. To run several experiments from one load, pass
+`deepcopy(fields)` to each run.
 """
 function greb_model!(run::RunSpec, cfg::PhysicsConfig;
     jld2_dir::AbstractString="", fields::ClimateFields=ClimateFields(),
@@ -313,6 +310,11 @@ function greb_model!(run::RunSpec, cfg::PhysicsConfig;
     end
     time_flux, time_ctrl, time_scnr = run.flux, run.ctrl, run.scnr
     sw_solar_backup = copy(fields.sw_solar)
+    is_forced_boundary = cfg.experiment in (:rcp85, :elnino, :lanina)
+    # The scenario adds anomalies to these in place; restore them so a reused
+    # `fields` does not carry them into the next run
+    boundary_backup = is_forced_boundary ?
+        map(name -> copy(getfield(fields, name)), _BOUNDARY_FIELDS) : nothing
     try
 
     state = ModelState()
@@ -335,7 +337,6 @@ function greb_model!(run::RunSpec, cfg::PhysicsConfig;
 
     # Determine experiment type from cfg
     is_orbital_exp = cfg.experiment in (:obliquity, :eccentricity, :earth_sun_distance)
-    is_forced_boundary = cfg.experiment in (:rcp85, :elnino, :lanina)
     is_sst_plus1 = cfg.experiment == :sst_plus1
     is_historical_exp = cfg.experiment == :historical_co2
 
@@ -418,6 +419,9 @@ function greb_model!(run::RunSpec, cfg::PhysicsConfig;
         cfg.co2_scenario = load_custom_co2_scenario(cfg.custom_co2_path)
     end
 
+    # Forced-boundary experiments
+    _apply_boundary_anomalies!(cfg, fields)
+
     # Reset state to initial conditions
     Ts .= Ts_ini;
     Ta .= Ta_ini
@@ -474,5 +478,10 @@ function greb_model!(run::RunSpec, cfg::PhysicsConfig;
 
     finally
         fields.sw_solar .= sw_solar_backup
+        if boundary_backup !== nothing
+            for (name, saved) in zip(_BOUNDARY_FIELDS, boundary_backup)
+                getfield(fields, name) .= saved
+            end
+        end
     end
 end

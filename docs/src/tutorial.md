@@ -74,11 +74,12 @@ result = greb_model!(run, cfg; jld2_dir = jld2_dir, fields = fields)
 This runs, in order: a flux-correction spin-up that holds the control climate
 at the observed climatology, a control run, and a scenario run under the
 experiment's forcing. The spin-up and control run at 340 ppm CO₂ (280 ppm for
-the IPCC-scenario experiments); the experiment sets only the scenario's CO₂.
+the IPCC CO₂-table scenarios; `:rcp85` uses 340); the experiment sets only the
+scenario's CO₂.
 
 Without the spin-up (`flux = 0`) the control drifts: about +2 K over 5 years
-in a `:full_model` run, which then shows up in the scenario anomaly. Use
-`flux = 3`, the original GREB default, for experiments.
+in a `:full_model` run, which then shows up in the scenario anomaly. `flux = 3`,
+the original GREB spin-up, is the default.
 
 ## 4. Inspect results
 

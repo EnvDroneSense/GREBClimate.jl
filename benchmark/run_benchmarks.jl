@@ -31,7 +31,7 @@ function time_1yr(jld2_dir::AbstractString; cfg=create_experiment_config(:full_m
 
     # Warm-up, so compilation is not timed.
     redirect_stdout(devnull) do
-        greb_model!(RunSpec(scnr=0), deepcopy(cfg); jld2_dir=jld2_dir, fields=deepcopy(fields))
+        greb_model!(RunSpec(flux=0, scnr=0), deepcopy(cfg); jld2_dir=jld2_dir, fields=deepcopy(fields))
     end
 
     times = Float64[]
@@ -39,7 +39,7 @@ function time_1yr(jld2_dir::AbstractString; cfg=create_experiment_config(:full_m
         fields_r = deepcopy(fields)  # the model mutates fields
         cfg_r = deepcopy(cfg)
         t = @elapsed redirect_stdout(devnull) do
-            greb_model!(RunSpec(scnr=0), cfg_r; jld2_dir=jld2_dir, fields=fields_r)
+            greb_model!(RunSpec(flux=0, scnr=0), cfg_r; jld2_dir=jld2_dir, fields=fields_r)
         end
         push!(times, t)
         println("  run $r: ", round(t, digits=3), " s")

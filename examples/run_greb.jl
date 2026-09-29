@@ -22,14 +22,14 @@ using GREBClimate
 using Statistics
 
 """
-    run_greb(jld2_dir; time_flux=0, time_ctrl=1, time_scnr=1)
+    run_greb(jld2_dir; time_flux=3, time_ctrl=1, time_scnr=1)
 
 Load the JLD2 dataset from `jld2_dir`, run a GREB control+scenario simulation,
 print a summary and (if Plots.jl is available) save a global-mean Ts plot.
 Returns the result NamedTuple, or `nothing` if the data directory is missing.
 """
 function run_greb(jld2_dir::AbstractString;
-                  time_flux::Int=0, time_ctrl::Int=1, time_scnr::Int=1)
+                  time_flux::Int=3, time_ctrl::Int=1, time_scnr::Int=1)
 
     # ── 1. locate + load input data ─────────────────────────────────────────
     if !isdir(jld2_dir)
