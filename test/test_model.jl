@@ -24,10 +24,19 @@ end
         cfg.log_topo_drsp = false
         cfg.log_qflux_dmc = true
         fields = ClimateFields()
-        quiet() do
-            greb_model!(RunSpec(flux = 1, ctrl = 0, scnr = 0), cfg; jld2_dir = tmpdir, fields = fields, allow_uninitialized = true)
+        # greb_model! restores `fields` when it returns, so the branch it took
+        # is read from its progress output: load the file, never recompute.
+        log = mktemp() do path, io
+            redirect_stdout(io) do
+                greb_model!(RunSpec(flux = 1, ctrl = 0, scnr = 0), cfg; jld2_dir = tmpdir, fields = fields, allow_uninitialized = true)
+            end
+            flush(io)
+            read(path, String)
         end
-
+        @test occursin("loading flux correction fields", log)
+        @test !occursin("% flux correction  CO2", log)
+        # The loader itself fills the three arrays from the file
+        GREBClimate.load_flux_corrections_jld2!(tmpdir, fields)
         @test all(==(42.0), fields.TF_correct)
         @test all(==(43.0), fields.qF_correct)
         @test all(==(44.0), fields.ToF_correct)
@@ -399,5 +408,52 @@ end
         @test_throws ErrorException load_cc_anomaly_jld2!(tmpdir_anom, ClimateFields(), cfg)
     finally
         rm(tmpdir_anom; recursive = true, force = true)
+    end
+end
+
+@testset "flux-correction round trip: a run step from the spin-up's start lands on Tclim" begin
+    # The spin-up solves for TF_correct so its step ends on Tclim; the run step
+    # adds the same surface flux sum plus that TF_correct. A flux term added to
+    # one of the two update loops but not the other moves Ts off Tclim here.
+    f = synthetic_fields()
+    cfg = create_experiment_config(:full_model)
+    ini = quiet(() -> init_model!(cfg, f))
+    cap0 = copy(f.cap_surf)   # seaice! changes it during the spin-up year
+    start() = (copy(ini.Ts_ini), copy(ini.Ta_ini), copy(ini.q_ini), copy(ini.To_ini))
+    Ts, Ta, q, To = start()
+    quiet() do
+        qflux_correction!(ini.CO2_ctrl, Ts, Ta, q, To, f, ModelState(), TimeState(1, 1), cfg,
+                          CirculationWorkspace(), 1)
+    end
+    function run_step()
+        f.cap_surf .= cap0
+        Ts, Ta, q, To = start()
+        quiet() do
+            time_loop!(1, 1970, ini.CO2_ctrl, 1, 0, Ts, Ta, q, To, MonthlyRecord[], f, ModelState(),
+                       CirculationWorkspace(), MonthlyAccumulator(), TimeState(1, 1), cfg)
+        end
+        return Ts
+    end
+    @test isapprox(run_step(), f.Tclim[:, :, 1]; rtol = 1e-6)
+    # Negative control: without the correction the same step does not land
+    f.TF_correct[:, :, 1] .= 0.0f0
+    @test !isapprox(run_step(), f.Tclim[:, :, 1]; rtol = 1e-6)
+end
+
+@testset "greb_model! restores the fields it changes, so one fields serves several runs" begin
+    f = synthetic_fields()
+    f.TF_correct .= 1.0f0   # stands in for loaded corrections; the run zeroes them here
+    names = (:sw_solar, :TF_correct, :qF_correct, :ToF_correct, :z_topo, :cldclim, :qclim, :mldclim)
+    before = Dict(n => copy(getfield(f, n)) for n in names)
+    # Constant topography with no flux corrections zeroes them; the _drsp
+    # switches replace the cloud, humidity and mixed-layer climatologies.
+    cfg = PhysicsConfig(log_topo_drsp = false, log_qflux_dmc = false, log_clouds_drsp = false,
+                        log_humid_drsp = false, log_ocean_drsp = false)
+    quiet() do
+        greb_model!(RunSpec(flux = 0, ctrl = 1, scnr = 0), cfg; jld2_dir = "", fields = f,
+                    allow_uninitialized = true)
+    end
+    for n in names
+        @test getfield(f, n) == before[n]
     end
 end

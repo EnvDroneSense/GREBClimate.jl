@@ -11,6 +11,15 @@ Notable changes to GREBClimate.jl, following
   postprocess, model) now lives in `src/core/`. No API change.
 - Maintainer tools are grouped by purpose; the dataset scripts moved to
   `tools/dataset/` (see `tools/README.md`).
+- `tools/validation/bit_identity.jl` checks that a refactor leaves every
+  output value unchanged.
+
+### Fixed
+
+- `greb_model!` left the climatologies replaced by the deconstruction and
+  sensitivity switches (clouds, humidity, mixed layer, topography) and the
+  flux corrections of one run in `fields`, so a later run on the same
+  `fields` used them. The run now restores them when it returns.
 
 ## [1.0.1] - 2026-09-29
 
