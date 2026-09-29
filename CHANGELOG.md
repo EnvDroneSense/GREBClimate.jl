@@ -3,6 +3,43 @@
 Notable changes to GREBClimate.jl, following
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Breaking changes
+
+- `ModelState.sw_solar_forcing` is a `Vector{Float32}` with one value per
+  latitude row instead of a `Float32`. Code that read it as a scalar must index
+  it; code that assigned it must use `.=`.
+
+### Added
+
+- **Shortwave add-ons** for any experiment's scenario run: a solar record
+  (`cfg.solar_scenario`, `load_solar_series`) and a stratospheric aerosol
+  (`cfg.aerosol = AerosolScenario(...)`) from volcanic eruptions, sustained
+  geoengineering injections with an optional stop year, or a published
+  optical-depth record (`load_aerosol_series`). Records are read from a
+  standard forcing-series JLD2 format whose times are on the model's 365-day
+  calendar, so converters, not the model, translate dates. The aerosol dims
+  sunlight per latitude through a delta-Eddington layer, calibrated to
+  −30 W/m² per unit optical depth. Extratropical eruptions follow Katmai
+  (Stothers 1996): aerosol only poleward of 30° in their hemisphere, a peak
+  after 2.5 months and a 0.8-year decay; the tropical latitude profile is
+  fitted to Pinatubo in the Sato-Lacis and GloSSAC records, and
+  `:tropical_nh`/`:tropical_sh` cover tropical eruptions that stayed mostly in
+  one hemisphere (El Chichón, Agung). Off by default; default runs are
+  bit-identical. Against observed temperatures it cools about twice as
+  strongly as observed; see the model overview.
+- Maintainer tools: a converter for the GISS stratospheric-aerosol NetCDF
+  files, the aerosol calibration and shortwave-pulse diagnostics, and a
+  comparison of the volcanic response with GISTEMP.
+
+### Changed
+
+- Maintainer tools in `tools/` are grouped by purpose (`dataset/`, `forcing/`,
+  `diagnostics/`, `validation/`; see `tools/README.md`).
+- The model's backbone (constants, config, state, tendencies, output,
+  postprocess, model) now lives in `src/core/`.
+
 ## [1.0.1] - 2026-09-29
 
 ### Changed
@@ -52,9 +89,6 @@ First release registered in the Julia General registry.
 - Removed: the `:a1b_enhanced` experiment (identical to `:a1b_scenario`),
   `ModelState`'s ten write-only annual-mean fields, `MonthlyAccumulator.count`
   and the unused `ε` constant.
-- `ModelState.sw_solar_forcing` is a `Vector{Float32}` with one value per
-  latitude row instead of a `Float32`. Code that read it as a scalar must index
-  it; code that assigned it must use `.=`.
 
 ### Changes to model results
 
@@ -84,22 +118,6 @@ First release registered in the Julia General registry.
   (1850-2017) and a user-supplied CO₂ trajectory (`:custom_co2`).
 - **Deconstruction experiments** `:decon_mean_climate` and `:decon_2xco2`,
   switching individual processes off.
-- **Shortwave add-ons** for any experiment's scenario run: a solar record
-  (`cfg.solar_scenario`, `load_solar_series`) and a stratospheric aerosol
-  (`cfg.aerosol = AerosolScenario(...)`) from volcanic eruptions, sustained
-  geoengineering injections with an optional stop year, or a published
-  optical-depth record (`load_aerosol_series`). Records are read from a
-  standard forcing-series JLD2 format whose times are on the model's 365-day
-  calendar, so converters, not the model, translate dates. The aerosol dims
-  sunlight per latitude through a delta-Eddington layer, calibrated to
-  −30 W/m² per unit optical depth. Extratropical eruptions follow Katmai
-  (Stothers 1996): aerosol only poleward of 30° in their hemisphere, a peak
-  after 2.5 months and a 0.8-year decay; the tropical latitude profile is
-  fitted to Pinatubo in the Sato-Lacis and GloSSAC records, and
-  `:tropical_nh`/`:tropical_sh` cover tropical eruptions that stayed mostly in
-  one hemisphere (El Chichón, Agung). Off by default; default runs are
-  bit-identical. Against observed temperatures it cools about twice as
-  strongly as observed; see the model overview.
 - **Plotting toolbox** (`viz/`): maps, global-mean time series, seasonal cycle,
   Hovmöller diagram and animations, plus a simplified Pluto explorer notebook.
   `julia viz/setup.jl` sets up its environment.
@@ -109,12 +127,8 @@ First release registered in the Julia General registry.
   `CirculationWorkspace` and `MonthlyAccumulator`.
 - Documentation site (tutorial, input data, model overview, plots, physics
   switches, API) with doctests, and `CONTRIBUTING.md`.
-- Maintainer tools in `tools/`, grouped by purpose (`dataset/`, `forcing/`,
-  `diagnostics/`, `validation/`; see `tools/README.md`): the dataset archive
-  and its SHA256; a `.bin` converter that only converts fields the model reads;
-  a converter for the GISS stratospheric-aerosol NetCDF files; the aerosol
-  calibration and shortwave-pulse diagnostics; and a comparison of the volcanic
-  response with GISTEMP.
+- Maintainer tools: `tools/package_dataset.jl` builds the dataset archive and
+  its SHA256; the `.bin` converter only converts fields the model reads.
 - CI on Julia 1.10 and current, in two test shards, with code coverage,
   Aqua.jl package checks, per-kernel allocation and type-stability tests, and a
   single- vs multi-threaded bit-identity test. TagBot and CompatHelper automate
@@ -127,15 +141,13 @@ First release registered in the Julia General registry.
   files no code reads. Results are unchanged.
 - `forcing` is pure: the dynamic regional-CO₂ masks are built once per run.
 - Source split from one 2,245-line file into topical files; tests split into
-  one file per subject. The model's backbone (constants, config, state,
-  tendencies, output, postprocess, model) now lives in `src/core/`.
+  one file per subject.
 
 ### Fixed
 
 - The README quick start discarded the loaded data and ran on a zero
   climatology (a −40 °C world) while reporting success.
 - `seaice!` returned a `Union` type; it now returns `nothing`.
-- `load_custom_co2_scenario` left the file open when a line was malformed.
 - 19 of 36 exported functions had docstrings detached from their definitions.
 - `tools/dataset/convert_greb_to_jld2.jl` defaulted to a non-existent `Data/input`.
 - Stale references in the documentation: an old notebook name, the Julia
