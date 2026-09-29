@@ -13,9 +13,6 @@ discarded `load_greb_jld2!`'s return value. It printed a ✅ and finished with
 
 Reading a snippet is not checking it. **Run it.**
 
-Full account of that bug and the rest of the 2026-08-21 sweep: the
-ClimaModel vault, `03-findings/onboarding.md`.
-
 ## When to use this
 
 - Before telling the user the docs are correct or updated.
@@ -88,9 +85,8 @@ failure. It checks:
   `Project.toml`'s compat bound. They disagreed — 1.10 / 1.9 / 1.10 — until
   2026-08-21.
 - **`@ref`'d names are actually exported** from `GREBClimate`.
-- **No dead `.jld2` files.** Reported as a NOTE, not a failure: 11 files
-  (148 MB) are currently unreferenced, pending the open `.new` question in
-  the ClimaModel vault, `03-findings/data-distribution.md`. This check is interpolation-aware —
+- **No dead `.jld2` files.** Reported as a NOTE, not a failure; at present every
+  file is referenced. This check is interpolation-aware —
   `src/io.jl` builds ENSO filenames as `"erainterim.tsurf.$suffix.forcing.jld2"`,
   so a naive grep reports ten false positives. If you write your own version of
   this check, expand `$suffix` first.
@@ -128,8 +124,3 @@ If a check fails, fix the docs rather than the check — unless the code is what
 is wrong, which happens: the converter's documented default input directory
 did not exist, and the fix belonged in the script.
 
-## Related
-
-- The ClimaModel vault, `03-findings/onboarding.md` — what this skill was built from,
-  including what was checked and found *accurate* (don't redo those).
-- The ClimaModel vault, `03-findings/00-index.md` — where to record what you find.
