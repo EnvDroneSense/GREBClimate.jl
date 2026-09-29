@@ -15,7 +15,7 @@ Requires Julia 1.10 (the current LTS) or later.
 
 ```julia
 using Pkg
-Pkg.develop(url = "https://github.com/EnvDroneSense/GREBClimate.jl")
+Pkg.add("GREBClimate")
 ```
 
 Or, working from a clone:

@@ -1,11 +1,18 @@
 # Changelog
 
 Notable changes to GREBClimate.jl, following
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The package has no
-registered release yet, so everything since the initial extraction is under
-Unreleased.
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased] - toward v1.0.0
+## [Unreleased]
+
+### Changed
+
+- README and docs install the package with `Pkg.add("GREBClimate")` now that it
+  is registered in the General registry.
+
+## [1.0.0] - 2026-09-26
+
+First release registered in the Julia General registry.
 
 ### Breaking changes
 

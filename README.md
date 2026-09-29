@@ -41,19 +41,21 @@ GREB is a conceptual climate model that simulates the global energy balance on a
 
 Requires **Julia 1.10** (the current LTS) or later. Download from [julialang.org](https://julialang.org/downloads/).
 
-```bash
-git clone https://github.com/EnvDroneSense/GREBClimate.jl
-cd GREBClimate.jl
-```
-
 ### Installation
 
-GREBClimate is not yet registered in the Julia General Registry; install it from the clone:
+GREBClimate is registered in the Julia General Registry:
 
 ```julia
 using Pkg
-Pkg.activate(".")
-Pkg.instantiate()
+Pkg.add("GREBClimate")
+```
+
+To work on the package itself, or to use the notebook below, clone the repository and instantiate it:
+
+```bash
+git clone https://github.com/EnvDroneSense/GREBClimate.jl
+cd GREBClimate.jl
+julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
 
 ### Launch the notebook (optional)
