@@ -121,7 +121,7 @@ Bug reports and contributions are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) co
 3. **Dommenget, D., Nice, K., Bayr, T., Kasang, D., Stassen, C., and Rezny, M.** The Monash Simple Climate Model Experiments: An interactive database of the mean climate, climate change and scenarios simulations. *Geoscientific Model Development*, 12, 2155-2179. [doi:10.5194/gmd-12-2155-2019](https://doi.org/10.5194/gmd-12-2155-2019)
 
 ### Original GREB Model
-- [Monash University GREB Homepage](http://www.monash.edu/science/research/climate)
+- [Monash University GREB Homepage](https://users.monash.edu.au/~dietmard/content/GREB/code.html)
 
 ## License
 
