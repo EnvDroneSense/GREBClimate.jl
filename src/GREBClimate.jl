@@ -32,19 +32,19 @@ export build_monthly_climatology, apply_scenario_anomalies, compute_annual_ice_c
 export qflux_correction!, greb_model!
 export xdim, ydim, nstep_yr
 
-include("constants.jl")
-include("config.jl")
+include("core/constants.jl")
+include("core/config.jl")
 include("data.jl")
-include("state.jl")
+include("core/state.jl")
 include("io.jl")
 include("physics/radiation.jl")
 include("physics/hydrology.jl")
 include("physics/ocean.jl")
 include("circulation.jl")
-include("tendencies.jl")
-include("output.jl")
-include("postprocess.jl")
-include("model.jl")
+include("core/tendencies.jl")
+include("core/output.jl")
+include("core/postprocess.jl")
+include("core/model.jl")
 
 function __init__()
     # Registration only: nothing is downloaded until `greb_data_dir()` has to

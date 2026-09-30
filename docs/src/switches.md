@@ -175,7 +175,7 @@ What each `create_experiment_config` preset changes relative to `:full_model`:
 
 `create_experiment_config` covers all of these too. They change no switches
 relative to `:full_model` - the experiment symbol alone selects the branch in
-`src/tendencies.jl`'s `forcing`, which sets the CO₂ or solar forcing per
+`src/core/tendencies.jl`'s `forcing`, which sets the CO₂ or solar forcing per
 timestep. Read that branch for exact behavior.
 
 | Category | Symbols |

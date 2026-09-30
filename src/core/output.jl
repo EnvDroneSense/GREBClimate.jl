@@ -115,7 +115,7 @@ function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
     # Humidity tendency buffer selection
     dq_eva_use = tend.dq_eva
     dq_rain_use = tend.dq_rain
-    dq_crcl_use = cfg.log_crcl_dmc ? tend.dq_crcl : ws.crcl
+    dq_crcl_use = tend.dq_crcl
     hydro_on = cfg.log_hydro_dmc ? 1.0f0 : 0.0f0
 
     SW = tend.SW; LW_surf = tend.LW_surf; LW_down = tend.LW_down

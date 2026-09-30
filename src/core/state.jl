@@ -20,7 +20,7 @@ Base.@kwdef mutable struct CirculationWorkspace
     # Tendency buffers
     temp_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # general workspace (humidity-update scratch)
     Q_sens_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Sensible heat flux buffer
-    crcl::Matrix{Float32} = zeros(Float32, xdim, ydim)  # dq_crcl (zero stand-in when log_crcl_dmc is off)
+    crcl::Matrix{Float32} = zeros(Float32, xdim, ydim)  # unused
 
     # State buffers
     Ts0_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface temperature output

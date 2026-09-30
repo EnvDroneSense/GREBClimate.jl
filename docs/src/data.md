@@ -101,8 +101,8 @@ several upstream sources and are not redistributed;
 documents them.
 
 ```bash
-julia --project=. tools/convert_greb_to_jld2.jl <input_dir> [output_dir]   # default: greb_input_data/
-julia --project=. tools/package_dataset.jl greb_input_data greb_input_data-v1.tar.gz
+julia --project=. tools/dataset/convert_greb_to_jld2.jl <input_dir> [output_dir]   # default: greb_input_data/
+julia --project=. tools/dataset/package_dataset.jl greb_input_data greb_input_data-v1.tar.gz
 ```
 
 The second command validates the tree against the converter's allowlist,

@@ -3,9 +3,11 @@
 @testset "golden regression: real dataset control+scenario run matches snapshot" begin
     # Tripwire for any refactor touching the physics kernels: a real 1yr
     # control + 1yr scenario run against the actual NCEP dataset,
-    # snapshotted as monthly global-mean Ts/Ta/q. The tolerances (0.01 K,
-    # 1e-5 kg/kg) catch behaviour changes, not bit-level drift, and the
-    # snapshot is a flux = 0 run, so qflux_correction! is not exercised here.
+    # snapshotted as monthly global-mean Ts/Ta/q, plus a flux = 1 control
+    # year so the flux-correction spin-up is exercised too. The tolerances
+    # (1e-3 K, 1e-6 kg/kg) are about 30 times the drift measured between runs;
+    # they catch behaviour changes, not bit-level drift. Exact equality is
+    # checked by tools/validation/bit_identity.jl.
     # Set RUN_GOLDEN=0 to skip this locally. CI skips it too - it has no
     # dataset, so the !isdir(DATA_DIR) branch below always fires there. This
     # guards nothing in CI: a golden break is local-red and CI-green.
@@ -56,15 +58,42 @@
         @test length(result.scnr) == length(scnr_ref)
         for (rec, ref) in zip(result.ctrl, ctrl_ref)
             s = summarize(rec)
-            @test isapprox(s.Ts, ref.Ts; atol = 1e-2)
-            @test isapprox(s.Ta, ref.Ta; atol = 1e-2)
-            @test isapprox(s.q, ref.q; atol = 1e-5)
+            @test isapprox(s.Ts, ref.Ts; atol = 1e-3)
+            @test isapprox(s.Ta, ref.Ta; atol = 1e-3)
+            @test isapprox(s.q, ref.q; atol = 1e-6)
         end
         for (rec, ref) in zip(result.scnr, scnr_ref)
             s = summarize(rec)
-            @test isapprox(s.Ts, ref.Ts; atol = 1e-2)
-            @test isapprox(s.Ta, ref.Ta; atol = 1e-2)
-            @test isapprox(s.q, ref.q; atol = 1e-5)
+            @test isapprox(s.Ts, ref.Ts; atol = 1e-3)
+            @test isapprox(s.Ta, ref.Ta; atol = 1e-3)
+            @test isapprox(s.q, ref.q; atol = 1e-6)
+        end
+
+        # One spin-up year, then the control: exercises qflux_correction!.
+        # Reuses `fields`, which greb_model! restores after the run above.
+        flux_result = quiet() do
+            greb_model!(RunSpec(flux = 1, ctrl = 1, scnr = 0), cfg; jld2_dir = DATA_DIR, fields = fields)
+        end
+        flux_ref = [
+            (Ts = 277.28638, Ta = 279.7823, q = 0.0063898247),
+            (Ts = 276.35574, Ta = 278.86285, q = 0.0064106397),
+            (Ts = 275.92465, Ta = 278.2391, q = 0.006436156),
+            (Ts = 276.80832, Ta = 278.9109, q = 0.0065385858),
+            (Ts = 278.5104, Ta = 280.59595, q = 0.006805867),
+            (Ts = 279.90192, Ta = 282.09723, q = 0.0072038374),
+            (Ts = 280.28174, Ta = 282.58386, q = 0.007454401),
+            (Ts = 279.82877, Ta = 282.20816, q = 0.007350458),
+            (Ts = 278.68015, Ta = 281.04367, q = 0.0068896553),
+            (Ts = 277.73822, Ta = 280.0452, q = 0.0064565144),
+            (Ts = 277.4416, Ta = 279.80316, q = 0.006277522),
+            (Ts = 277.36218, Ta = 279.8118, q = 0.0062873242),
+        ]
+        @test length(flux_result.ctrl) == length(flux_ref)
+        for (rec, ref) in zip(flux_result.ctrl, flux_ref)
+            s = summarize(rec)
+            @test isapprox(s.Ts, ref.Ts; atol = 1e-3)
+            @test isapprox(s.Ta, ref.Ta; atol = 1e-3)
+            @test isapprox(s.q, ref.q; atol = 1e-6)
         end
     end
 end

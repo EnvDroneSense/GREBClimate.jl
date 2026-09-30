@@ -5,170 +5,56 @@ description: Run GREBClimate.jl's timing/allocation benchmarks (benchmark/run_be
 
 # GREB benchmark
 
-`benchmark/run_benchmarks.jl` is a dependency-free harness with four modes,
-all against the real dataset, post-JIT-warmup:
+`benchmark/run_benchmarks.jl` is a dependency-free harness with five modes, all on the real dataset after JIT warm-up. Benchmarks are not a correctness signal; the test suite is.
 
-| Mode | What it does |
-|---|---|
-| `year` (default) | Wall-clock time for a real 1-simulated-year `:full_model` control run. |
-| `stages` | Per-timestep breakdown: times each of `tendencies!`'s stages (`circulation!` for `Ta`/`q`, `SWradiation!`, `LWradiation!`, `hydro!`, `deep_ocean!`) individually and reports each one's share of the total. |
-| `threads` | Runs `year` in separate `-t N` subprocesses (thread count is fixed at Julia startup) and reports relative speedup vs. `-t 1`. |
-| `alloc` | Reports bytes allocated by one `tendencies!` call - a regression guard for the zero-allocation hot path. Budget is **256 bytes** (`benchmark/run_benchmarks.jl:205`, enforced in `test/test_invariants.jl:58`). |
-| `years` | Wall-clock time for a `--ctrl=N`-year control run followed by a `--scnr=N`-year scenario run (default 10/10). For long-run cost/stability, not just one year. `--experiment=NAME` picks the config (default `full_model`, which holds CO2 flat through the scenario phase regardless of `scnr` - use `a1b_scenario` or another CO2-trajectory experiment to see a forced multi-year trend, not just cost). |
+| Mode | Answers | Command |
+|---|---|---|
+| `year` (default) | How fast is a 1-year `:full_model` control run; before vs after a change | `julia --project=. -t 2 benchmark/run_benchmarks.jl year` |
+| `stages` | Where the time goes: each `tendencies!` stage and its share | `julia --project=. -t 1 benchmark/run_benchmarks.jl stages` |
+| `threads` | Speedup of `-t 1..4`, each in its own subprocess | `julia --project=. -t 1 benchmark/run_benchmarks.jl threads` |
+| `alloc` | Bytes allocated by one `tendencies!` call; budget 256 bytes (`TENDENCIES_ALLOC_BUDGET`, same value in `test/test_invariants.jl`) | `julia --project=. -t 1 benchmark/run_benchmarks.jl alloc` |
+| `years` | Cost and stability over many years: `--ctrl=N --scnr=N [--experiment=NAME]` (default 10/10, `full_model`, which holds CO2 flat; use `a1b_scenario` for a trend) | `julia --project=. -t 2 benchmark/run_benchmarks.jl years --ctrl=10 --scnr=100` |
 
-The model runs natively in `Float32` throughout (climatology, workspace
-buffers, model state - see the ClimaModel vault, `03-findings/performance.md` §2.3).
-**The baseline band on this machine depends on background load - there are
-now two recorded regimes, not one:**
+The data directory is the next positional argument (default `../greb_input_data`, or `GREB_DATA`); `[jld2_dir] [reps]` are positional in every mode. The legacy form `run_benchmarks.jl <dir>` runs `year`.
+
+## Reference numbers (this machine)
 
 | Regime | `year` at `-t 2` | Recorded |
 |---|---|---|
-| Normal background load | **~0.6-0.75s/simulated year** | 2026-08-21, 0.63s mean (0.56-0.71s across 3 reps) |
-| Background processes deliberately closed | **~0.27-0.43s/simulated year** | 2026-09-22, 0.31s mean (0.256-0.434s across 9 runs) |
+| Normal background load | ~0.6-0.75 s per simulated year | 2026-08-21, mean 0.63 s |
+| Background processes closed | ~0.27-0.43 s per simulated year | 2026-09-22, mean 0.31 s |
 
-Check which regime the machine is actually in (`tasklist` for what's
-running) before judging a reading against either band - a ~0.6s reading is
-normal under load and a false "regression" if the machine was quiet for the
-2026-08-21 baseline's assumptions, and a ~0.3s reading is not a code
-speedup if load was simply lighter than usual. Pre-`Float32` (both
-regimes N/A, that baseline predates this split) the model ran ~1.1-1.2s/year.
+| Measure | Value (2026-09-22) |
+|---|---|
+| `circulation!` share of a timestep | 94.5% (Ta and q about half each) |
+| `-t 2` over `-t 1` | 1.13x mean (1.01-1.26x); still the best count |
+| `-t 3`, `-t 4` | 0.87-1.00x; never help on this grid |
+| Allocations per `tendencies!` | 0 bytes |
 
-**Default to `-t 2`, not `-t 3`.** This reverses older guidance in this
-repo (and in git history of this file) - `-t 3` used to be the recommended
-count. `Float32` shifted the per-timestep cost balance enough that the
-third thread `-t 3` adds no longer has reliable work to do (see the
-"Threading recommendation" note below) - `-t 2` is now the consistent,
-low-variance choice.
+Check which regime the machine is in (`tasklist`) before judging a `year` reading: 0.6 s is normal under load, and 0.3 s is not a speedup if the load was simply lighter.
 
 ## Steps
 
-1. Pick the mode that answers the actual question:
-   - Plain "how fast is the model" / comparing before-vs-after a change →
-     `year` (the default).
-   - "Where does the time actually go" / did a kernel-specific change move
-     the needle → `stages`.
-   - "Is the 3-way threading split still working" → `threads` (this spawns
-     its own subprocesses at each thread count, so run it with any `-t`;
-     the outer process's thread count doesn't matter for this mode).
-   - "Did this change add allocations to the hot path" → `alloc`.
-   - "How does this behave/cost over many simulated years, not just one" →
-     `years`.
+1. Pick the mode that answers the question (table above). Default to `-t 2`.
+2. Before trusting a slow or surprising `year`/`threads` reading, rule out noise:
 
-   ```bash
-   julia --project=. -t 2 benchmark/run_benchmarks.jl year
-   julia --project=. -t 1 benchmark/run_benchmarks.jl stages
-   julia --project=. -t 1 benchmark/run_benchmarks.jl threads
-   julia --project=. -t 1 benchmark/run_benchmarks.jl alloc
-   julia --project=. -t 2 benchmark/run_benchmarks.jl years --ctrl=10 --scnr=100
-   ```
+   | Cause | Check |
+   |---|---|
+   | Stale precompile cache | `julia --project -e 'using Pkg; Pkg.precompile()'`; if it recompiles `GREBClimate`, re-run |
+   | Post-reboot background load | `tasklist \| grep -i searchindexer`; wait 1-2 minutes |
+   | Normal wall-clock swing | 50-150 ms across repeated `year` runs; average several runs or sweeps |
 
-   Pass a JLD2 data directory as the next positional argument if it isn't
-   at the default `../greb_input_data` location, or set `GREB_DATA`. The
-   legacy single-argument call form (`... run_benchmarks.jl <dir>`, no mode)
-   still works and defaults to `year`.
+   `stages` and `alloc` are far less noise-prone; a single reading there is more trustworthy.
+3. For thread counts use `threads`, and run it several times: the threaded paths carry most of the variance (`-t 1` is stable). Compare relative speedups, not absolute times.
+4. Report mean/min/max (`year`, `threads`), the per-stage table (`stages`) or the byte count (`alloc`). Say plainly when noise makes a reading untrustworthy.
 
-   `years`' `--ctrl=N`/`--scnr=N`/`--experiment=NAME` flags can appear
-   anywhere in the arguments, but the positional `[jld2_dir] [reps]` slots
-   still follow the same convention as every other mode - reps cannot be
-   given without a dir either, flags or not.
+## Other checks
 
-2. **Before trusting a slow or surprising `year`/`threads` reading**, rule
-   out known sources of noise on this machine - don't report a single
-   reading as fact:
-   - **Stale precompile cache**: if source files changed since the last
-     `using GREB`, the first run in a fresh process pays a one-time recompile.
-     Check with `julia --project -e 'using Pkg; Pkg.precompile()'` - if it
-     recompiles `GREB` (not just prints the manifest-resolution warning),
-     re-run the benchmark afterward.
-   - **Post-restart background load**: right after a reboot, indexing and
-     other Windows background services (e.g. `SearchIndexer.exe`) can contend
-     for disk/CPU for a couple of minutes. Check with
-     `tasklist | grep -i searchindexer` and, if present and the machine was
-     recently restarted, wait ~1-2 min and re-run.
-   - General wall-clock noise on this shared/dev machine is real even without
-     either cause above - a ~50-150ms swing across repeated `year` runs is
-     normal at the current ~0.7s baseline (proportionally similar to the
-     ~300-600ms swing seen at the older ~1.1-1.2s baseline).
-   - `stages`/`alloc` are much less noise-prone (µs/byte-scale, no dataset
-     I/O in the timed region) - trust a single reading there more readily
-     than a single `year`/`threads` reading.
+| Check | When |
+|---|---|
+| `InteractiveUtils.code_native`, grep for `gather` and `cvtss2sd`/`cvtsd2ss` | A change touches a `@turbo` loop; a width mismatch or stray `Float64` can hide behind a wall-clock number |
+| Isolated `@benchmark` of one function (BenchmarkTools in a scratch environment) with realistic input | A change scoped to one kernel; confirm the magnitude afterwards with `year`/`stages` |
+| `test/test_threading.jl` "threaded circulation matches serial" | After touching the parallel branch of `tendencies!` or either `circulation!` call; `Pkg.test()` alone is single-threaded |
+| `test/test_golden.jl` or a diff against a saved run | With every timing change; a faster wrong answer is not a win |
 
-3. If comparing thread counts, prefer `threads` over running `year` manually
-   at each count - it does exactly that, back-to-back, and prints the
-   speedup table directly. **Threading recommendation (re-reviewed
-   2026-08-13, post-`Float32` — see the ClimaModel vault, `03-findings/performance.md` §2.11): `-t 2`
-   is the reliable default.** Circulation was ~98% of per-timestep cost pre-ghost-cell;
-   after `865ae01`'s periodic ghost cells it is ~93% and has not been re-measured since
-   (`Float32` sped up the other stages proportionally more than
-   circulation), so the third lane `-t 3` used to justify is nearly free -
-   `-t 2` already captures almost all the real parallelism via work-stealing
-   once the tiny synchronous "rest" finishes. Measured across 5 independent
-   `threads` sweeps (2026-08-13): `-t 2` gave ~1.5× (range 1.24-1.62×, *low*
-   variance - always a clear win); `-t 3`/`-t 4` ranged anywhere from ~1.0×
-   (barely better than serial) to ~1.65× (occasionally best) - *high*
-   variance, no longer a dependable edge over `-t 2`.
-
-   **Re-measured 2026-08-21 (3 sweeps): `-t 2` averaged 1.31× (range
-   1.14-1.54×) - the conclusion holds, but the older "consistent ~1.5×, low
-   variance" figure is optimistic.** `-t 3` averaged 1.21× (1.08-1.31×) and
-   `-t 4` 1.22× (1.02-1.47×), so `-t 2` remains both the fastest and the
-   least erratic choice. `-t 1` was rock-stable across all three sweeps
-   (1.003/1.018/1.024s), which puts the variance squarely in the threaded
-   paths rather than in general machine noise - expect a wide spread at
-   `-t 2`+ and average several sweeps before calling anything a regression. Don't take one
-   `threads` run as settling a `-t 2` vs `-t 3` question either way -
-   `-t 3`/`-t 4` are the ones sensitive enough to background load
-   (SearchIndexer and similar, see below) to flip either direction; run it a
-   few times before concluding a real regression or improvement at those
-   counts specifically. `-t 4`+ has no reliable reason to help further on
-   this grid size regardless. Compare *relative* speedup, not just absolute
-   numbers - absolute baselines drift with machine load, but the relative
-   improvement from a real code change should hold up.
-
-   **Re-measured 2026-09-22 on a deliberately quiet machine: the `-t 2`
-   win itself shrinks, not just the absolute baseline.** Three sweeps gave
-   `-t 2` a mean of 1.13× (range 1.01-1.26×) - narrower than 08-21's
-   1.14-1.54× and, in the worst sweep, within noise of no benefit at all.
-   `-t 3`/`-t 4` were flat-to-negative in every sweep (0.87-1.00×), so `-t 2`
-   remains the best of the four counts and the recommendation is unchanged,
-   but do not expect the older ~1.3-1.5× figures on a quiet machine -
-   see `03-findings/performance.md`'s 2026-09-22 section for the working
-   hypothesis (smaller serial baseline -> thread-spawn overhead is a bigger
-   fraction of a smaller budget) and full numbers.
-
-4. Report mean/min/max (for `year`/`threads`) or the per-stage table (for
-   `stages`) or the byte count (for `alloc`), and call out plainly if noise
-   (any of the causes above, or high run-to-run variance) makes a reading
-   untrustworthy rather than presenting it as a clean result.
-
-## Other ways to check performance (not scripted, use when they fit better)
-
-- **`@code_native`/gather-instruction count**: when a change touches a
-  `@turbo` loop with neighbor-index lookups (`circulation.jl`'s
-  `diffusion!`/`advection!`), a wall-clock number alone can hide a width
-  mismatch (e.g. `Float32` data gathered through `Int64` indices - see
-  the ClimaModel vault, `03-findings/performance.md` §2.3's `lon_jm1`/etc. `Int32` fix). Check with
-  `InteractiveUtils.code_native` and grep the output for `"gather"` and for
-  `cvtss2sd`/`cvtsd2ss`-style conversions - a rising gather count or any
-  conversion instruction in a loop that shouldn't have one is a real signal
-  wall-clock timing alone can miss or mis-attribute to noise.
-- **Isolated kernel microbenchmarks**: for a change scoped to one function
-  (not the whole pipeline), a standalone `@benchmark` (BenchmarkTools, not
-  a dependency of this package but fine to add temporarily to a scratch
-  script) on just that function - with realistic, not synthetic-zero, input
-  data - gives a cleaner signal than `year`'s whole-model number, which
-  mixes in dataset loading and every other stage's noise. This is how every
-  number in the ClimaModel vault, `03-findings/performance.md` §2.3/§2.15 was actually produced before
-  being confirmed against the real `year`/`stages` numbers here.
-- **Threaded-vs-serial equivalence** is covered by a test, not just by
-  benchmarking: `test/test_threading.jl`'s "threaded circulation matches serial"
-  testset spawns `-t 1` and `-t 2` subprocesses and asserts bit-identical
-  monthly means. Run the light shard after touching `tendencies!`'s
-  parallel branch or either `circulation!` call. Note `Pkg.test()` alone is
-  single-threaded, so that subprocess pair is the only thing exercising the
-  `Threads.@spawn` path locally; CI sets `JULIA_NUM_THREADS=2` as well.
-- **Numeric regression alongside any timing change**: a faster wrong answer
-  is not a win. Pair any timing comparison with a correctness check -
-  `test/test_golden.jl`'s golden-regression test, or a direct diff against a
-  saved reference run - especially for anything touching numerical
-  precision (`Float32` conversions, reassociated arithmetic).
+For measurements beyond this harness: compile old and new into one process, alternate them in shuffled order, take the minimum of N trials, and time a second copy of the baseline as a self-check (it must land at about 1.00x).

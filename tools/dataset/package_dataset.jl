@@ -4,7 +4,7 @@
 # MAINTAINER TOOL. Produces the `.tar.gz` that `src/data.jl`'s DataDep points
 # at, and prints the hash to paste into `DATA_SHA256`.
 #
-#   julia --project=. tools/package_dataset.jl [dataset_dir] [output_path]
+#   julia --project=. tools/dataset/package_dataset.jl [dataset_dir] [output_path]
 #   # defaults: dataset_dir = greb_input_data
 #   #           output_path = greb_input_data-v1.tar.gz (in the current dir)
 #
@@ -17,7 +17,7 @@
 
 using SHA
 
-const REPO = normpath(joinpath(@__DIR__, ".."))
+const REPO = normpath(joinpath(@__DIR__, "..", ".."))
 
 """
 Fixed timestamp stamped on every archive entry, so the archive depends only on
@@ -35,7 +35,7 @@ function validate_dataset(dir::AbstractString)
     isdir(dir) || error("dataset directory not found: $dir")
 
     # MODEL_FIELD_NAMES lives in the converter; read it rather than duplicating.
-    conv = read(joinpath(REPO, "tools", "convert_greb_to_jld2.jl"), String)
+    conv = read(joinpath(REPO, "tools", "dataset", "convert_greb_to_jld2.jl"), String)
     m = match(r"const MODEL_FIELD_NAMES = Set\{String\}\(\[(.*?)\n\]\)"s, conv)
     m === nothing && error("could not parse MODEL_FIELD_NAMES from the converter")
     body = m.captures[1]
@@ -88,8 +88,7 @@ function build_archive(dir::AbstractString, out::AbstractString)
     #   --owner/--group    no uid/gid from the building machine
     #   --mtime            pinned; tar stores each file's mtime, so without this
     #                      a regenerated dataset produces a different archive
-    #                      even when every file is byte-identical (this bit us
-    #                      on 2026-08-21: same content, 17-byte-different .gz)
+    #                      even when every file is byte-identical
     #   gzip -n            no timestamp or filename in the gzip header
     cmd = pipeline(`tar --sort=name --owner=0 --group=0 --numeric-owner
                         --mtime=$ARCHIVE_MTIME -cf - -C $dir .`,

@@ -144,6 +144,21 @@ function _apply_boundary_anomalies!(cfg::PhysicsConfig, fields::ClimateFields)
     return fields
 end
 
+# Arrays of `fields` a run overwrites in place, restored by `greb_model!`: the
+# solar table (orbital swaps), the flux corrections (spin-up, file load or
+# zeroing), the boundary climatologies (scenario anomalies) and the
+# climatologies the deconstruction and sensitivity switches overwrite in
+# `init_model!`. Everything else `init_model!` writes is derived from these.
+function _mutated_fields(cfg::PhysicsConfig)
+    names = [:sw_solar, :TF_correct, :qF_correct, :ToF_correct]
+    cfg.experiment in (:rcp85, :elnino, :lanina) && append!(names, _BOUNDARY_FIELDS)
+    cfg.log_topo_drsp || push!(names, :z_topo)
+    (cfg.log_clouds_dmc && cfg.log_clouds_drsp) || push!(names, :cldclim)
+    (cfg.log_hydro_dmc && cfg.log_humid_drsp) || push!(names, :qclim)
+    cfg.log_ocean_drsp || push!(names, :mldclim)
+    return names
+end
+
 """
     apply_dynamic_co2_mask!(cfg::PhysicsConfig, fields::ClimateFields, icmn_ctrl)
 
@@ -286,12 +301,10 @@ Run a GREB flux-correction spin-up (`run.flux` years), control run
 (`run.ctrl` years), and scenario run (`run.scnr` years) for `cfg`.
 
 `fields` holds the loaded climatology/grid/flux-correction state (see
-[`ClimateFields`](@ref), built by [`load_greb_jld2!`](@ref)). The run mutates
-`fields`: `co2_part`, `sw_solar` and the boundary anomalies of `:rcp85`,
-`:elnino` and `:lanina` are restored afterwards, but the deconstruction and
-sensitivity switches (e.g. `log_clouds_drsp`, `log_topo_drsp`) overwrite
-climatologies for good. To run several experiments from one load, pass
-`deepcopy(fields)` to each run.
+[`ClimateFields`](@ref), built by [`load_greb_jld2!`](@ref)). The run changes
+`fields` while it runs (flux corrections, scenario anomalies, the
+climatologies the deconstruction and sensitivity switches replace) and restores
+them when it returns, so one loaded `fields` can be passed to several runs.
 """
 function greb_model!(run::RunSpec, cfg::PhysicsConfig;
     jld2_dir::AbstractString="", fields::ClimateFields=ClimateFields(),
@@ -309,12 +322,10 @@ function greb_model!(run::RunSpec, cfg::PhysicsConfig;
               """)
     end
     time_flux, time_ctrl, time_scnr = run.flux, run.ctrl, run.scnr
-    sw_solar_backup = copy(fields.sw_solar)
     is_forced_boundary = cfg.experiment in (:rcp85, :elnino, :lanina)
-    # The scenario adds anomalies to these in place; restore them so a reused
-    # `fields` does not carry them into the next run
-    boundary_backup = is_forced_boundary ?
-        map(name -> copy(getfield(fields, name)), _BOUNDARY_FIELDS) : nothing
+    # The run overwrites these in place; restore them so a reused `fields`
+    # does not carry one run's changes into the next
+    saved = [name => copy(getfield(fields, name)) for name in _mutated_fields(cfg)]
     try
 
     state = ModelState()
@@ -477,11 +488,8 @@ function greb_model!(run::RunSpec, cfg::PhysicsConfig;
     return (ctrl=ctrl_output, scnr=scnr_output)
 
     finally
-        fields.sw_solar .= sw_solar_backup
-        if boundary_backup !== nothing
-            for (name, saved) in zip(_BOUNDARY_FIELDS, boundary_backup)
-                getfield(fields, name) .= saved
-            end
+        for (name, a) in saved
+            getfield(fields, name) .= a
         end
     end
 end

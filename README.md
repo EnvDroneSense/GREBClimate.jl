@@ -1,5 +1,7 @@
 # GREB Climate Model - Julia Implementation
 
+<img src="docs/src/assets/logo-wordmark.svg" width="400" alt="GREBClimate.jl logo">
+
 [![CI](https://github.com/EnvDroneSense/GREBClimate.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/EnvDroneSense/GREBClimate.jl/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/github/EnvDroneSense/GREBClimate.jl/graph/badge.svg?token=CKFBW810SH)](https://codecov.io/github/EnvDroneSense/GREBClimate.jl)
 [![docs dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://EnvDroneSense.github.io/GREBClimate.jl/dev/)
