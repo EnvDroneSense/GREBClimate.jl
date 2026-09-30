@@ -5,6 +5,11 @@ Notable changes to GREBClimate.jl, following
 
 ## [Unreleased]
 
+### Added
+
+- Project logo and favicon (`docs/src/assets/`), shown in the README and the
+  documentation site.
+
 ### Changed
 
 - The model's backbone (constants, config, state, tendencies, output,
