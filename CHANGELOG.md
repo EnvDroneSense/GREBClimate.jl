@@ -5,6 +5,8 @@ Notable changes to GREBClimate.jl, following
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-09-30
+
 ### Added
 
 - Project logo and favicon (`docs/src/assets/`), shown in the README and the
