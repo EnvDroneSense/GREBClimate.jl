@@ -8,7 +8,7 @@ from the repository root with `julia --project=. tools/<folder>/<script>.jl`.
 | `dataset/` | Build and publish the model's input dataset | `fetch_era5_data.py` | Fetches an ERA5 climatology and writes GREB `.bin` files |
 | | | `convert_greb_to_jld2.jl` | Converts GREB `.bin` files into `greb_input_data/` |
 | | | `package_dataset.jl` | Builds the dataset archive and its SHA256 for the DataDep |
-| `validation/` | Check the model against a reference | `bit_identity.jl` | Saves every record field of fixed runs, then compares a later build with exact equality; for refactors that must not change results |
+| `validation/` | Check the model against a reference | `bit_identity.jl`, `preset_reference.jl` | `bit_identity.jl` saves every record field of every experiment preset, then compares a later build with exact equality; for refactors that must not change results. `preset_reference.jl` writes `test/data/preset_reference.jl`, what each preset imposes, which `test/test_presets.jl` checks |
 
 Where a new script goes:
 

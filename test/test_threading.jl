@@ -45,3 +45,33 @@
 
     @test isequal(threaded.digest, serial.digest)
 end
+
+@testset "threaded run matches serial on the real dataset (subprocess -t 1 vs -t 2)" begin
+    # The synthetic run above goes non-finite after about two months, so it
+    # compares little real physics. This one runs a flux-correction spin-up
+    # and a control year on the dataset and compares every record field.
+    if !isdir(DATA_DIR)
+        @test_skip "greb_input_data/ not present"
+    else
+        script = """
+            using GREBClimate
+            result = redirect_stdout(devnull) do
+                fields = load_greb_jld2!(raw"$(DATA_DIR)"; dataset = :ncep)
+                greb_model!(RunSpec(flux = 1, ctrl = 1, scnr = 0), create_experiment_config(:full_model);
+                            jld2_dir = raw"$(DATA_DIR)", fields = fields)
+            end
+            finite = all(r -> all(isfinite, r.Ts) && all(isfinite, r.Ta), result.ctrl)
+            print(Threads.nthreads(), " ", finite, " ",
+                  hash([getfield(r, v) for r in result.ctrl for v in fieldnames(MonthlyRecord)]))
+        """
+        exe = first(Base.julia_cmd())
+        project = normpath(joinpath(@__DIR__, ".."))
+        run_at(n) = split(strip(read(`$exe --startup-file=no --project=$project -t $n -e $script`, String)))
+
+        serial = run_at(1)
+        threaded = run_at(2)
+        @test serial[1:2] == ["1", "true"]
+        @test threaded[1:2] == ["2", "true"]
+        @test threaded[3] == serial[3]
+    end
+end

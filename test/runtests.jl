@@ -14,6 +14,7 @@ include("testutils.jl")
 # the heavy one.
 const SHARD = [
     ("test_config.jl",     "light"),
+    ("test_presets.jl",    "light"),
     ("test_state.jl",      "light"),
     ("test_output.jl",     "light"),
     ("test_physics.jl",    "light"),

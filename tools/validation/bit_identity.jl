@@ -2,10 +2,11 @@
 #
 # MAINTAINER TOOL - not part of the package. Needs the local dataset.
 #
-# Runs a few fixed configurations and saves every monthly record field of the
-# control and scenario runs; after a change, runs them again and compares with
-# exact equality. A refactor that claims "no change to results" must report 0
-# differing values here.
+# Runs every experiment preset, plus one case with switches off, and saves every
+# monthly record field of the control and scenario runs; after a change, runs
+# them again and compares with exact equality (NaN equals NaN). A refactor that
+# claims "no change to results" must report 0 differing values here. A snapshot
+# is about 250 MB and a run takes a few minutes.
 #
 # Snapshots are only comparable on the same machine and Julia version:
 # `@turbo` code differs between CPUs (AVX2, AVX-512) and Julia releases. Take
@@ -33,17 +34,31 @@ function _decon_cfg()
     return cfg
 end
 
-# name => config constructor
-const CASES = (
-    "full_model" => () -> create_experiment_config(:full_model),
-    "decon_crcl_hydro_off" => _decon_cfg,
-    "elnino" => () -> create_experiment_config(:elnino),
-)
+# A fixed two-year CO2 path for the :custom_co2 preset
+function _custom_co2_file()
+    path = joinpath(mktempdir(), "custom_co2.txt")
+    write(path, "1950 400\n1951 420\n")
+    return path
+end
+
+# name => config constructor: every preset, then the switch case
+function _cases()
+    presets = sort!(collect(keys(GREBClimate._EXPERIMENT_OVERRIDES)))
+    append!(presets, (:decon_mean_climate, :decon_2xco2))
+    cases = Pair{String,Function}[]
+    for p in presets
+        mk = p === :custom_co2 ? () -> create_experiment_config(p; co2_path=_custom_co2_file()) :
+                                 () -> create_experiment_config(p)
+        push!(cases, string(p) => mk)
+    end
+    push!(cases, "decon_crcl_hydro_off" => _decon_cfg)
+    return cases
+end
 
 function run_cases()
     fields = load_greb_jld2!(DATA_DIR; dataset=:ncep)
     snap = Dict{String,Array{Float32,3}}()
-    for (name, mkcfg) in CASES
+    for (name, mkcfg) in _cases()
         result = redirect_stdout(devnull) do
             greb_model!(RUN, mkcfg(); jld2_dir=DATA_DIR, fields=deepcopy(fields))
         end
