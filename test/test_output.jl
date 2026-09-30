@@ -127,7 +127,7 @@ end
     @test all(==(2.0), output_buf[1].precip)
 end
 
-@testset "time_loop! integrates one timestep and clamps at min_T_K" begin
+function _time_loop_fields()
     fields = ClimateFields()
     fields.z_topo .= -1.0
     fields.mldclim .= 50.0
@@ -141,6 +141,11 @@ end
     fields.omegaclim .= 0.001
     fields.omegastdclim .= 0.01
     fields.wsclim .= 4.0
+    return fields
+end
+
+@testset "time_loop! integrates one timestep and clamps at min_T_K" begin
+    fields = _time_loop_fields()
     cfg = create_experiment_config(:full_model)
     ini = init_model!(cfg, fields)
 
@@ -166,4 +171,23 @@ end
     @test all(>=(GREBClimate.min_T_K), Ta)
     @test mon == 1
     @test irec == 0
+end
+
+@testset "time_loop!'s min_T_K floor leaves NaN as NaN" begin
+    # A max-based floor inside @turbo turns NaN into min_T_K, which hides a
+    # failed run behind a plausible-looking cold planet.
+    fields = _time_loop_fields()
+    cfg = create_experiment_config(:full_model)
+    ini = init_model!(cfg, fields)
+    Ts = copy(ini.Ts_ini)
+    Ta = copy(ini.Ta_ini)
+    Ts[5, 5] = NaN32
+    Ta[40, 30] = NaN32
+
+    time_loop!(1, 1970, ini.CO2_ctrl, 1, 0, Ts, Ta, copy(ini.q_ini), copy(ini.To_ini),
+        MonthlyRecord[], fields, ModelState(), CirculationWorkspace(), MonthlyAccumulator(),
+        TimeState(1, 1), cfg)
+
+    @test isnan(Ts[5, 5])
+    @test isnan(Ta[40, 30])
 end

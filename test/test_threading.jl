@@ -43,5 +43,5 @@
     @test length(serial.digest) == 36
     @test length(threaded.digest) == length(serial.digest)
 
-    @test threaded.digest == serial.digest
+    @test isequal(threaded.digest, serial.digest)
 end

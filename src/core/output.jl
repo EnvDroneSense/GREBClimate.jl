@@ -133,8 +133,8 @@ function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
             Ta[i, j] = Ta[i, j] + dTa_crcl[i, j] + Δt * (LW_up[i, j] + LW_down[i, j] -
                 em[i, j] * LW_surf[i, j] + Q_lat_air[i, j] - Q_sens[i, j]) / cap_air
 
-            Ts[i, j] = max(Ts[i, j], min_T_K)
-            Ta[i, j] = max(Ta[i, j], min_T_K)
+            Ts[i, j] = ifelse(Ts[i, j] < min_T_K, min_T_K, Ts[i, j])
+            Ta[i, j] = ifelse(Ta[i, j] < min_T_K, min_T_K, Ta[i, j])
 
             To[i, j] = To[i, j] + dTo[i, j] + ToF_corr[i, j]
 

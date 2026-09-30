@@ -317,17 +317,28 @@ end
     end
     @test length(result_drsp.scnr) == 12
 
+    # greb_model! builds the mask from the control run's own ice cover. The
+    # data-free control is not physical, so compare against the mask that ice
+    # cover gives rather than against a fixed pattern.
     run_mask(sym) = begin
         f = ClimateFields()
         f.z_topo[1:(X - 48), :] .= 100.0f0   # left half land, right half ocean
-        quiet() do
-            greb_model!(RunSpec(ctrl = 1, scnr = 0), PhysicsConfig(experiment = sym);
+        cfg = PhysicsConfig(experiment = sym)
+        result = quiet() do
+            greb_model!(RunSpec(ctrl = 1, scnr = 0), cfg;
                         jld2_dir = "", fields = f, allow_uninitialized = true)
         end
-        f.co2_part
+        expected = ClimateFields()
+        expected.z_topo .= f.z_topo
+        GREBClimate.apply_dynamic_co2_mask!(cfg, expected, compute_annual_ice_climatology(result.ctrl))
+        (got = copy(f.co2_part), expected = expected.co2_part)
     end
-    @test all(==(0.5f0), run_mask(:regional_co2_ocean))
-    @test all(isone, run_mask(:regional_co2_land_ice))
+    ocean = run_mask(:regional_co2_ocean)
+    @test ocean.got == ocean.expected
+    @test all(==(0.5f0), ocean.got[1:(X - 48), :])   # land halved whatever the ice
+    land_ice = run_mask(:regional_co2_land_ice)
+    @test land_ice.got == land_ice.expected
+    @test all(isone, land_ice.got[1:(X - 48), :])    # land kept whatever the ice
 end
 
 @testset "CMIP5/ERA-Interim anomaly forcing is actually loaded (was previously a silent no-op)" begin

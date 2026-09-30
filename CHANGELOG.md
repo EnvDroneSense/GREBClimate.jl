@@ -5,6 +5,12 @@ Notable changes to GREBClimate.jl, following
 
 ## [Unreleased]
 
+### Changes to model results
+
+- A failed run no longer looks like a frozen planet: the 40 K floor on `Ts`
+  and `Ta` turned non-finite values into exactly 40 K. They now stay NaN.
+  Results of runs that stay finite are unchanged.
+
 ## [1.0.2] - 2026-09-30
 
 ### Added
