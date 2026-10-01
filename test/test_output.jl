@@ -191,3 +191,26 @@ end
     @test isnan(Ts[5, 5])
     @test isnan(Ta[40, 30])
 end
+
+@testset "time_loop! integrates the shared surface and atmosphere flux sums" begin
+    # One step of the run changes Ts and Ta by exactly these sums (plus the
+    # stored correction), so a term added to the sums reaches the run.
+    fields = _time_loop_fields()
+    r = resolve(preset(:full_model))
+    ini = quiet(() -> init_model!(r, fields))
+    fields.TF_correct .= 0.25f0
+    Ts, Ta, q, To = copy(ini.Ts_ini), copy(ini.Ta_ini), copy(ini.q_ini), copy(ini.To_ini)
+    tend = tendencies!(ini.CO2_ctrl, Ts, Ta, To, q, fields, ModelState(), CirculationWorkspace(), TimeState(1, 1), r)
+    Δt, cap_air, cap = GREBClimate.Δt, GREBClimate.cap_air, copy(fields.cap_surf)
+    dTs = [tend.dT_ocean[i, j] + Δt * (GREBClimate.surface_flux(tend, i, j) + 0.25f0) / cap[i, j]
+           for i in 1:X, j in 1:Y]
+    dTa = [tend.dTa_crcl[i, j] + Δt * GREBClimate.atmosphere_flux(tend, i, j) / cap_air for i in 1:X, j in 1:Y]
+    Ts0, Ta0 = copy(Ts), copy(Ta)
+    quiet() do
+        time_loop!(1, 1970, ini.CO2_ctrl, 1, 0, Ts, Ta, q, To, MonthlyRecord[], fields, ModelState(),
+                   CirculationWorkspace(), MonthlyAccumulator(), TimeState(1, 1), r)
+    end
+    # 1e-4 K is a few ulp of Ts; 1 W/m2 more or less over the ocean moves Ts by 2e-4 K
+    @test maximum(abs, (Ts .- Ts0) .- dTs) < 1e-4
+    @test maximum(abs, (Ta .- Ta0) .- dTa) < 1e-4
+end

@@ -128,10 +128,8 @@ function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
     # Surface/air temperature, deep ocean, and humidity update
     @turbo for j in 1:ydim
         for i in 1:xdim
-            Ts[i, j] = Ts[i, j] + dT_ocean[i, j] + Δt * (SW[i, j] + LW_surf[i, j] - LW_down[i, j] +
-                Q_lat[i, j] + Q_sens[i, j] + TF_corr[i, j]) / cap_surf[i, j]
-            Ta[i, j] = Ta[i, j] + dTa_crcl[i, j] + Δt * (LW_up[i, j] + LW_down[i, j] -
-                em[i, j] * LW_surf[i, j] + Q_lat_air[i, j] - Q_sens[i, j]) / cap_air
+            Ts[i, j] = Ts[i, j] + dT_ocean[i, j] + Δt * (@surface_flux(i, j) + TF_corr[i, j]) / cap_surf[i, j]
+            Ta[i, j] = Ta[i, j] + dTa_crcl[i, j] + Δt * @atmosphere_flux(i, j) / cap_air
 
             Ts[i, j] = ifelse(Ts[i, j] < min_T_K, min_T_K, Ts[i, j])
             Ta[i, j] = ifelse(Ta[i, j] < min_T_K, min_T_K, Ta[i, j])

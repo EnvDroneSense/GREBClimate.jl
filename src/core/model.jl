@@ -159,16 +159,13 @@ function qflux_correction!(CO2_ctrl, Ts, Ta, q, To, fields::ClimateFields, state
 
         @turbo for j in 1:ydim
             for i in 1:xdim
-                ts0 = Ts[i, j] + dT_ocean[i, j] + Δt * (SW[i, j] + LW_surf[i, j] - LW_down[i, j] +
-                    Q_lat[i, j] + Q_sens[i, j]) / cap_surf[i, j]
+                ts0 = Ts[i, j] + dT_ocean[i, j] + Δt * @surface_flux(i, j) / cap_surf[i, j]
                 tfc = (Tc[i, j] - ts0) * cap_surf[i, j] / Δt
                 ts0 = ts0 + tfc * Δt / cap_surf[i, j]
                 TFc[i, j] = tfc
                 Ts0_buf[i, j] = ts0
 
-                Ta0_buf[i, j] = Ta[i, j] + dTa_crcl[i, j] + ΔT_AIR_FACTOR * (
-                    LW_up[i, j] + LW_down[i, j] - em[i, j] * LW_surf[i, j] +
-                    Q_lat_air[i, j] - Q_sens[i, j])
+                Ta0_buf[i, j] = Ta[i, j] + dTa_crcl[i, j] + ΔT_AIR_FACTOR * @atmosphere_flux(i, j)
 
                 to0 = To[i, j] + dTo[i, j]
                 tofc = Toc[i, j] - to0

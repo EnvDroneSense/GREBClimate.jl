@@ -12,8 +12,8 @@ module GREBClimate
 #
 # Files below are included in dependency order: constants ->
 # config/{processes,scenario,presets} -> data -> state -> io -> config/resolve
-# -> physics/{radiation,hydrology,ocean,circulation} -> tendencies -> forcing
-# -> output -> postprocess -> model.
+# -> physics/{radiation,hydrology,ocean,circulation} -> tendencies -> budgets
+# -> forcing -> output -> postprocess -> model.
 # =============================================================================
 
 using LoopVectorization   # @turbo SIMD
@@ -53,6 +53,7 @@ include("physics/hydrology.jl")
 include("physics/ocean.jl")
 include("physics/circulation.jl")
 include("core/tendencies.jl")
+include("core/budgets.jl")
 include("forcing/forcing.jl")
 include("core/output.jl")
 include("core/postprocess.jl")
