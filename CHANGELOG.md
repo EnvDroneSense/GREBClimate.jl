@@ -5,6 +5,8 @@ Notable changes to GREBClimate.jl, following
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-01
+
 ### Added
 
 - A new configuration API: `Config` with a `Scenario` (CO2 path and mask,

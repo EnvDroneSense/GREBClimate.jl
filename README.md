@@ -60,6 +60,10 @@ cd GREBClimate.jl
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
 
+### Upgrading from 1.x
+
+Version 2.0 replaces `PhysicsConfig` and `create_experiment_config` with `preset(name)` and `Config`, moves the spin-up length from `RunSpec` into the config (`SpinUp(years)`), and renames some presets. A few experiments give different results. [CHANGELOG.md](CHANGELOG.md) lists every change.
+
 ### Launch the notebook (optional)
 
 ```bash
