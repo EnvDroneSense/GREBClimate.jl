@@ -219,11 +219,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
         ("year", String[])
     elseif ARGS[1] in _MODES
         (ARGS[1], ARGS[2:end])
-    elseif isdir(ARGS[1])
-        ("year", ARGS)          # legacy form: bare directory, no mode
     else
-        error("unknown mode $(repr(ARGS[1])); expected one of $(join(_MODES, ", ")) " *
-              "or a path to an existing dataset directory")
+        error("unknown mode $(repr(ARGS[1])); expected one of $(join(_MODES, ", "))")
     end
 
     # `--name=value` flags (only `years` uses them today) can appear anywhere
