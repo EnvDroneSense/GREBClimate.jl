@@ -21,7 +21,7 @@ climatologies.
 | `hydrology` | `:full`, `:no_evap_rain`, `:none` | No evaporation and rain; or no water cycle at all (humidity 0, not updated) |
 | `ocean` | `:full`, `:mixed_layer`, `:none` | A 50 m mixed layer without deep ocean; or land heat capacity everywhere |
 | `topography` | `:observed`, `:flat` | Topography capped at 1 m |
-| `control_co2` | `true`, `false` | Control CO₂ 0 ppm |
+| `co2` | `true`, `false` | CO₂ 0 ppm in the control and the scenario |
 | `ice_albedo` | `true`, `false` | No ice-albedo feedback |
 | `transport` | `true`, `false` | No atmospheric heat and moisture transport |
 | `heat_diffusion`, `heat_advection`, `vapour_diffusion`, `vapour_advection`, `moisture_convergence` | `true`, `false` | The single transport term switched off |
@@ -33,7 +33,7 @@ struct Processes
     hydrology::Symbol
     ocean::Symbol
     topography::Symbol
-    control_co2::Bool
+    co2::Bool
     ice_albedo::Bool
     transport::Bool
     heat_diffusion::Bool
@@ -44,7 +44,7 @@ struct Processes
 end
 
 function Processes(; atmosphere=true, clouds=:observed, humidity=:observed, hydrology=:full,
-    ocean=:full, topography=:observed, control_co2=true, ice_albedo=true, transport=true,
+    ocean=:full, topography=:observed, co2=true, ice_albedo=true, transport=true,
     heat_diffusion=true, heat_advection=true, vapour_diffusion=true, vapour_advection=true,
     moisture_convergence=true)
     return Processes(atmosphere,
@@ -53,7 +53,7 @@ function Processes(; atmosphere=true, clouds=:observed, humidity=:observed, hydr
         _check_option(:hydrology, hydrology, (:full, :no_evap_rain, :none)),
         _check_option(:ocean, ocean, (:full, :mixed_layer, :none)),
         _check_option(:topography, topography, (:observed, :flat)),
-        control_co2, ice_albedo, transport, heat_diffusion, heat_advection,
+        co2, ice_albedo, transport, heat_diffusion, heat_advection,
         vapour_diffusion, vapour_advection, moisture_convergence)
 end
 

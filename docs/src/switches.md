@@ -21,7 +21,7 @@ Two suffixes recur:
 | `log_crcl_dmc` | Bool | `true` | Mean climate | Disables circulation (advection+diffusion+convergence) when `false` |
 | `log_hydro_dmc` | Bool | `true` | Mean climate | Disables hydrology (evap/rain/latent heat) when `false` |
 | `log_atmos_dmc` | Bool | `true` | Mean climate | Master atmosphere switch - decouples atmosphere from surface when `false` |
-| `log_co2_dmc` | Bool | `true` | Mean climate | Forces control-run CO₂ to 0 ppm when `false` |
+| `log_co2_dmc` | Bool | `true` | Mean climate | Forces CO₂ to 0 ppm in the control and the scenario when `false` |
 | `log_ocean_dmc` | Bool | `true` | Mean climate | Master ocean-coupling switch - no mixed-layer/deep-ocean exchange when `false` |
 | `log_qflux_dmc` | Bool | `true` | Mean climate | Governs whether flux corrections are computed, loaded, or zeroed |
 | `log_clouds_drsp` | Bool | `true` | CO₂ response | Freezes cloud cover at a constant 0.7 when `false` |
@@ -54,7 +54,7 @@ Passed as keywords to `create_experiment_config(:decon_mean_climate; ...)`.
 | `log_crcl_dmc` | `true` | No transport: no advection, diffusion or convergence. |
 | `log_hydro_dmc` | `true` | Humidity climatology zeroed and `hydro!` (evaporation, rain, latent heat) disabled. |
 | `log_atmos_dmc` | `true` | Decouples the atmosphere: no sensible heat flux, fixed downward longwave, no transport or hydrology. |
-| `log_co2_dmc` | `true` | Control-run CO₂ set to 0 ppm. |
+| `log_co2_dmc` | `true` | CO₂ set to 0 ppm in the control and the scenario. |
 | `log_ocean_dmc` | `true` | No ocean heat storage: land heat capacity everywhere, no sea-ice blending, no deep-ocean exchange. |
 | `log_qflux_dmc` | `true` | Together with `log_topo_drsp`, decides whether flux corrections are computed in the spin-up, loaded from file, or zeroed. |
 

@@ -56,8 +56,7 @@ function init_model!(cfg::PhysicsConfig, fields::ClimateFields)
         fields.cldclim .= 0.0f0  # zero cloud climatology
     end
 
-    # Apply flux correction conditional zeroing (MSCM feature)
-    if !cfg.log_topo_drsp && !cfg.log_qflux_dmc
+    if _corrections_mode(cfg) === :none
         fields.TF_correct .= 0.0f0
         fields.qF_correct .= 0.0f0
         fields.ToF_correct .= 0.0f0
@@ -142,6 +141,14 @@ function _apply_boundary_anomalies!(cfg::PhysicsConfig, fields::ClimateFields)
         getfield(fields, name) .+= getfield(fields, Symbol(name, suffix))
     end
     return fields
+end
+
+# How the run obtains its flux corrections. Without an explicit choice, flat
+# topography reads the stored ones (or none without log_qflux_dmc) and observed
+# topography computes them.
+function _corrections_mode(cfg::PhysicsConfig)
+    cfg.flux_corrections === :auto || return cfg.flux_corrections
+    return !cfg.log_topo_drsp ? (cfg.log_qflux_dmc ? :stored : :none) : :spinup
 end
 
 # Arrays of `fields` a run overwrites in place, restored by `greb_model!`: the
@@ -363,10 +370,11 @@ function greb_model!(run::RunSpec, cfg::PhysicsConfig;
     timestate = TimeState(1, 1)
 
     # ── 2. Flux-correction spin-up ──────────────────────────────
-    if !cfg.log_topo_drsp && cfg.log_qflux_dmc
+    corrections = _corrections_mode(cfg)
+    if corrections === :stored
         println("% loading flux correction fields...")
         load_flux_corrections_jld2!(jld2_dir, fields)
-    elseif cfg.log_topo_drsp || cfg.log_qflux_dmc
+    elseif corrections === :spinup
         println("% flux correction  CO2 = ", CO2_ctrl)
         qflux_correction!(CO2_ctrl, Ts_ini, Ta_ini, q_ini, To_ini, fields, state, timestate, cfg, ws, time_flux;
             ws_a=ws_a, ws_q=ws_q)

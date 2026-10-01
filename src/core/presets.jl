@@ -75,34 +75,60 @@ The names [`preset`](@ref) accepts, sorted.
 """
 preset_names() = sort!(collect(keys(_PRESET_SCENARIOS)))
 
+# Presets whose physics differs from the default Config. Mean-climate
+# deconstruction runs the MSCM physics on the stored corrections, so a
+# switched-off process changes the climate instead of being corrected away.
+const _PRESET_PHYSICS = Dict{Symbol,NamedTuple}(
+    :decon_mean_climate => (processes=Processes(moisture_convergence=false),
+                            hydrology=mscm_hydrology(), corrections=Stored()),
+)
+
 """
-    preset(name; processes=Processes(), hydrology=Hydrology(), corrections=nothing,
+    preset(name; processes=nothing, hydrology=nothing, corrections=nothing,
            index=0, pct=0, path="") -> Config
 
 The [`Config`](@ref) of a named experiment ([`preset_names`](@ref) lists them).
-`processes` and `hydrology` change the physics, typically for
+`processes` and `hydrology` change the preset's physics: a NamedTuple such as
+`(ocean = :none,)` changes those options, a [`Processes`](@ref) or
+[`Hydrology`](@ref) replaces them. `index` selects the table row of
+`:obliquity`/`:eccentricity`, `pct` the distance change of
+`:earth_sun_distance`, `path` the CO₂ file of `:custom_co2`.
+
+Every preset runs the default physics with a 3-year [`SpinUp`](@ref), except
 `:decon_mean_climate` (mean-climate deconstruction; run it with
-`RunSpec(scnr = 0)`) and `:decon_2xco2` (2×CO₂-response deconstruction).
-`index` selects the table row of `:obliquity`/`:eccentricity`, `pct` the
-distance change of `:earth_sun_distance`, `path` the CO₂ file of
-`:custom_co2`. `corrections` defaults to a 3-year [`SpinUp`](@ref), or to the
-[`Stored`](@ref) corrections when topography is flat.
+`RunSpec(scnr = 0)`): it runs the MSCM physics ([`mscm_hydrology`](@ref),
+`moisture_convergence = false`) on the [`Stored`](@ref) corrections, so a
+switched-off process changes the climate. `:decon_2xco2` is the 2×CO₂-response
+deconstruction.
 
 ```jldoctest
 julia> preset(:co2_double).scenario.co2
 ConstantCO2(680.0f0)
 ```
 """
-function preset(name::Symbol; processes::Processes=Processes(), hydrology::Hydrology=Hydrology(),
-    corrections::Union{Corrections,Nothing}=nothing, index::Integer=0, pct::Real=0, path::AbstractString="")
+function preset(name::Symbol; processes::Union{Processes,NamedTuple,Nothing}=nothing,
+    hydrology::Union{Hydrology,NamedTuple,Nothing}=nothing, corrections::Union{Corrections,Nothing}=nothing,
+    index::Integer=0, pct::Real=0, path::AbstractString="")
     haskey(_PRESET_SCENARIOS, name) ||
         throw(ArgumentError("unknown preset :$name; known: $(join((":$p" for p in preset_names()), ", "))"))
     s = _PRESET_SCENARIOS[name]
     s.solar isa SolarTable && s.solar.kind !== :paleo && (s = _with(s; solar=SolarTable(s.solar.kind, index)))
     s.solar isa EarthSunDistance && (s = _with(s; solar=EarthSunDistance(pct)))
     s.co2 isa CO2File && (s = _with(s; co2=CO2File(path)))
-    corrections = something(corrections, processes.topography === :flat ? Stored() : SpinUp(3))
+    defaults = get(_PRESET_PHYSICS, name, (;))
+    processes = _change(get(defaults, :processes, Processes()), processes)
+    hydrology = _change(get(defaults, :hydrology, Hydrology()), hydrology)
+    corrections = something(corrections, get(defaults, :corrections, SpinUp(3)))
     return Config(; scenario=s, processes, hydrology, corrections)
 end
 
-_with(s::Scenario; kw...) = Scenario(; (f => getfield(s, f) for f in fieldnames(Scenario))..., kw...)
+_change(default, new) = new
+_change(default, ::Nothing) = default
+function _change(default::T, new::NamedTuple) where {T}
+    for k in keys(new)
+        k in fieldnames(T) || throw(ArgumentError("$(nameof(T)) has no option $k"))
+    end
+    return _with(default; new...)
+end
+
+_with(s::T; kw...) where {T} = T(; (f => getfield(s, f) for f in fieldnames(T))..., kw...)

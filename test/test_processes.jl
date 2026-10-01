@@ -10,6 +10,7 @@
     @test_throws ArgumentError Hydrology(rain = :best)
     @test_throws ArgumentError Hydrology(rain = :original, rain_fit = :ncep)   # a fit only applies to :fitted
     @test mscm_hydrology() == Hydrology(rain = :original, evaporation = :original)
+    @test Processes().co2 === true
     @test SpinUp(3).years == 3
     @test_throws ArgumentError SpinUp(-1)
 end
@@ -27,8 +28,6 @@ end
 # Two configs with the same effect run the same model.
 function switch_effect(c::PhysicsConfig)
     circulation = c.log_atmos_dmc && c.log_crcl_dmc && c.log_crcl_drsp
-    corrections = (!c.log_topo_drsp && c.log_qflux_dmc) ? :stored :
-                  (c.log_topo_drsp || c.log_qflux_dmc) ? :spinup : :none
     return (atmosphere = c.log_atmos_dmc,
             circulation = circulation,
             transport_parts = circulation ? (c.log_hdif, c.log_hadv, c.log_vdif, c.log_vadv, c.log_conv) : nothing,
@@ -41,8 +40,8 @@ function switch_effect(c::PhysicsConfig)
             deep_ocean = c.log_ocean_dmc && c.log_ocean_drsp,
             ice_albedo = c.log_ice,
             topography = c.log_topo_drsp ? :observed : :flat,
-            corrections = corrections,
-            control_co2 = c.log_co2_dmc)
+            corrections = GREBClimate._corrections_mode(c),
+            co2 = c.log_co2_dmc)
 end
 
 # Legacy flags -> v2 options (test-only; the package only translates downwards)
@@ -53,7 +52,7 @@ function raise(c::PhysicsConfig)
                   humidity = c.log_humid_drsp ? :observed : :uniform,
                   hydrology = !c.log_hydro_dmc ? :none : !c.log_hydro_drsp ? :no_evap_rain : :full,
                   ocean = !c.log_ocean_dmc ? :none : !c.log_ocean_drsp ? :mixed_layer : :full,
-                  topography = e.topography, control_co2 = c.log_co2_dmc, ice_albedo = c.log_ice,
+                  topography = e.topography, co2 = c.log_co2_dmc, ice_albedo = c.log_ice,
                   transport = c.log_crcl_dmc && c.log_crcl_drsp,
                   heat_diffusion = c.log_hdif, heat_advection = c.log_hadv,
                   vapour_diffusion = c.log_vdif, vapour_advection = c.log_vadv,
@@ -77,12 +76,12 @@ end
     @test mismatches == 0
 end
 
-@testset "corrections that need step-4 plumbing are refused, not silently changed" begin
-    lower(p, c) = GREBClimate._lower_switches!(PhysicsConfig(), p, c)
-    @test switch_effect(lower(Processes(), SpinUp(3))).corrections === :spinup
-    @test switch_effect(lower(Processes(topography = :flat), Stored())).corrections === :stored
-    @test switch_effect(lower(Processes(topography = :flat), NoCorrections())).corrections === :none
-    @test_throws ArgumentError lower(Processes(), Stored())
-    @test_throws ArgumentError lower(Processes(), NoCorrections())
-    @test_throws ArgumentError lower(Processes(topography = :flat), SpinUp(3))
+@testset "every topography and corrections combination translates" begin
+    mode(p, c) = GREBClimate._corrections_mode(GREBClimate._lower_switches!(PhysicsConfig(), p, c))
+    for topography in (:observed, :flat)
+        p = Processes(topography = topography)
+        @test mode(p, SpinUp(3)) === :spinup
+        @test mode(p, Stored()) === :stored
+        @test mode(p, NoCorrections()) === :none
+    end
 end

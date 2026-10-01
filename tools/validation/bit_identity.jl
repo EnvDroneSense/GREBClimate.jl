@@ -47,9 +47,9 @@ function _cases()
         mk = p === :custom_co2 ? () -> case(p; path=_custom_co2_file()) : () -> case(p)
         push!(cases, name => mk)
     end
-    # flat topography runs on the stored corrections (the former :constant_topo)
-    push!(cases, "constant_topo" => () -> preset(:co2_double; processes=Processes(topography=:flat)))
-    push!(cases, "decon_crcl_hydro_off" => () -> case(:full_model; processes=Processes(transport=false, hydrology=:none)))
+    # flat topography on the stored corrections (the former :constant_topo)
+    push!(cases, "constant_topo" => () -> preset(:co2_double; processes=(topography=:flat,), corrections=Stored()))
+    push!(cases, "decon_crcl_hydro_off" => () -> case(:full_model; processes=(transport=false, hydrology=:none)))
     return sort!(cases; by=first)
 end
 

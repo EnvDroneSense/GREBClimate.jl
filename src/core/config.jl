@@ -44,6 +44,10 @@ Base.@kwdef mutable struct PhysicsConfig
     log_hwind_ext::Bool = false
     log_omega_ext::Bool = false
 
+    # Flux corrections: :spinup, :stored or :none; :auto picks them from
+    # log_topo_drsp and log_qflux_dmc
+    flux_corrections::Symbol = :auto
+
     # Experiment Type
     experiment::Symbol = :full_model  # :full_model, :constant_topo, :co2_double, etc.
 

@@ -15,16 +15,28 @@ Notable changes to GREBClimate.jl, following
   for the original GREB scheme) and `Corrections` (`SpinUp(years)`, `Stored()`,
   `NoCorrections()`). `preset(name)` builds every experiment; run it with
   `greb_model!(run, config)`, where the spin-up length comes from `SpinUp`.
-  Results are identical to the `PhysicsConfig` path. Not yet available: free
-  combinations of scenario parts that match no preset, and corrections that do
-  not follow the topography (observed topography always spins up; flat
-  topography uses the stored or no corrections). Preset names that changed:
-  `:rcp85` is `:rcp85_boundary`, `:co2_step` is `:co2_abrupt_reverse`,
-  `:a1b_scenario` is `:a1b`; `:constant_topo` has no preset (use
-  `preset(:decon_2xco2; processes = Processes(topography = :flat))`).
+  Results are identical to the `PhysicsConfig` path. Any topography works with
+  any corrections; every preset spins up for 3 years unless told otherwise,
+  except `:decon_mean_climate` (below). `preset(name; processes = (ocean =
+  :none,))` changes single options of a preset's physics. Not yet available:
+  free combinations of scenario parts that match no preset. Preset names that
+  changed: `:rcp85` is `:rcp85_boundary`, `:co2_step` is
+  `:co2_abrupt_reverse`, `:a1b_scenario` is `:a1b`; `:constant_topo` has no
+  preset (use `preset(:co2_double; processes = (topography = :flat,),
+  corrections = Stored())`).
+- A regression test that the MSCM configuration (`mscm_hydrology()`,
+  `moisture_convergence = false`) reproduces the MSCM 2xCO2 response: year 1
+  global mean 0.5946 K in both.
 
 ### Changes to model results
 
+- `:decon_mean_climate` runs the MSCM physics (`mscm_hydrology()`, no moisture
+  convergence) on the stored flux corrections. It spun up new corrections for
+  every configuration before, which pulled each one back to the observed
+  climate, so a switched-off process left the global mean unchanged.
+- Switching CO2 off (`Processes(co2 = false)`, formerly `log_co2_dmc = false`)
+  sets 0 ppm in the scenario too; it applied only to the control before, and
+  `:decon_mean_climate` ran its scenario at 340 ppm.
 - A failed run no longer looks like a frozen planet: the 40 K floor on `Ts`
   and `Ta` turned non-finite values into exactly 40 K. They now stay NaN.
   Results of runs that stay finite are unchanged.

@@ -11,16 +11,9 @@ function _lower_hydrology!(cfg::PhysicsConfig, h::Hydrology)
     return cfg
 end
 
-# The legacy code picks the corrections from the topography switch: observed
-# topography always spins up, flat topography reads the stored file or runs
-# without. The other three combinations cannot be expressed yet.
-function _lower_corrections!(cfg::PhysicsConfig, flat::Bool, c::Corrections)
-    if !flat && c isa SpinUp || flat && !(c isa SpinUp)
-        cfg.log_qflux_dmc = !(c isa NoCorrections)
-        return cfg
-    end
-    throw(ArgumentError("$(flat ? "flat" : "observed") topography with $(nameof(typeof(c)))() " *
-                        "corrections is not available yet"))
+function _lower_corrections!(cfg::PhysicsConfig, c::Corrections)
+    cfg.flux_corrections = c isa SpinUp ? :spinup : c isa Stored ? :stored : :none
+    return cfg
 end
 
 function _lower_switches!(cfg::PhysicsConfig, p::Processes, c::Corrections)
@@ -33,7 +26,7 @@ function _lower_switches!(cfg::PhysicsConfig, p::Processes, c::Corrections)
     cfg.log_ocean_dmc = p.ocean !== :none
     cfg.log_ocean_drsp = p.ocean !== :mixed_layer
     cfg.log_topo_drsp = p.topography === :observed
-    cfg.log_co2_dmc = p.control_co2
+    cfg.log_co2_dmc = p.co2
     cfg.log_ice = p.ice_albedo
     cfg.log_crcl_dmc = cfg.log_crcl_drsp = p.transport
     cfg.log_hdif = p.heat_diffusion
@@ -41,7 +34,7 @@ function _lower_switches!(cfg::PhysicsConfig, p::Processes, c::Corrections)
     cfg.log_vdif = p.vapour_diffusion
     cfg.log_vadv = p.vapour_advection
     cfg.log_conv = p.moisture_convergence
-    return _lower_corrections!(cfg, p.topography === :flat, c)
+    return _lower_corrections!(cfg, c)
 end
 
 # Preset scenario => legacy experiment symbol. The deconstruction presets run

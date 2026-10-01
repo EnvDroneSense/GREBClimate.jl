@@ -78,9 +78,14 @@ according to `cfg.experiment`. Pure - the `regional_co2_*` masks are built
 once per run by [`apply_dynamic_co2_mask!`](@ref), not here. `:full_model`
 short-circuits before the experiment dispatch chain. The `:rcp26`/`:rcp45`/`:rcp60`/
 `:custom_co2`/`:ssp*`/`:historical_co2` experiments look `year` up in
-`cfg.co2_scenario`.
+`cfg.co2_scenario`. With `cfg.log_co2_dmc` off, CO₂ is 0.
 """
 function forcing(it, year, cfg::PhysicsConfig, fields::ClimateFields, icmn_ctrl; nstep_yr=nstep_yr)
+    f = _experiment_forcing(it, year, cfg, nstep_yr)
+    return cfg.log_co2_dmc ? f : (CO2=0.0f0, sw_solar_forcing=f.sw_solar_forcing)
+end
+
+function _experiment_forcing(it, year, cfg::PhysicsConfig, nstep_yr)
     # Default CO₂ concentration
     CO2 = cfg.co2_concentration
     sw_solar_forcing = 1.0f0

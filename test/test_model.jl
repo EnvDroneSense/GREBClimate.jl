@@ -487,3 +487,33 @@ end
     end.ctrl[1].Ts
     @test all(isfinite, first_ts(0)) && first_ts(0) != first_ts(1) && first_ts(1) == first_ts(1)
 end
+
+@testset "greb_model! takes the corrections it is given, with either topography" begin
+    with_tempdir() do dir
+        mkpath(joinpath(dir, "climatology"))
+        GREBClimate.jldopen(joinpath(dir, "climatology", "flux_corrections.jld2"), "w") do f
+            f["Tsurf_flux_correction"] = fill(0.5f0, X, Y, GREBClimate.nstep_yr)
+            f["vapour_flux_correction"] = zeros(Float32, X, Y, GREBClimate.nstep_yr)
+            f["Tocean_flux_correction"] = zeros(Float32, X, Y, GREBClimate.nstep_yr)
+        end
+        for topography in (:observed, :flat)
+            # Month 1 of the control; `preloaded` stands in for corrections already in `fields`
+            function first_ts(c; preloaded = 0.0f0, jld2_dir = dir)
+                f = synthetic_fields()
+                f.TF_correct .= preloaded
+                cfg = preset(:full_model; processes = (topography = topography,), corrections = c)
+                return quiet() do
+                    greb_model!(RunSpec(ctrl = 1, scnr = 0), cfg; jld2_dir, fields = f, allow_uninitialized = true)
+                end.ctrl[1].Ts
+            end
+            stored = first_ts(Stored())
+            # Stored reads the file: the same as a run on those values without a spin-up
+            @test isequal(stored, first_ts(SpinUp(0); preloaded = 0.5f0, jld2_dir = ""))
+            # NoCorrections zeroes whatever was there
+            @test isequal(first_ts(NoCorrections(); preloaded = 0.5f0), first_ts(SpinUp(0); jld2_dir = ""))
+            @test !isequal(stored, first_ts(NoCorrections()))
+            # SpinUp computes them
+            @test !isequal(stored, first_ts(SpinUp(1)))
+        end
+    end
+end

@@ -97,3 +97,40 @@
         end
     end
 end
+
+# Area-weighted global mean of a monthly-record field, averaged over `recs`
+function area_mean(recs, var = :Ts)
+    w = cosd.(range(-88.125, 88.125; length = Y))
+    return sum(sum(getfield(r, var) .* w') for r in recs) / (length(recs) * X * sum(w))
+end
+
+@testset "MSCM configuration reproduces the MSCM 2xCO2 response" begin
+    # MSCM (Monash Simple Climate Model) database, 2xCO2 with every process on:
+    # year-1 global-mean surface temperature response 0.594636 K.
+    mscm_year1 = 0.594636
+    if !isdir(DATA_DIR)
+        @test_skip "greb_input_data/ not present"
+    else
+        cfg = preset(:co2_double; processes = (moisture_convergence = false,), hydrology = mscm_hydrology())
+        result = quiet() do
+            greb_model!(RunSpec(ctrl = 1, scnr = 1), cfg; jld2_dir = DATA_DIR,
+                        fields = load_greb_jld2!(DATA_DIR; dataset = :ncep))
+        end
+        @test isapprox(area_mean(result.scnr), mscm_year1; atol = 1e-3)
+    end
+end
+
+@testset "mean-climate deconstruction: a switched-off process changes the control climate" begin
+    # On computed corrections every configuration is pulled back to the
+    # observed climate; on the stored ones the switch shows.
+    if !isdir(DATA_DIR)
+        @test_skip "greb_input_data/ not present"
+    else
+        fields = load_greb_jld2!(DATA_DIR; dataset = :ncep)
+        control(processes) = quiet() do
+            greb_model!(RunSpec(ctrl = 1, scnr = 0), preset(:decon_mean_climate; processes);
+                        jld2_dir = DATA_DIR, fields)
+        end.ctrl
+        @test abs(area_mean(control((ocean = :none,))) - area_mean(control((;)))) > 0.1
+    end
+end
