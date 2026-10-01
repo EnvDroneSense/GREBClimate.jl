@@ -31,8 +31,8 @@ GREB is a conceptual climate model that simulates the global energy balance on a
 
 ## Features
 
-- **40+ experiments**: CO₂ scaling, IPCC RCP and SSP scenarios, a historical CO₂ hindcast, your own CO₂ trajectory, solar, orbital and paleoclimate forcing, and ENSO and regional-CO₂ runs ([experiment list](https://EnvDroneSense.github.io/GREBClimate.jl/dev/switches/#Experiment-Presets))
-- **Deconstruction experiments**: switch individual feedback processes off to isolate their role in the mean climate or the 2×CO₂ response ([switches](https://EnvDroneSense.github.io/GREBClimate.jl/dev/switches/))
+- **40+ experiments**: CO₂ scaling, IPCC RCP and SSP scenarios, a historical CO₂ hindcast, your own CO₂ trajectory, solar, orbital and paleoclimate forcing, and ENSO and regional-CO₂ runs ([experiment list](https://EnvDroneSense.github.io/GREBClimate.jl/dev/configuration/#Presets))
+- **Deconstruction experiments**: switch individual feedback processes off to isolate their role in the mean climate or the 2×CO₂ response ([switches](https://EnvDroneSense.github.io/GREBClimate.jl/dev/configuration/))
 - **Two climatologies**: NCEP and ERA-Interim
 - **Fast**: SIMD-vectorised physics, and the temperature and humidity transport run concurrently with `julia -t 2`
 - **Plots and notebook**: maps, time series, seasonal cycles, Hovmöller diagrams and animations ([guide](https://EnvDroneSense.github.io/GREBClimate.jl/dev/viz/))
