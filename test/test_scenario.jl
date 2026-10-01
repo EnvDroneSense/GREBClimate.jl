@@ -23,8 +23,9 @@ end
 end
 
 @testset "parameterised presets carry their parameter" begin
-    @test preset(:eccentricity; index = 32).scenario.solar == SolarTable(:eccentricity, 32)
-    @test preset(:obliquity; index = 95).scenario.solar == SolarTable(:obliquity, 95)
+    # not the default rows (32, 95): an ignored `index` must show
+    @test preset(:eccentricity; index = 5).scenario.solar == SolarTable(:eccentricity, 5)
+    @test preset(:obliquity; index = 10).scenario.solar == SolarTable(:obliquity, 10)
     @test preset(:earth_sun_distance; pct = 2.5).scenario.solar == EarthSunDistance(2.5)
     @test preset(:custom_co2; path = "co2.txt").scenario.co2 == CO2File("co2.txt")
 end

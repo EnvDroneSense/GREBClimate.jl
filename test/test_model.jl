@@ -423,7 +423,8 @@ end
         greb_model!(RunSpec(ctrl = 1, scnr = 0), preset(:full_model; corrections = SpinUp(years));
                     jld2_dir = "", fields = synthetic_fields(), allow_uninitialized = true)
     end.ctrl[1].Ts
-    @test all(isfinite, first_ts(0)) && first_ts(0) != first_ts(1) && first_ts(1) == first_ts(1)
+    none, one_year = first_ts(0), first_ts(1)
+    @test all(isfinite, none) && none != one_year
 end
 
 @testset "greb_model! takes the corrections it is given, with either topography" begin

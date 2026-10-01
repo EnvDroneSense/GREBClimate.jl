@@ -195,22 +195,18 @@ end
 # The allocation budget for SWradiation! (and every other kernel) lives in
 # test_invariants.jl, alongside the return-type checks.
 
-@testset "hydrology = :none freezes humidity entirely (not just evaporation and rain)" begin
-    # With the water cycle off, q must never move from its initial
-    # climatological value
-    if !isdir(DATA_DIR)
-        @test_skip "greb_input_data/ not present"
-    else
-        fields = load_greb_jld2!(DATA_DIR; dataset = :ncep)
-        cfg = preset(:full_model; processes = (hydrology = :none,))
-        # The initial humidity as init_model! sets it for this configuration;
-        # greb_model! restores `fields` afterwards, so it cannot be read there.
-        q_ini = quiet(() -> init_model!(resolve(cfg), deepcopy(fields))).q_ini
-        result = quiet() do
-            greb_model!(RunSpec(scnr = 0), cfg; jld2_dir = DATA_DIR, fields = fields)
-        end
-        for rec in result.ctrl
-            @test all(isapprox.(rec.q, q_ini; atol = 1e-7))
-        end
+@testset "hydrology = :none: humidity stays put, whatever the humidity correction" begin
+    # Evaporation, rain and transport are zero with the water cycle off, so the
+    # only term left to move q is the flux correction. SpinUp(0) keeps the one
+    # set here.
+    fields = synthetic_fields()
+    fields.qF_correct .= 1.0f-4
+    cfg = preset(:full_model; processes = (hydrology = :none,), corrections = SpinUp(0))
+    q_ini = quiet(() -> init_model!(resolve(cfg), deepcopy(fields))).q_ini
+    result = quiet() do
+        greb_model!(RunSpec(scnr = 0), cfg; jld2_dir = "", fields = fields, allow_uninitialized = true)
+    end
+    for rec in result.ctrl
+        @test rec.q == q_ini
     end
 end

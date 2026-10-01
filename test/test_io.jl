@@ -89,12 +89,19 @@ end
         @test_throws ErrorException greb_data_dir()
         delete!(ENV, "GREB_DATA")
 
-        cached = GREBClimate._cached_datadep_path()
-        if cached === nothing
-            @test_skip "no DataDeps cache on this machine"
-        else
-            @test isdir(cached)
-            @test greb_data_dir(; allow_download = false) !== nothing
+        # A downloaded dataset is the directory `<load path>/GREB-input-data`.
+        # Stand one up so the cache step runs on machines that never downloaded it.
+        # DataDeps splits DATADEPS_LOAD_PATH on ':', which cuts a Windows drive
+        # letter off, so the load path is given relative to the working directory.
+        cd(tmp_b) do
+            withenv("DATADEPS_LOAD_PATH" => ".", "DATADEPS_NO_STANDARD_LOAD_PATH" => "true") do
+                @test GREBClimate._cached_datadep_path() === nothing
+                cache = mkpath(joinpath(pwd(), GREBClimate.DATA_DEP_NAME))
+                @test abspath(GREBClimate._cached_datadep_path()) == cache
+                # the repo-local dataset wins over the cache; without it the cache is used
+                local_dir = normpath(joinpath(@__DIR__, "..", "greb_input_data"))
+                @test abspath(greb_data_dir(; allow_download = false)) == (isdir(local_dir) ? local_dir : cache)
+            end
         end
 
         @test greb_data_dir(""; allow_download = false) ==
