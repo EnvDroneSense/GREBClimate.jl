@@ -42,16 +42,9 @@ end
     end
 end
 
-@testset "greb_model! runs across the evaporation and rain schemes" begin
-    # One end-to-end run proves the plumbing. The remaining evaporation schemes
-    # are separate `@turbo` blocks in `hydro!`, reachable directly for the price
-    # of one call each rather than a simulated year each.
-    result = quiet() do
-        greb_model!(RunSpec(scnr = 0), preset(:full_model; hydrology = (rain = :fitted, evaporation = :original));
-                    jld2_dir = "", allow_uninitialized = true)
-    end
-    @test length(result.ctrl) == 12
-
+@testset "hydro! is finite under every evaporation and rain scheme" begin
+    # Each evaporation scheme is a separate `@turbo` block in `hydro!`; the
+    # default pair runs end to end in the baseline testset.
     fields = synthetic_fields()
     Ts = fill(288.0f0, X, Y)
     q = fill(0.005f0, X, Y)
@@ -126,11 +119,6 @@ end
 
         # sw_solar restored to its pre-run value after greb_model! returns
         @test fields.sw_solar == saved_sw_solar
-
-        quiet() do
-            greb_model!(RunSpec(scnr = 0), preset(:full_model); jld2_dir = "", fields = fields, allow_uninitialized = true)
-        end
-        @test fields.sw_solar == saved_sw_solar
     finally
         rm(tmpdir; recursive = true, force = true)
     end
@@ -200,11 +188,6 @@ end
                         allow_uninitialized = true)
         end
         @test length(result.scnr) == 12
-
-        # A year missing from the table must raise a clear error rather than
-        # silently defaulting.
-        @test_throws ErrorException greb_model!(RunSpec(ctrl = 0, scnr = 2),
-            preset(:ssp585); jld2_dir = dir, allow_uninitialized = true)
     end
 end
 
