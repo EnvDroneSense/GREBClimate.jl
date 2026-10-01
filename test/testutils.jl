@@ -78,3 +78,31 @@ function synthetic_fields()
 end
 
 gmean(x) = sum(x) / length(x)
+
+struct StopRun <: Exception end
+
+"""
+Run `greb_model!(run, config; kwargs...)` up to the first step of `phase`
+(`:ctrl` or `:scnr`), return `f(view)` of the observer's view there, and stop
+the run. `point` is `:after_tendencies` (state before the step's update) or
+`:after_step`. For what is already decided at the first step - the CO2, the
+solar table, the climatology in use - without paying for the rest of the year.
+The observer is not called during the spin-up, so pass `NoCorrections()` or
+`SpinUp(0)` unless the spin-up is what is being tested.
+"""
+function at_first_step(f, run, config; phase = :scnr, point = :after_step, kwargs...)
+    seen = nothing
+    function observer(pt, view)
+        (view.phase === phase && pt === point) || return nothing
+        seen = f(view)
+        throw(StopRun())
+    end
+    try
+        quiet() do
+            greb_model!(run, config; allow_uninitialized = true, observer, kwargs...)
+        end
+    catch e
+        e isa StopRun || rethrow()
+    end
+    return seen
+end
