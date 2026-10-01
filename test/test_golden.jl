@@ -3,8 +3,8 @@
 @testset "golden regression: real dataset control+scenario run matches snapshot" begin
     # Tripwire for any refactor touching the physics kernels: a real 1yr
     # control + 1yr scenario run against the actual NCEP dataset,
-    # snapshotted as monthly global-mean Ts/Ta/q, plus a flux = 1 control
-    # year so the flux-correction spin-up is exercised too. The tolerances
+    # snapshotted as monthly global-mean Ts/Ta/q, plus a control year
+    # after a one-year spin-up so the flux-correction spin-up is exercised too. The tolerances
     # (1e-3 K, 1e-6 kg/kg) are about 30 times the drift measured between runs;
     # they catch behaviour changes, not bit-level drift. Exact equality is
     # checked by tools/validation/bit_identity.jl.
