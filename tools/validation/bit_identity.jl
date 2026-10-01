@@ -25,11 +25,9 @@ const DATA_DIR = something(greb_data_dir(; allow_download=false),
 isdir(DATA_DIR) || error("dataset not found at $DATA_DIR")
 
 # One spin-up year, so the flux-correction loop is exercised, then a control
-# and a scenario year. Case names are the preset names. Snapshots saved before
-# the names were introduced (no "naming" key) used the pre-2.0 experiment names
-# and are renamed on load.
+# and a scenario year. Case names are the preset names; a snapshot must hold
+# every case of the current run, so retake it when a case is renamed.
 const RUN = RunSpec(ctrl=1, scnr=1)
-const RENAMED = Dict("rcp85" => "rcp85_boundary", "co2_step" => "co2_abrupt_reverse", "a1b_scenario" => "a1b")
 
 case(name; kw...) = preset(name; corrections=SpinUp(1), kw...)
 
@@ -79,17 +77,12 @@ function main(args)
             f["nthreads"] = Threads.nthreads()
             f["julia"] = string(VERSION)
             f["data"] = snap
-            f["naming"] = "presets"
         end
         println("saved $(length(snap)) arrays to $path")
         return 0
     end
-    old, nt, jv, renamed = GREBClimate.jldopen(path, "r") do f
-        f["data"], f["nthreads"], f["julia"], !haskey(f, "naming")
-    end
-    if renamed
-        rename(k) = (c = split(k, '/'; limit=2); string(get(RENAMED, c[1], c[1]), '/', c[2]))
-        old = Dict(rename(k) => v for (k, v) in old)
+    old, nt, jv = GREBClimate.jldopen(path, "r") do f
+        f["data"], f["nthreads"], f["julia"]
     end
     nt == Threads.nthreads() || error("snapshot taken with $nt threads; rerun with -t $nt")
     jv == string(VERSION) || @warn "snapshot taken on Julia $jv; exact equality is not expected across versions"
