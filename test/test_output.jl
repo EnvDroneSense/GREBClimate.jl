@@ -1,16 +1,9 @@
 # Per-timestep bookkeeping: diagnostics!, output!, time_loop!, climatology helpers.
 
 @testset "build_monthly_climatology/apply_scenario_anomalies" begin
-    # Hand-built records with every field filled to one scalar value
-    # make the averaging arithmetic trivial to check by hand.
-    mkrec(v) =(Ts=fill(v, GREBClimate.xdim, GREBClimate.ydim), Ta=fill(v, GREBClimate.xdim, GREBClimate.ydim),
-        To=fill(v, GREBClimate.xdim, GREBClimate.ydim), q=fill(v, GREBClimate.xdim, GREBClimate.ydim),
-        albedo=fill(v, GREBClimate.xdim, GREBClimate.ydim), ice=fill(v, GREBClimate.xdim, GREBClimate.ydim),
-        precip=fill(v, GREBClimate.xdim, GREBClimate.ydim), evap=fill(v, GREBClimate.xdim, GREBClimate.ydim),
-        qcrcl=fill(v, GREBClimate.xdim, GREBClimate.ydim), sw=fill(v, GREBClimate.xdim, GREBClimate.ydim),
-        lw=fill(v, GREBClimate.xdim, GREBClimate.ydim), qlat=fill(v, GREBClimate.xdim, GREBClimate.ydim),
-        qsens=fill(v, GREBClimate.xdim, GREBClimate.ydim),
-        olr=fill(v, GREBClimate.xdim, GREBClimate.ydim), lwdown=fill(v, GREBClimate.xdim, GREBClimate.ydim))
+    # Records with every field filled to one scalar value make the averaging
+    # arithmetic trivial to check by hand.
+    mkrec = uniform_record
 
     @test build_monthly_climatology(MonthlyRecord[]) == MonthlyRecord[]
 
@@ -49,14 +42,7 @@ end
 @testset "compute_annual_ice_climatology" begin
     # Same record-index-encodes-value trick as the climatology test
     # above: final-year-only.
-    mkrec(v) = (Ts=zeros(GREBClimate.xdim, GREBClimate.ydim), Ta=zeros(GREBClimate.xdim, GREBClimate.ydim),
-        To=zeros(GREBClimate.xdim, GREBClimate.ydim), q=zeros(GREBClimate.xdim, GREBClimate.ydim),
-        albedo=zeros(GREBClimate.xdim, GREBClimate.ydim), ice=fill(v, GREBClimate.xdim, GREBClimate.ydim),
-        precip=zeros(GREBClimate.xdim, GREBClimate.ydim), evap=zeros(GREBClimate.xdim, GREBClimate.ydim),
-        qcrcl=zeros(GREBClimate.xdim, GREBClimate.ydim), sw=zeros(GREBClimate.xdim, GREBClimate.ydim),
-        lw=zeros(GREBClimate.xdim, GREBClimate.ydim), qlat=zeros(GREBClimate.xdim, GREBClimate.ydim),
-        qsens=zeros(GREBClimate.xdim, GREBClimate.ydim),
-        olr=zeros(GREBClimate.xdim, GREBClimate.ydim), lwdown=zeros(GREBClimate.xdim, GREBClimate.ydim))
+    mkrec(v) = uniform_record(0; ice = v)
 
     @test all(iszero, compute_annual_ice_climatology(MonthlyRecord[]))
 
@@ -135,22 +121,8 @@ end
     @test all(==(210.0), output_buf[1].lwdown)   # positive into the surface
 end
 
-function _time_loop_fields()
-    fields = ClimateFields()
-    fields.z_topo .= -1.0
-    fields.mldclim .= 50.0
-    fields.Tclim .= 280.0
-    fields.Toclim .= 285.0
-    fields.qclim .= 0.006
-    fields.cldclim .= 0.5
-    fields.swetclim .= 0.5
-    fields.uclim .= 2.0
-    fields.vclim .= 1.0
-    fields.omegaclim .= 0.001
-    fields.omegastdclim .= 0.01
-    fields.wsclim .= 4.0
-    return fields
-end
+# All ocean, with wind and rising air
+_time_loop_fields() = constant_fields(z_topo = -1.0, swet = 0.5, u = 2.0, v = 1.0, omega = 0.001, omegastd = 0.01, ws = 4.0)
 
 @testset "time_loop! integrates one timestep and clamps at min_T_K" begin
     fields = _time_loop_fields()

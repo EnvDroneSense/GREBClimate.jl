@@ -128,29 +128,13 @@ end
 end
 
 @testset "hydro! :original_gust evaporation: latent heat flux over land and ocean" begin
-    mkfields(topo) = begin
-        fields = ClimateFields()
-        fields.z_topo .= topo
-        fields.mldclim .= 50.0
-        fields.Tclim .= 280.0
-        fields.Toclim .= 285.0
-        fields.qclim .= 0.006
-        fields.cldclim .= 0.5
-        fields.swetclim .= 1.0
-        fields.uclim .= 0.0
-        fields.vclim .= 0.0
-        fields.omegaclim .= 0.0
-        fields.omegastdclim .= 0.0
-        fields.wsclim .= 0.0
-        fields
-    end
     r = resolve(preset(:full_model; hydrology = (evaporation = :original_gust,)))
     Ts = fill(290.0f0, GREBClimate.xdim, GREBClimate.ydim)
     q = fill(0.008f0, GREBClimate.xdim, GREBClimate.ydim)
     ts = TimeState(1, 1)
 
     for (topo, gust, coeff) in ((1.0, 4.0 + 144.0, 0.04), (-1.0, 9.0 + 50.41, 0.73))
-        fields = mkfields(topo)
+        fields = constant_fields(z_topo = topo)
         init_model!(r, fields)
         ws = CirculationWorkspace()
         result = hydro!(Ts, q, fields, ts, Processes(), r.hydrology, ws)
@@ -162,19 +146,7 @@ end
 end
 
 @testset "hydro! fitted rain: dq_rain and Q_lat_air values, with no limit on rain" begin
-    fields = ClimateFields()
-    fields.z_topo .= 1.0
-    fields.mldclim .= 50.0
-    fields.Tclim .= 280.0
-    fields.Toclim .= 285.0
-    fields.qclim .= 0.006
-    fields.cldclim .= 0.5
-    fields.swetclim .= 1.0
-    fields.uclim .= 0.0
-    fields.vclim .= 0.0
-    fields.omegaclim .= 0.0
-    fields.omegastdclim .= 0.0
-    fields.wsclim .= 0.0
+    fields = constant_fields(z_topo = 1.0)
     init_model!(resolve(preset(:full_model)), fields)
     # c_q is large enough that any per-step limit on rain inside hydro! would
     # change the result: the fitted scheme applies none

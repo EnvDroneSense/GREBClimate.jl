@@ -79,6 +79,32 @@ end
 
 gmean(x) = sum(x) / length(x)
 
+"""
+A `ClimateFields` that is the same in every cell and at every step: topography
+`z_topo` everywhere (above 0 m is land), a 50 m mixed layer, and the given
+soil wetness, winds and vertical velocity. For checking a kernel against a
+hand calculation.
+"""
+function constant_fields(; z_topo, swet = 1.0, u = 0.0, v = 0.0, omega = 0.0, omegastd = 0.0, ws = 0.0)
+    f = ClimateFields()
+    f.z_topo .= z_topo
+    f.mldclim .= 50.0
+    f.Tclim .= 280.0
+    f.Toclim .= 285.0
+    f.qclim .= 0.006
+    f.cldclim .= 0.5
+    f.swetclim .= swet
+    f.uclim .= u
+    f.vclim .= v
+    f.omegaclim .= omega
+    f.omegastdclim .= omegastd
+    f.wsclim .= ws
+    return f
+end
+
+"A `MonthlyRecord` with every field filled with `v`; a keyword sets one field to another value."
+uniform_record(v; kw...) = MonthlyRecord(map(n -> fill(Float32(get(kw, n, v)), X, Y), fieldnames(MonthlyRecord)))
+
 struct StopRun <: Exception end
 
 """
