@@ -7,7 +7,7 @@ parts, [`resolve`](@ref)) are documented on the [Configuration](@ref) page.
 
 ```@autodocs
 Modules = [GREBClimate]
-Pages = ["core/model.jl", "core/output.jl", "core/postprocess.jl"]
+Pages = ["core/model.jl", "core/output.jl", "core/postprocess.jl", "core/budgets.jl"]
 ```
 
 ## Data

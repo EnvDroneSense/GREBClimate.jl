@@ -107,6 +107,8 @@ Base.@kwdef mutable struct MonthlyAccumulator
     lwmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Longwave radiation accumulator
     qlatmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Latent heat accumulator
     qsensmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Sensible heat accumulator
+    olrmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Outgoing longwave accumulator
+    lwdownmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Downward longwave accumulator
 end
 
 function reset!(acc::MonthlyAccumulator)
@@ -123,13 +125,17 @@ function reset!(acc::MonthlyAccumulator)
     fill!(acc.lwmm, 0.0f0)
     fill!(acc.qlatmm, 0.0f0)
     fill!(acc.qsensmm, 0.0f0)
+    fill!(acc.olrmm, 0.0f0)
+    fill!(acc.lwdownmm, 0.0f0)
 end
 
-function accumulate!(acc::MonthlyAccumulator, Ts, Ta, To, q, albedo, ice, precip, evap, qcrcl, sw, lw, qlat, qsens)
+function accumulate!(acc::MonthlyAccumulator, Ts, Ta, To, q, albedo, ice, precip, evap, qcrcl, sw, lw, qlat, qsens,
+    lw_up, lw_down, em)
     Tmm = acc.Tmm; Tamm = acc.Tamm; Tomm = acc.Tomm; qmm = acc.qmm
     apmm = acc.apmm; icemm = acc.icemm
     precipmm = acc.precipmm; evapmm = acc.evapmm; qcrclmm = acc.qcrclmm
     swmm = acc.swmm; lwmm = acc.lwmm; qlatmm = acc.qlatmm; qsensmm = acc.qsensmm
+    olrmm = acc.olrmm; lwdownmm = acc.lwdownmm
 
     @turbo for j in 1:ydim
         for i in 1:xdim
@@ -146,6 +152,8 @@ function accumulate!(acc::MonthlyAccumulator, Ts, Ta, To, q, albedo, ice, precip
             lwmm[i, j] += lw[i, j]
             qlatmm[i, j] += qlat[i, j]
             qsensmm[i, j] += qsens[i, j]
+            olrmm[i, j] -= lw_up[i, j] + (1.0f0 - em[i, j]) * lw[i, j]
+            lwdownmm[i, j] -= lw_down[i, j]
         end
     end
 end
@@ -263,7 +271,13 @@ end
 
 One monthly-mean output record: a `NamedTuple` with fields `Ts`, `Ta`, `To`,
 `q`, `albedo`, `ice`, `precip`, `evap`, `qcrcl`, `sw`, `lw`, `qlat`, `qsens`,
-each an `(xdim, ydim)` `Matrix{Float32}`. Produced by [`output!`](@ref);
-`greb_model!`'s `ctrl`/`scnr` results are `Vector{MonthlyRecord}`.
+`olr`, `lwdown`, each an `(xdim, ydim)` `Matrix{Float32}`. Produced by
+[`output!`](@ref); `greb_model!`'s `ctrl`/`scnr` results are
+`Vector{MonthlyRecord}`.
+
+The fluxes are in W/m2. `sw`, `lw`, `qlat` and `qsens` are positive into the
+surface; `lw` is the surface's own emission alone, so it is negative. `olr` is
+the longwave leaving to space, positive upward; `lwdown` is the longwave the
+air sends down, positive into the surface.
 """
-const MonthlyRecord = NamedTuple{(:Ts, :Ta, :To, :q, :albedo, :ice, :precip, :evap, :qcrcl, :sw, :lw, :qlat, :qsens),NTuple{13,Matrix{Float32}}};
+const MonthlyRecord = NamedTuple{(:Ts, :Ta, :To, :q, :albedo, :ice, :precip, :evap, :qcrcl, :sw, :lw, :qlat, :qsens, :olr, :lwdown),NTuple{15,Matrix{Float32}}};

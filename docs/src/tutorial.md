@@ -87,8 +87,9 @@ result.scnr    # Vector{MonthlyRecord}, one per scenario-run month
 ```
 
 Each [`MonthlyRecord`](@ref) is a `NamedTuple` with fields
-`Ts, Ta, To, q, albedo, ice, precip, evap, qcrcl, sw, lw, qlat, qsens` - each
-a `(96, 48)` matrix of that month's mean.
+`Ts, Ta, To, q, albedo, ice, precip, evap, qcrcl, sw, lw, qlat, qsens, olr, lwdown` -
+each a `(96, 48)` matrix of that month's mean. `olr` is the longwave leaving
+to space and `lwdown` the longwave reaching the surface from the air.
 
 `result.ctrl` is in absolute units. `result.scnr` is an **anomaly**: each
 month minus the same calendar month of the control's final year. It stays

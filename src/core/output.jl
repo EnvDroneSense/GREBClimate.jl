@@ -53,7 +53,8 @@ function output!(it, irec, mon, surf::SurfaceState, tend, ws::CirculationWorkspa
     mon = clamp(mon, 1, 12)
 
     accumulate!(acc, surf.Ts, surf.Ta, surf.To, surf.q, tend.albedo, tend.ice_cover,
-        ws.precip_out, ws.evap_out, ws.qcrcl_out, tend.SW, tend.LW_surf, tend.Q_lat, tend.Q_sens)
+        ws.precip_out, ws.evap_out, ws.qcrcl_out, tend.SW, tend.LW_surf, tend.Q_lat, tend.Q_sens,
+        tend.LW_up, tend.LW_down, tend.em)
 
     # ----- Check end of month -----
     if timestate.jday == jday_mon_cumsum[mon] && (it % ndt_days == 0)
@@ -72,7 +73,9 @@ function output!(it, irec, mon, surf::SurfaceState, tend, ws::CirculationWorkspa
             sw=acc.swmm ./ ndm,
             lw=acc.lwmm ./ ndm,
             qlat=acc.qlatmm ./ ndm,
-            qsens=acc.qsensmm ./ ndm
+            qsens=acc.qsensmm ./ ndm,
+            olr=acc.olrmm ./ ndm,
+            lwdown=acc.lwdownmm ./ ndm
         ))
         reset!(acc)
         mon = mon == 12 ? 1 : mon + 1
@@ -81,18 +84,21 @@ function output!(it, irec, mon, surf::SurfaceState, tend, ws::CirculationWorkspa
 end
 
 """
-    time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf, fields, state, ws, acc, timestate, r::ResolvedConfig; ws_a=ws, ws_q=ws)
+    time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf, fields, state, ws, acc, timestate, r::ResolvedConfig;
+               ws_a=ws, ws_q=ws, observer=nothing, phase=:ctrl)
 
 One full model timestep: computes [`tendencies!`](@ref), integrates
 `Ts`/`Ta`/`To`/`q` forward with flux corrections applied, runs
 [`seaice!`](@ref), then dispatches to [`output!`](@ref) and
 [`diagnostics!`](@ref). Returns `(mon, irec)`. `ws_a`/`ws_q` are forwarded to
 [`tendencies!`](@ref) - see its docstring for the opt-in threading they
-enable.
+enable. `observer` is called before and after the update (see
+[`greb_model!`](@ref)); `phase` is passed on to it.
 """
 function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
     fields::ClimateFields, state::ModelState, ws::CirculationWorkspace, acc::MonthlyAccumulator,
-    timestate, r::ResolvedConfig; ws_a::CirculationWorkspace=ws, ws_q::CirculationWorkspace=ws)
+    timestate, r::ResolvedConfig; ws_a::CirculationWorkspace=ws, ws_q::CirculationWorkspace=ws,
+    observer=nothing, phase::Symbol=:ctrl)
     # Calendar lookup
     cal = it <= max_timesteps ? calendar_lookup[it] : (
         day=mod((it - 1) ÷ ndt_days, ndays_yr) + 1,
@@ -104,6 +110,9 @@ function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
 
     # Compute tendencies
     tend = tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, timestate, r; ws_a=ws_a, ws_q=ws_q)
+
+    observer === nothing ||
+        observer(:after_tendencies, _step_view(phase, it, year, ityr, CO2, Ts, Ta, To, q, tend, fields, r))
 
     # Correction views
     TF_corr = @view fields.TF_correct[:, :, ityr]
@@ -152,6 +161,8 @@ function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
     # Sea ice heat capacity
     seaice!(Ts, fields, timestate, r.config.processes)
 
+    observer === nothing ||
+        observer(:after_step, _step_view(phase, it, year, ityr, CO2, Ts, Ta, To, q, tend, fields, r))
 
     # Output and diagnostics
     surf = SurfaceState(Ts, Ta, To, q)

@@ -9,7 +9,8 @@
         precip=fill(v, GREBClimate.xdim, GREBClimate.ydim), evap=fill(v, GREBClimate.xdim, GREBClimate.ydim),
         qcrcl=fill(v, GREBClimate.xdim, GREBClimate.ydim), sw=fill(v, GREBClimate.xdim, GREBClimate.ydim),
         lw=fill(v, GREBClimate.xdim, GREBClimate.ydim), qlat=fill(v, GREBClimate.xdim, GREBClimate.ydim),
-        qsens=fill(v, GREBClimate.xdim, GREBClimate.ydim))
+        qsens=fill(v, GREBClimate.xdim, GREBClimate.ydim),
+        olr=fill(v, GREBClimate.xdim, GREBClimate.ydim), lwdown=fill(v, GREBClimate.xdim, GREBClimate.ydim))
 
     @test build_monthly_climatology(MonthlyRecord[]) == MonthlyRecord[]
 
@@ -54,7 +55,8 @@ end
         precip=zeros(GREBClimate.xdim, GREBClimate.ydim), evap=zeros(GREBClimate.xdim, GREBClimate.ydim),
         qcrcl=zeros(GREBClimate.xdim, GREBClimate.ydim), sw=zeros(GREBClimate.xdim, GREBClimate.ydim),
         lw=zeros(GREBClimate.xdim, GREBClimate.ydim), qlat=zeros(GREBClimate.xdim, GREBClimate.ydim),
-        qsens=zeros(GREBClimate.xdim, GREBClimate.ydim))
+        qsens=zeros(GREBClimate.xdim, GREBClimate.ydim),
+        olr=zeros(GREBClimate.xdim, GREBClimate.ydim), lwdown=zeros(GREBClimate.xdim, GREBClimate.ydim))
 
     @test all(iszero, compute_annual_ice_climatology(MonthlyRecord[]))
 
@@ -105,7 +107,9 @@ end
         fill(285.0, GREBClimate.xdim, GREBClimate.ydim), fill(0.005, GREBClimate.xdim, GREBClimate.ydim))
     tend = (albedo=fill(0.3, GREBClimate.xdim, GREBClimate.ydim), SW=fill(100.0, GREBClimate.xdim, GREBClimate.ydim),
         ice_cover=fill(0.1, GREBClimate.xdim, GREBClimate.ydim), LW_surf=fill(-50.0, GREBClimate.xdim, GREBClimate.ydim),
-        Q_lat=fill(-20.0, GREBClimate.xdim, GREBClimate.ydim), Q_sens=fill(-5.0, GREBClimate.xdim, GREBClimate.ydim))
+        Q_lat=fill(-20.0, GREBClimate.xdim, GREBClimate.ydim), Q_sens=fill(-5.0, GREBClimate.xdim, GREBClimate.ydim),
+        LW_up=fill(-200.0, GREBClimate.xdim, GREBClimate.ydim), LW_down=fill(-210.0, GREBClimate.xdim, GREBClimate.ydim),
+        em=fill(0.75, GREBClimate.xdim, GREBClimate.ydim))
     ws.precip_out .= 2.0
     ws.evap_out .= 1.0
     ws.qcrcl_out .= 0.5
@@ -125,6 +129,10 @@ end
     @test mon == 2
     @test all(==(280.0), output_buf[1].Ts)
     @test all(==(2.0), output_buf[1].precip)
+    # Out to space: what the air emits upward plus the part of the surface's
+    # emission the air lets through, 200 + (1 - 0.75) * 50. Positive upward.
+    @test all(==(212.5), output_buf[1].olr)
+    @test all(==(210.0), output_buf[1].lwdown)   # positive into the surface
 end
 
 function _time_loop_fields()
@@ -190,27 +198,4 @@ end
 
     @test isnan(Ts[5, 5])
     @test isnan(Ta[40, 30])
-end
-
-@testset "time_loop! integrates the shared surface and atmosphere flux sums" begin
-    # One step of the run changes Ts and Ta by exactly these sums (plus the
-    # stored correction), so a term added to the sums reaches the run.
-    fields = _time_loop_fields()
-    r = resolve(preset(:full_model))
-    ini = quiet(() -> init_model!(r, fields))
-    fields.TF_correct .= 0.25f0
-    Ts, Ta, q, To = copy(ini.Ts_ini), copy(ini.Ta_ini), copy(ini.q_ini), copy(ini.To_ini)
-    tend = tendencies!(ini.CO2_ctrl, Ts, Ta, To, q, fields, ModelState(), CirculationWorkspace(), TimeState(1, 1), r)
-    Δt, cap_air, cap = GREBClimate.Δt, GREBClimate.cap_air, copy(fields.cap_surf)
-    dTs = [tend.dT_ocean[i, j] + Δt * (GREBClimate.surface_flux(tend, i, j) + 0.25f0) / cap[i, j]
-           for i in 1:X, j in 1:Y]
-    dTa = [tend.dTa_crcl[i, j] + Δt * GREBClimate.atmosphere_flux(tend, i, j) / cap_air for i in 1:X, j in 1:Y]
-    Ts0, Ta0 = copy(Ts), copy(Ta)
-    quiet() do
-        time_loop!(1, 1970, ini.CO2_ctrl, 1, 0, Ts, Ta, q, To, MonthlyRecord[], fields, ModelState(),
-                   CirculationWorkspace(), MonthlyAccumulator(), TimeState(1, 1), r)
-    end
-    # 1e-4 K is a few ulp of Ts; 1 W/m2 more or less over the ocean moves Ts by 2e-4 K
-    @test maximum(abs, (Ts .- Ts0) .- dTs) < 1e-4
-    @test maximum(abs, (Ta .- Ta0) .- dTa) < 1e-4
 end

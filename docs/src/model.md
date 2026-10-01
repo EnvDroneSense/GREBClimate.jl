@@ -60,7 +60,7 @@ terms, integrates the four prognostic fields, then updates sea ice.
 | Control (`ctrl` years of the [`RunSpec`](@ref)) | control: 340 ppm (280 for the IPCC scenarios) | The reference climate |
 | Scenario (`scnr` years) | set by [`forcing`](@ref) from the scenario | The experiment |
 
-The result holds monthly means (`MonthlyRecord`s) of 13 fields for the control
+The result holds monthly means (`MonthlyRecord`s) of 15 fields for the control
 and the scenario. The scenario is returned as an anomaly: each month minus the
 same calendar month of the control's final year, except for the orbital
 experiments and runs without a control. See the [Tutorial](@ref) for a run

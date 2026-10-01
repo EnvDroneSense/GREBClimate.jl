@@ -19,11 +19,9 @@ end
     @test eltype(ws.dTa_crcl) === Float32
 
     acc = MonthlyAccumulator()
-    fill!(acc.Tmm, 42.0f0)
-    fill!(acc.qsensmm, 42.0f0)
+    foreach(f -> fill!(getfield(acc, f), 42.0f0), fieldnames(MonthlyAccumulator))
     GREBClimate.reset!(acc)
-    @test all(iszero, acc.Tmm)
-    @test all(iszero, acc.qsensmm)
+    @test all(f -> all(iszero, getfield(acc, f)), fieldnames(MonthlyAccumulator))
 
     ts = TimeState(1, 1)
     @test ts.jday == 1
@@ -77,10 +75,10 @@ end
         @test all(iszero, v)
     end
 
-    # MonthlyAccumulator: 13 accumulators, all (xdim, ydim). There is no
+    # MonthlyAccumulator: 15 accumulators, all (xdim, ydim). There is no
     # `count` field - output! divides by cjday_mon[mon] * ndt_days.
     ma = MonthlyAccumulator()
-    @test length(fieldnames(MonthlyAccumulator)) == 13
+    @test length(fieldnames(MonthlyAccumulator)) == 15
     for f in fieldnames(MonthlyAccumulator)
         v = getfield(ma, f)
         @test size(v) == (X, Y) && eltype(v) === Float32 && all(iszero, v)

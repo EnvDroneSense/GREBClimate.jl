@@ -199,7 +199,7 @@ end
 
 """
     greb_model!(run::RunSpec, config::Config; jld2_dir="", fields=ClimateFields(),
-                allow_uninitialized=false)
+                allow_uninitialized=false, observer=nothing)
     greb_model!(run::RunSpec, r::ResolvedConfig; ...)
 
 Run `config`: the flux corrections its `corrections` ask for (a
@@ -215,13 +215,24 @@ anomaly against the control's final year when the scenario's `output` is
 `fields` while it runs (flux corrections, scenario anomalies, the
 climatologies the [`Processes`](@ref) options replace) and restores them when
 it returns, so one loaded `fields` can be passed to several runs.
+
+`observer` (experimental: what it is handed can change in any release) is a
+function `observer(point, view)` the control and scenario runs call twice per
+timestep: at `:after_tendencies`, when the step's flows are known and the
+state is still the old one, and at `:after_step`, when the state is updated.
+`view` is a `NamedTuple` with `phase` (`:ctrl` or `:scnr`), `it`, `year`,
+`ityr`, `CO2`, the state `Ts`, `Ta`, `To`, `q`, the flows `tend` (what
+[`tendencies!`](@ref) returns), `fields` and `config`. These are the model's
+own arrays: read them, copy what must outlast the call, and do not write to
+them. The flux-correction spin-up does not call it. `GREBClimate.BudgetCheck`
+is an observer that checks the step's bookkeeping.
 """
 greb_model!(run::RunSpec, config::Config; jld2_dir::AbstractString="", kwargs...) =
     greb_model!(run, resolve(config; jld2_dir); jld2_dir, kwargs...)
 
 function greb_model!(run::RunSpec, r::ResolvedConfig;
     jld2_dir::AbstractString="", fields::ClimateFields=ClimateFields(),
-    allow_uninitialized::Bool=false)
+    allow_uninitialized::Bool=false, observer=nothing)
     if !fields.loaded && !allow_uninitialized
         error("""
               greb_model! was given an uninitialized ClimateFields (all-zero climatology).
@@ -308,7 +319,7 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     for it in 1:(time_ctrl*nstep_yr)
         (mon, irec) = time_loop!(it, year, CO2_ctrl, mon, irec,
             Ts, Ta, q, To, ctrl_output, fields, state, ws, acc, timestate, r;
-            ws_a=ws_a, ws_q=ws_q)
+            ws_a=ws_a, ws_q=ws_q, observer=observer, phase=:ctrl)
         if mod(it, nstep_yr) == 0
             year += 1
         end
@@ -367,7 +378,7 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
 
         (mon, irec) = time_loop!(it, year, CO2, mon, irec,
             Ts, Ta, q, To, scnr_output, fields, state, ws, acc, timestate, r;
-            ws_a=ws_a, ws_q=ws_q)
+            ws_a=ws_a, ws_q=ws_q, observer=observer, phase=:scnr)
 
         if mod(it, nstep_yr) == 0
             year += 1

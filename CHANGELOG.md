@@ -31,6 +31,17 @@ Notable changes to GREBClimate.jl, following
 - A regression test that the MSCM configuration (`mscm_hydrology()`,
   `moisture_convergence = false`) reproduces the MSCM 2xCO2 response: year 1
   global mean 0.5946 K in both.
+- `MonthlyRecord` has two more fields: `olr`, the longwave leaving to space
+  (positive upward), and `lwdown`, the longwave the air sends to the surface
+  (positive downward), both in W/m2. Code that builds a `MonthlyRecord` by hand
+  or relies on its 13 fields has to add them.
+- `greb_model!(...; observer = f)` (experimental): `f(point, view)` is called
+  before and after every step's state update of the control and scenario runs
+  with the model's state and flows, for diagnostics that need per-step values.
+  Without it the run is unchanged. `GREBClimate.BudgetCheck()` is an observer
+  that checks each store changes by the sum of its flows and counts the cells
+  the model's limiters held; `tools/diagnostics/budget.jl` prints its result
+  and the global-mean flows of a run.
 
 ### Removed
 
