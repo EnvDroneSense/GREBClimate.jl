@@ -70,7 +70,7 @@ function hydro!(Ts, q, fields::ClimateFields, timestate, p::Processes, h::Resolv
 
                 u_val = u[i, j]; v_val = v[i, j]
                 wind = sqrt(u_val*u_val + v_val*v_val)
-                wind = sqrt(wind*wind + ifelse(z_topo[i, j] > 0.0f0, gust_land, gust_ocean))
+                wind = sqrt(wind*wind + ifelse(@is_land(z_topo[i, j]), gust_land, gust_ocean))
                 qlat = (q[i, j] - qs) * wind * const_latent * swet[i, j]
                 Q_lat[i, j] = qlat
 
@@ -93,7 +93,7 @@ function hydro!(Ts, q, fields::ClimateFields, timestate, p::Processes, h::Resolv
                 rq = q[i, j] / qs0
                 ws.rq[i, j] = rq
 
-                Tskin = ifelse(z_topo[i, j] > 0.0f0, Ts[i, j] + 5.0f0, Ts[i, j] + 1.0f0)
+                Tskin = ifelse(@is_land(z_topo[i, j]), Ts[i, j] + 5.0f0, Ts[i, j] + 1.0f0)
                 Tskin = ifelse(Tskin < 200.0f0, 200.0f0, Tskin)
                 ws.Tskin[i, j] = Tskin
                 T = Tskin - 273.15f0
@@ -101,10 +101,10 @@ function hydro!(Ts, q, fields::ClimateFields, timestate, p::Processes, h::Resolv
 
                 ws_base = ws_view[i, j]
                 ws.ws_base[i, j] = ws_base
-                gust = ifelse(z_topo[i, j] > 0.0f0, 132.25f0, 29.16f0)
+                gust = ifelse(@is_land(z_topo[i, j]), 132.25f0, 29.16f0)
                 wind = sqrt(ws_base*ws_base + gust)
 
-                cE = ifelse(z_topo[i, j] > 0.0f0, cE_land, cE_ocean)
+                cE = ifelse(@is_land(z_topo[i, j]), cE_land, cE_ocean)
                 ws.cE_buf[i, j] = cE
                 qlat = cE * wind * ρ_air * cq_latent * (q[i, j] - qs_val) * swet[i, j]
                 Q_lat[i, j] = qlat
@@ -131,8 +131,8 @@ function hydro!(Ts, q, fields::ClimateFields, timestate, p::Processes, h::Resolv
 
                 u_val = u[i, j]; v_val = v[i, j]
                 wind = sqrt(u_val*u_val + v_val*v_val)
-                wind = sqrt(wind*wind + ifelse(z_topo[i, j] > 0.0f0, gust_land_1, gust_ocean_1))
-                coeff = ifelse(z_topo[i, j] > 0.0f0, 0.04f0, 0.73f0)
+                wind = sqrt(wind*wind + ifelse(@is_land(z_topo[i, j]), gust_land_1, gust_ocean_1))
+                coeff = ifelse(@is_land(z_topo[i, j]), 0.04f0, 0.73f0)
                 qlat = (q[i, j] - qs) * wind * cq_latent * ρ_air * coeff * ce * swet[i, j]
                 Q_lat[i, j] = qlat
 
@@ -158,8 +158,8 @@ function hydro!(Ts, q, fields::ClimateFields, timestate, p::Processes, h::Resolv
                 ws.rq[i, j] = rq
 
                 wind = ws_view[i, j]
-                wind = sqrt(wind*wind + ifelse(z_topo[i, j] > 0.0f0, gust_land_2, gust_ocean_2))
-                coeff = ifelse(z_topo[i, j] > 0.0f0, 0.56f0, 0.79f0)
+                wind = sqrt(wind*wind + ifelse(@is_land(z_topo[i, j]), gust_land_2, gust_ocean_2))
+                coeff = ifelse(@is_land(z_topo[i, j]), 0.56f0, 0.79f0)
                 qlat = (q[i, j] - qs) * wind * cq_latent * ρ_air * coeff * ce * swet[i, j]
                 Q_lat[i, j] = qlat
 

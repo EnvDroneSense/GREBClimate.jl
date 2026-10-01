@@ -67,8 +67,10 @@ end
 end
 
 @testset "qflux_correction! pulls Ts/To/q to climatology; Ta gets no correction (matches Fortran)" begin
+    # All ocean (topography 0 m), so it needs a mixed layer
     fields = ClimateFields()
-    fields.cap_surf .= GREBClimate.cap_ocean
+    fields.mldclim .= 50.0
+    fields.cap_surf .= GREBClimate.cap_ocean * 50.0f0
     for j in 1:GREBClimate.ydim, i in 1:GREBClimate.xdim
         fields.Tclim[i, j, :] .= 280.0 + 5.0 * sin(i / 10.0) * cos(j / 8.0)
         fields.Toclim[i, j, :] .= 279.0
@@ -140,6 +142,14 @@ end
     @test all(==(0.5f0), f.co2_part[:, 1:24]) && all(isone, f.co2_part[:, 25:48])
     GREBClimate.apply_co2_mask!(UniformMask(), f)          # resets a reused fields
     @test all(isone, f.co2_part)
+    # Each band keeps the full CO2 at the latitudes it names (longitude 1 is
+    # clear of the edge rows' every-fourth-longitude exception)
+    lat = GREBClimate.lat_grid
+    full(band) = (GREBClimate.apply_co2_mask!(LatitudeMask(band), f); lat[f.co2_part[1, :] .== 1.0f0])
+    @test full(:nh) == lat[lat .> 0]
+    @test full(:sh) == lat[lat .< 0]
+    @test full(:tropics) == lat[-33.75 .< lat .< 30]
+    @test full(:extratropics) == lat[(lat .< -33.75) .| (lat .> 30)]
 
     fields = ClimateFields()  # z_topo defaults to 0 everywhere -> land branch never fires
     icmn_ctrl = zeros(Float64, X, Y, 12)

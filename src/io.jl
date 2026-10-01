@@ -276,11 +276,7 @@ function load_greb_jld2!(jld2_dir::String; dataset::Symbol=:ncep)
     println("📂 Loading flux corrections...")
     load_flux_corrections_jld2!(jld2_dir, fields)
 
-    # Update wind sign splits
-    @. fields.uclim_m = ifelse(fields.uclim >= 0.0, fields.uclim, 0.0)
-    @. fields.uclim_p = ifelse(fields.uclim < 0.0, fields.uclim, 0.0)
-    @. fields.vclim_m = ifelse(fields.vclim >= 0.0, fields.vclim, 0.0)
-    @. fields.vclim_p = ifelse(fields.vclim < 0.0, fields.vclim, 0.0)
+    split_winds!(fields)
 
     fields.loaded = true
     println("✅ All GREB data loaded successfully from JLD2")

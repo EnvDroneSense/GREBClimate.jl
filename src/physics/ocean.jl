@@ -17,7 +17,7 @@ function seaice!(Ts0, fields::ClimateFields, timestate, p::Processes)
 
     # Compute ice‑dependent heat capacity for ocean points
     @turbo for i in 1:xdim, j in 1:ydim
-        is_ocean = z_topo[i, j] < 0.0f0
+        is_ocean = !@is_land(z_topo[i, j])
         T = Ts0[i, j]
         mld_val = mld[i, j]
         cap_open = cap_ocean * mld_val
@@ -37,7 +37,7 @@ function seaice!(Ts0, fields::ClimateFields, timestate, p::Processes)
     # Override for experiments without ice‑albedo feedback
     if !p.ice_albedo
         @turbo for i in 1:xdim, j in 1:ydim
-            cap_surf[i, j] = ifelse(z_topo[i, j] > 0.0f0, cap_land, cap_ocean * mld[i, j])
+            cap_surf[i, j] = ifelse(@is_land(z_topo[i, j]), cap_land, cap_ocean * mld[i, j])
         end
     end
 
@@ -79,7 +79,7 @@ function deep_ocean!(Ts, To, fields::ClimateFields, timestate, p::Processes, ws:
 
     # ── Entrainment & detrainment & turbulent mixing ──────
     @turbo for i in 1:xdim, j in 1:ydim
-        is_ocean = z_topo[i, j] < 0.0f0
+        is_ocean = !@is_land(z_topo[i, j])
         # Entrainment/detrainment require Ts >= To_ice2
         active = is_ocean & (Ts[i, j] >= To_ice2)
         h_now = mld_now[i, j]

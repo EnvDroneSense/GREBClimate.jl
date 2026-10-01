@@ -60,6 +60,17 @@ Notable changes to GREBClimate.jl, following
   `forcing(it, year, resolved_config)` dispatches on the scenario's parts.
   `load_cc_anomaly_jld2!` and `load_enso_anomaly_jld2!` load every anomaly
   field and take no configuration.
+- `ClimateFields`: the winds split by sign are named for what they hold,
+  `uclim_pos`/`uclim_neg` and `vclim_pos`/`vclim_neg` (formerly `uclim_m`,
+  `uclim_p`, `vclim_m`, `vclim_p`, where `_m` held the positive part).
+- `GREBClimate.derive_fields!(fields, processes)` computes every field that
+  follows from the input maps (heat capacity, pressure weights, rain limit,
+  deep-ocean depth, radiation-temperature offset, wind split); `init_model!`
+  calls it, and it can be called again after changing a map. One land test,
+  `GREBClimate.is_land(z) = z > 0`, replaces the four spellings in the
+  kernels: a cell at exactly 0 m is ocean everywhere (no such cell exists in
+  the dataset, so results are unchanged). The regional CO2 bands are written
+  as latitudes instead of row numbers.
 - Documentation: the Configuration page (formerly Physics Switches) shows
   the configuration types' own docstrings and a preset table generated from
   the presets; the API reference is split into sections.

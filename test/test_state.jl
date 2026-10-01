@@ -91,3 +91,26 @@ end
     @test size(MonthlyAccumulator(Tmm = zeros(Float32, 2, 2)).Tmm) == (2, 2)
     @test size(CirculationWorkspace(T1h = zeros(Float32, 3)).T1h) == (3,)
 end
+
+@testset "derive_fields! follows the input maps" begin
+    fields = synthetic_fields()
+    quiet(() -> init_model!(resolve(preset(:full_model)), fields))
+    @test fields.cap_surf[60, 10] == GREBClimate.cap_ocean * fields.mldclim[60, 10, 1]
+
+    fields.z_topo[60, 10] = 500.0f0          # an ocean cell becomes land
+    fields.mldclim[70, 20, :] .= 80.0f0
+    fields.uclim[1, 1, 1] = -3.0f0
+    fields.vclim[2, 2, 2] = 4.0f0
+    GREBClimate.derive_fields!(fields, Processes())
+
+    @test fields.cap_surf[60, 10] == GREBClimate.cap_land
+    @test fields.wz_air[60, 10] == exp(-500.0f0 / GREBClimate.z_air)
+    @test fields.wz_vapor[60, 10] == exp(-500.0f0 / GREBClimate.z_vapor)
+    @test fields.z_ocean[70, 20] == 240.0f0
+    @test fields.cap_surf[70, 20] == GREBClimate.cap_ocean * 80.0f0
+    @test (fields.uclim_neg[1, 1, 1], fields.uclim_pos[1, 1, 1]) == (-3.0f0, 0.0f0)
+    @test (fields.vclim_neg[2, 2, 2], fields.vclim_pos[2, 2, 2]) == (0.0f0, 4.0f0)
+    @test fields.uclim_pos .+ fields.uclim_neg == fields.uclim
+    @test fields.vclim_pos .+ fields.vclim_neg == fields.vclim
+    @test all(>=(0), fields.uclim_pos) && all(<=(0), fields.uclim_neg)
+end

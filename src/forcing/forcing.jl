@@ -70,25 +70,25 @@ end
 
 _latitude_mask!(co2_part, ::CO2Mask) = co2_part
 
-# The band edges at every fourth longitude follow the original code
+# The tropics band runs from 33.75 S to 30 N, as in the original code, which
+# also keeps the full CO2 at every fourth longitude of the outermost rows it
+# halves.
+const _TROPICS_SOUTH = -33.75f0
+const _TROPICS_NORTH = 30.0f0
+
 function _latitude_mask!(co2_part, m::LatitudeMask)
+    south = findall(<(0), lat_grid)
+    tropics = findall(lat -> _TROPICS_SOUTH < lat < _TROPICS_NORTH, lat_grid)
     if m.band === :nh
-        co2_part[:, 1:24] .= 0.5f0
+        co2_part[:, south] .= 0.5f0
     elseif m.band === :sh
-        co2_part[:, 25:48] .= 0.5f0
+        co2_part[:, setdiff(1:ydim, south)] .= 0.5f0
     elseif m.band === :tropics
-        co2_part[:, 1:15] .= 0.5f0
-        co2_part[:, 33:48] .= 0.5f0
-        for i in 4:4:96
-            co2_part[i, 33] = 1.0f0
-            co2_part[i, 15] = 1.0f0
-        end
+        co2_part[:, setdiff(1:ydim, tropics)] .= 0.5f0
+        co2_part[4:4:xdim, [first(tropics) - 1, last(tropics) + 1]] .= 1.0f0
     else
-        co2_part[:, 16:32] .= 0.5f0
-        for i in 4:4:96
-            co2_part[i, 32] = 1.0f0
-            co2_part[i, 16] = 1.0f0
-        end
+        co2_part[:, tropics] .= 0.5f0
+        co2_part[4:4:xdim, [first(tropics), last(tropics)]] .= 1.0f0
     end
     return co2_part
 end
@@ -113,7 +113,7 @@ function apply_dynamic_co2_mask!(mask::SurfaceMask, fields::ClimateFields, icmn_
     if mask.surface === :ocean
         # 2×CO₂ ocean only: halve CO₂ over land, and over annual-mean ice.
         for j in 1:ydim, i in 1:xdim
-            if z_topo[i, j] > 0.0f0
+            if is_land(z_topo[i, j])
                 co2_part[i, j] = 0.5f0
             end
         end
@@ -125,7 +125,7 @@ function apply_dynamic_co2_mask!(mask::SurfaceMask, fields::ClimateFields, icmn_
     else
         # 2×CO₂ land/ice only: halve CO₂ over ocean, then exempt annual-mean ice.
         for j in 1:ydim, i in 1:xdim
-            if z_topo[i, j] <= 0.0f0
+            if !is_land(z_topo[i, j])
                 co2_part[i, j] = 0.5f0
             end
         end

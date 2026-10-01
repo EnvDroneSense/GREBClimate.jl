@@ -101,29 +101,29 @@ function _diffusion!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, ws::CirculationW
     ccx = ccx_diff
     is_polar = IS_POLAR
 
-    term_north = ws.term_north
     term_south = ws.term_south
+    term_north = ws.term_north
     T1h = ws.T1h
     dTxh = ws.dTxh
 
     # ----- Precompute k-independent terms for the poles -----
     @turbo for i in 1:xdim
         ip = i + nghost
-        # For k == 1 (North Pole)
-        term_north[i] = ccy * wzp[ip, 2] * (Tp[ip, 2] - Tp[ip, 1])
-        # For k == ydim (South Pole)
-        term_south[i] = ccy * wzp[ip, ydim-1] * (Tp[ip, ydim-1] - Tp[ip, ydim])
+        # k == 1, the southernmost row
+        term_south[i] = ccy * wzp[ip, 2] * (Tp[ip, 2] - Tp[ip, 1])
+        # k == ydim, the northernmost row
+        term_north[i] = ccy * wzp[ip, ydim-1] * (Tp[ip, ydim-1] - Tp[ip, ydim])
     end
 
     @inbounds for k in 1:ydim
         # ----- Meridional diffusion -----
         if k == 1
             @turbo for i in 1:xdim
-                dX_diff[i, k] = wzp[i+nghost, k] * term_north[i]
+                dX_diff[i, k] = wzp[i+nghost, k] * term_south[i]
             end
         elseif k == ydim
             @turbo for i in 1:xdim
-                dX_diff[i, k] = wzp[i+nghost, k] * term_south[i]
+                dX_diff[i, k] = wzp[i+nghost, k] * term_north[i]
             end
         else
             # Mid-latitudes: no precomputation possible (depends on k-1, k+1)
@@ -227,10 +227,10 @@ function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateF
     dX_adv = ws.dX_adv
 
     # Extract 2D views for current time step
-    vclim_p_t = @view fields.vclim_p[:, :, timestate.ityr]
-    vclim_m_t = @view fields.vclim_m[:, :, timestate.ityr]
-    uclim_p_t = @view fields.uclim_p[:, :, timestate.ityr]
-    uclim_m_t = @view fields.uclim_m[:, :, timestate.ityr]
+    vclim_neg_t = @view fields.vclim_neg[:, :, timestate.ityr]
+    vclim_pos_t = @view fields.vclim_pos[:, :, timestate.ityr]
+    uclim_neg_t = @view fields.uclim_neg[:, :, timestate.ityr]
+    uclim_pos_t = @view fields.uclim_pos[:, :, timestate.ityr]
 
     # Precomputed constants
     ccy = ccy_adv
@@ -242,21 +242,21 @@ function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateF
 
     @inbounds for k in 1:ydim
         # ----- Meridional (v) advection -----
-        if k == 1          # North Pole
+        if k == 1          # southernmost row
             @turbo for j in 1:xdim
-                v_p = vclim_p_t[j, k]
-                dX_adv[j, k] = ccy * v_p * (
+                v_neg = vclim_neg_t[j, k]
+                dX_adv[j, k] = ccy * v_neg * (
                     wzp[j+nghost, 2] * (Tp[j+nghost, 1] - Tp[j+nghost, 2]) +
                     wzp[j+nghost, 3] * (Tp[j+nghost, 1] - Tp[j+nghost, 3])
                 ) / 3.0f0
             end
         elseif k == 2
             @turbo for j in 1:xdim
-                v_m = vclim_m_t[j, k]
-                v_p = vclim_p_t[j, k]
+                v_pos = vclim_pos_t[j, k]
+                v_neg = vclim_neg_t[j, k]
                 dX_adv[j, k] = ccy * (
-                    -v_m * wzp[j+nghost, 1] * (Tp[j+nghost, 2] - Tp[j+nghost, 1]) +
-                    v_p * (wzp[j+nghost, 3] * (Tp[j+nghost, 2] - Tp[j+nghost, 3]) +
+                    -v_pos * wzp[j+nghost, 1] * (Tp[j+nghost, 2] - Tp[j+nghost, 1]) +
+                    v_neg * (wzp[j+nghost, 3] * (Tp[j+nghost, 2] - Tp[j+nghost, 3]) +
                            wzp[j+nghost, 4] * (Tp[j+nghost, 2] - Tp[j+nghost, 4])) / 3.0f0
                 )
             end
@@ -264,12 +264,12 @@ function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateF
             km1, km2 = k-1, k-2
             kp1, kp2 = k+1, k+2
             @turbo for j in 1:xdim
-                v_m = vclim_m_t[j, k]
-                v_p = vclim_p_t[j, k]
+                v_pos = vclim_pos_t[j, k]
+                v_neg = vclim_neg_t[j, k]
                 dX_adv[j, k] = ccy * (
-                    -v_m * (wzp[j+nghost, km1] * (Tp[j+nghost, k] - Tp[j+nghost, km1]) +
+                    -v_pos * (wzp[j+nghost, km1] * (Tp[j+nghost, k] - Tp[j+nghost, km1]) +
                             wzp[j+nghost, km2] * (Tp[j+nghost, k] - Tp[j+nghost, km2])) +
-                    v_p * (wzp[j+nghost, kp1] * (Tp[j+nghost, k] - Tp[j+nghost, kp1]) +
+                    v_neg * (wzp[j+nghost, kp1] * (Tp[j+nghost, k] - Tp[j+nghost, kp1]) +
                            wzp[j+nghost, kp2] * (Tp[j+nghost, k] - Tp[j+nghost, kp2]))
                 ) / 3.0f0
             end
@@ -277,20 +277,20 @@ function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateF
             km1, km2 = k-1, k-2
             kp1 = k+1
             @turbo for j in 1:xdim
-                v_m = vclim_m_t[j, k]
-                v_p = vclim_p_t[j, k]
+                v_pos = vclim_pos_t[j, k]
+                v_neg = vclim_neg_t[j, k]
                 dX_adv[j, k] = ccy * (
-                    -v_m * (wzp[j+nghost, km1] * (Tp[j+nghost, k] - Tp[j+nghost, km1]) +
+                    -v_pos * (wzp[j+nghost, km1] * (Tp[j+nghost, k] - Tp[j+nghost, km1]) +
                             wzp[j+nghost, km2] * (Tp[j+nghost, k] - Tp[j+nghost, km2])) / 3.0f0 +
-                    v_p * wzp[j+nghost, kp1] * (Tp[j+nghost, k] - Tp[j+nghost, kp1])
+                    v_neg * wzp[j+nghost, kp1] * (Tp[j+nghost, k] - Tp[j+nghost, kp1])
                 )
             end
-        else               # k == ydim (South Pole)
+        else               # k == ydim, the northernmost row
             km1, km2 = k-1, k-2
             @turbo for j in 1:xdim
-                v_m = vclim_m_t[j, k]
+                v_pos = vclim_pos_t[j, k]
                 dX_adv[j, k] = ccy * (
-                    -v_m * (wzp[j+nghost, km1] * (Tp[j+nghost, k] - Tp[j+nghost, km1]) +
+                    -v_pos * (wzp[j+nghost, km1] * (Tp[j+nghost, k] - Tp[j+nghost, km1]) +
                             wzp[j+nghost, km2] * (Tp[j+nghost, k] - Tp[j+nghost, km2]))
                 ) / 3.0f0
             end
@@ -305,11 +305,11 @@ function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateF
                 tm2 = Tp[j+1, k];  tm1 = Tp[j+2, k]
                 t0 = Tp[j+3, k]
                 tp1 = Tp[j+4, k];  tp2 = Tp[j+5, k]
-                u_m = uclim_m_t[j, k]
-                u_p = uclim_p_t[j, k]
+                u_pos = uclim_pos_t[j, k]
+                u_neg = uclim_neg_t[j, k]
                 dX_adv[j, k] += cc * (
-                    -u_m * (wm1 * (t0 - tm1) + wm2 * (t0 - tm2)) +
-                    u_p * (wp1 * (t0 - tp1) + wp2 * (t0 - tp2))
+                    -u_pos * (wm1 * (t0 - tm1) + wm2 * (t0 - tm2)) +
+                    u_neg * (wp1 * (t0 - tp1) + wp2 * (t0 - tp2))
                 ) / 3.0f0
             end
         else # polar regions - sub-timestepping
@@ -330,14 +330,14 @@ function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateF
                     tm3 = T1h[j];      tm2 = T1h[j+1];    tm1 = T1h[j+2]
                     t0 = T1h[j+3]
                     tp1 = T1h[j+4];    tp2 = T1h[j+5];    tp3 = T1h[j+6]
-                    u_m = uclim_m_t[j, k]
-                    u_p = uclim_p_t[j, k]
+                    u_pos = uclim_pos_t[j, k]
+                    u_neg = uclim_neg_t[j, k]
 
                     dTxh[j] = ccx2 * (
-                        -u_m * (10.0f0 * wm1 * (t0 - tm1) +
+                        -u_pos * (10.0f0 * wm1 * (t0 - tm1) +
                                 4.0f0 * wm2 * (tm1 - tm2) +
                                 1.0f0 * wm3 * (tm2 - tm3)) +
-                        u_p * (10.0f0 * wp1 * (t0 - tp1) +
+                        u_neg * (10.0f0 * wp1 * (t0 - tp1) +
                                4.0f0 * wp2 * (tp1 - tp2) +
                                1.0f0 * wp3 * (tp2 - tp3))
                     ) / 20.0f0

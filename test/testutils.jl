@@ -73,10 +73,7 @@ function synthetic_fields()
     f.Toclim .= 283.0f0
     f.cldclim .= 0.5f0
     f.swetclim .= 0.4f0
-    f.uclim_p .= max.(f.uclim, 0.0f0)
-    f.uclim_m .= min.(f.uclim, 0.0f0)
-    f.vclim_p .= max.(f.vclim, 0.0f0)
-    f.vclim_m .= min.(f.vclim, 0.0f0)
+    GREBClimate.split_winds!(f)
     return f
 end
 

@@ -27,7 +27,7 @@ function SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, p
             ifelse(T < To_ice2,
                 1.0f0 - (T - To_ice1) * inv_To_ice_range,
                 0.0f0))
-        ice_cover[i, j] = ifelse(z_topo[i, j] >= 0.0f0, land_expr, ocean_expr)
+        ice_cover[i, j] = ifelse(@is_land(z_topo[i, j]), land_expr, ocean_expr)
     end
 
     # 2. Atmospheric albedo
@@ -47,7 +47,7 @@ function SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, p
                 ifelse(T >= To_ice2, a_no_ice,
                     a_no_ice + da_ice * (1.0f0 - (T - To_ice1) * inv_To_ice_range)))
             # Choose based on topography
-            a_surf[i, j] = ifelse(z_topo[i, j] >= 0.0f0, land_alb, ocean_alb)
+            a_surf[i, j] = ifelse(@is_land(z_topo[i, j]), land_alb, ocean_alb)
             # Glacier override: if glacier mask > 0.5, set to ice albedo
             a_surf[i, j] = ifelse(glacier[i, j] > 0.5f0, a_no_ice + da_ice, a_surf[i, j])
         end

@@ -3,8 +3,9 @@
 
 One-time per-run setup: sets the CO₂ mask, applies the climatologies the
 [`Processes`](@ref) options replace (flat topography, cloud cover, humidity,
-mixed layer) and zeroes the flux corrections for `NoCorrections()`, then
-computes the control-run initial state. Returns
+mixed layer) and zeroes the flux corrections for `NoCorrections()`, derives
+the fields that follow from them ([`derive_fields!`](@ref)), then computes the
+control-run initial state. Returns
 `(Ts_ini, Ta_ini, To_ini, q_ini, CO2_ctrl)`.
 """
 function init_model!(r::ResolvedConfig, fields::ClimateFields)
@@ -16,12 +17,6 @@ function init_model!(r::ResolvedConfig, fields::ClimateFields)
 
     Tclim = fields.Tclim
     z_topo = fields.z_topo
-
-    # ── dTrad: offset between T_atm and radiation temperature ────
-    @. fields.dTrad = -0.16f0 * Tclim - 5.0f0
-
-    # ── z_ocean: 3× maximum mixed-layer depth over the year ──────
-    fields.z_ocean .= 3.0f0 .* dropdims(maximum(fields.mldclim; dims=3); dims=3)
 
     # ── Sensitivity experiment overrides ─────────────────────────
     if p.topography === :flat
@@ -55,26 +50,7 @@ function init_model!(r::ResolvedConfig, fields::ClimateFields)
         fields.mldclim .= d_ocean       # no deep ocean
     end
 
-    # ── Topography pressure weights ─────
-    @. fields.wz_air = exp(-z_topo / z_air)
-    @. fields.wz_vapor = exp(-z_topo / z_vapor)
-
-    # ── hydro!'s rain-limit divisor (rain = :rh): depends only on wz_vapor,
-    # invariant for the whole run
-    @. fields.rain_limit = -0.0015f0 / (fields.wz_vapor * r_qviwv * 86400.0f0)
-
-    # ── Surface heat capacity ────────────────────────────────────
-    cap_surf = fields.cap_surf
-    mldclim = fields.mldclim
-    @inbounds for j in 1:ydim
-        for i in 1:xdim
-            if z_topo[i, j] > 0.0f0
-                cap_surf[i, j] = cap_land
-            else
-                cap_surf[i, j] = p.ocean !== :none ? cap_ocean * mldclim[i, j, 1] : cap_land
-            end
-        end
-    end
+    derive_fields!(fields, p)
 
     # ── Initial conditions from last time step of climatology ────
     Ts_ini = Tclim[:, :, nstep_yr] |> copy          # surface temperature
@@ -373,7 +349,7 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
         if s.surface isa SSTOffset
             CO2 = CO2_ctrl
             ityr_now = mod(it - 1, nstep_yr) + 1
-            @. Ts = ifelse(fields.z_topo < 0.0f0, fields.Tclim[:, :, ityr_now] + s.surface.K, Ts)
+            @. Ts = ifelse(!is_land(fields.z_topo), fields.Tclim[:, :, ityr_now] + s.surface.K, Ts)
         end
 
         (mon, irec) = time_loop!(it, year, CO2, mon, irec,

@@ -27,6 +27,19 @@
     @test all(iszero, tend_off.Q_sens)
 end
 
+@testset "land is topography above 0 m, in every kernel" begin
+    @test GREBClimate.is_land.([-1.0f0, 0.0f0, 0.1f0]) == [false, false, true]
+
+    # At 270 K land and ocean give different ice cover; a cell at exactly 0 m
+    # goes with the ocean
+    fields = ClimateFields()
+    fields.z_topo[1, 1], fields.z_topo[2, 1], fields.z_topo[3, 1] = -1.0f0, 0.0f0, 1.0f0
+    sw = SWradiation!(fill(270.0f0, X, Y), fields, ModelState(), TimeState(1, 1), Processes(), CirculationWorkspace())
+    @test sw.ice_cover[2, 1] == sw.ice_cover[1, 1]
+    @test sw.ice_cover[3, 1] > sw.ice_cover[1, 1]
+    @test sw.albedo[2, 1] == sw.albedo[1, 1]
+end
+
 @testset "diffusion!/advection!/circulation! per-cell snapshot (incl. date-line wraparound)" begin
     fields = ClimateFields()
     xdim_, ydim_ = GREBClimate.xdim, GREBClimate.ydim
@@ -35,10 +48,10 @@ end
     fields.wz_air .= wz
     fields.wz_vapor .= wz
     for it in 1:GREBClimate.nstep_yr, k in 1:ydim_, i in 1:xdim_
-        fields.uclim_p[i, k, it] = 0.5 + 0.0001 * i
-        fields.uclim_m[i, k, it] = 0.3 + 0.0001 * k
-        fields.vclim_p[i, k, it] = 0.4 + 0.0002 * i
-        fields.vclim_m[i, k, it] = 0.2 + 0.0002 * k
+        fields.uclim_neg[i, k, it] = 0.5 + 0.0001 * i
+        fields.uclim_pos[i, k, it] = 0.3 + 0.0001 * k
+        fields.vclim_neg[i, k, it] = 0.4 + 0.0002 * i
+        fields.vclim_pos[i, k, it] = 0.2 + 0.0002 * k
     end
     ws = CirculationWorkspace()
     ts = TimeState(1, 1)

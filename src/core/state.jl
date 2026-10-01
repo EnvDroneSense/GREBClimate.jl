@@ -67,8 +67,8 @@ Base.@kwdef mutable struct CirculationWorkspace
     precip_out::Matrix{Float32} = zeros(Float32, xdim, ydim)  # precipitation output
     evap_out::Matrix{Float32} = zeros(Float32, xdim, ydim)  # evaporation output
     qcrcl_out::Matrix{Float32} = zeros(Float32, xdim, ydim)  # circulation moisture output
-    term_north::Vector{Float32} = zeros(Float32, xdim)  # northern boundary term
-    term_south::Vector{Float32} = zeros(Float32, xdim)  # southern boundary term
+    term_north::Vector{Float32} = zeros(Float32, xdim)  # diffusion term of the northernmost row
+    term_south::Vector{Float32} = zeros(Float32, xdim)  # diffusion term of the southernmost row
 end
 
 """
@@ -205,11 +205,11 @@ Base.@kwdef mutable struct ClimateFields
     omegaclim_anom_cc::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
     wsclim_anom_cc::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
 
-    # Precomputed wind sign splits
-    uclim_m::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # u >= 0 components
-    uclim_p::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # u < 0 components
-    vclim_m::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # v >= 0 components
-    vclim_p::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # v < 0 components
+    # The winds split by sign (derive_fields!): pos + neg = the wind
+    uclim_pos::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # eastward part, 0 elsewhere
+    uclim_neg::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # westward part, 0 elsewhere
+    vclim_pos::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # northward part, 0 elsewhere
+    vclim_neg::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # southward part, 0 elsewhere
 
     Toclim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # deep ocean temperature [K]
     cldclim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # cloud cover fraction
@@ -242,6 +242,66 @@ place each timestep by [`time_loop!`](@ref)/[`qflux_correction!`](@ref).
 mutable struct TimeState
     jday::Int  # Current calendar day in year [1..365]
     ityr::Int  # Current timestep in year [1..730]
+end
+
+# The land test as a macro for the `@turbo` loops, which compile a comparison
+# they can see better than a function call
+macro is_land(z)
+    return esc(:($z > 0.0f0))
+end
+
+"""
+    is_land(z_topo)
+
+Whether a cell of topographic height `z_topo` [m] is land: above 0 m.
+Everything else is ocean. The one land/ocean test of the model.
+"""
+is_land(z_topo) = @is_land(z_topo)
+
+"""
+    derive_fields!(fields::ClimateFields, p::Processes)
+
+Compute every field of `fields` that follows from its input maps: the
+radiation-temperature offset `dTrad` (from `Tclim`), the deep-ocean depth
+`z_ocean` (from `mldclim`), the pressure weights `wz_air`/`wz_vapor` and the
+rain limit (from `z_topo`), the surface heat capacity `cap_surf` (from
+`z_topo` and `mldclim`) and the winds split by sign. Call it again after
+changing an input map; [`init_model!`](@ref) calls it once per run.
+"""
+function derive_fields!(fields::ClimateFields, p::Processes)
+    z_topo = fields.z_topo
+    mldclim = fields.mldclim
+
+    @. fields.dTrad = -0.16f0 * fields.Tclim - 5.0f0
+    # Three times the deepest mixed layer of the year
+    fields.z_ocean .= 3.0f0 .* dropdims(maximum(mldclim; dims=3); dims=3)
+
+    @. fields.wz_air = exp(-z_topo / z_air)
+    @. fields.wz_vapor = exp(-z_topo / z_vapor)
+    @. fields.rain_limit = -0.0015f0 / (fields.wz_vapor * r_qviwv * 86400.0f0)
+
+    cap_surf = fields.cap_surf
+    for j in 1:ydim, i in 1:xdim
+        cap_surf[i, j] = is_land(z_topo[i, j]) || p.ocean === :none ? cap_land : cap_ocean * mldclim[i, j, 1]
+    end
+
+    split_winds!(fields)
+    return fields
+end
+
+# Upwind advection reads the eastward/westward and northward/southward parts
+function split_winds!(fields::ClimateFields)
+    _split_sign!(fields.uclim_pos, fields.uclim_neg, fields.uclim)
+    _split_sign!(fields.vclim_pos, fields.vclim_neg, fields.vclim)
+    return fields
+end
+
+function _split_sign!(pos, neg, x)
+    @turbo for i in eachindex(x)
+        pos[i] = ifelse(x[i] >= 0.0f0, x[i], 0.0f0)
+        neg[i] = ifelse(x[i] < 0.0f0, x[i], 0.0f0)
+    end
+    return nothing
 end
 
 """
