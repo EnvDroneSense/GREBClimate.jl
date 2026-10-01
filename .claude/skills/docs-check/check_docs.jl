@@ -22,7 +22,7 @@
 const ROOT = normpath(joinpath(@__DIR__, "..", "..", ".."))
 const DOC_FILES = ["README.md", "DATA_README.md", "CHANGELOG.md",
                    "docs/src/index.md", "docs/src/tutorial.md",
-                   "docs/src/switches.md", "docs/src/api.md"]
+                   "docs/src/configuration.md", "docs/src/api.md"]
 
 failures = String[]
 fail(msg) = (push!(failures, msg); println("  FAIL  ", msg))
@@ -84,7 +84,7 @@ let src = read(joinpath(ROOT, "src", "GREBClimate.jl"), String)
     end
     isempty(exported) && fail("no exports parsed from src/GREBClimate.jl")
     missing_names = String[]
-    for rel in ["docs/src/tutorial.md", "docs/src/switches.md", "README.md"]
+    for rel in ["docs/src/tutorial.md", "docs/src/configuration.md", "README.md"]
         s = read(joinpath(ROOT, rel), String)
         # [`name`](@ref) - Documenter would catch these, but this is instant
         for m in eachmatch(r"\[`([A-Za-z_][A-Za-z0-9_!]*)`\]\(@ref\)", s)

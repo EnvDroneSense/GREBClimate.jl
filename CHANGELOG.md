@@ -49,6 +49,9 @@ Notable changes to GREBClimate.jl, following
   `forcing(it, year, resolved_config)` dispatches on the scenario's parts.
   `load_cc_anomaly_jld2!` and `load_enso_anomaly_jld2!` load every anomaly
   field and take no configuration.
+- Documentation: the Configuration page (formerly Physics Switches) shows
+  the configuration types' own docstrings and a preset table generated from
+  the presets; the API reference is split into sections.
 - Source layout: the configuration lives in `src/config/`, `forcing()` in
   `src/forcing/`, `circulation.jl` in `src/physics/`.
 

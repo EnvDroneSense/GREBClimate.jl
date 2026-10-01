@@ -27,7 +27,7 @@ makedocs(
         "Input data" => "data.md",
         "Model overview" => "model.md",
         "Plots and notebook" => "viz.md",
-        "Configuration" => "switches.md",
+        "Configuration" => "configuration.md",
         "API Reference" => "api.md",
     ],
 )
