@@ -34,6 +34,16 @@ c_{surf} \frac{dT_{surf}}{dt} = F_{solar} + F_{thermal} + F_{latent} + F_{sense}
 The atmospheric temperature and humidity have similar budgets, plus transport
 by the circulation.
 
+### Signs and units
+
+Heat fluxes are in W/m². A term in a layer's budget is positive when it warms
+that layer, so heat moved from the surface to the air is negative in the
+surface budget and positive in the air's. Output fields at the surface (`sw`,
+`lwdown`, `qlat`, `qsens`) are positive into the surface; `lw` is the
+surface's own emission and therefore negative; `olr`, the longwave leaving to
+space, is positive upward. Two internal arrays keep the sign of the original
+code: the longwave emitted by the surface and by the air are stored negative.
+
 ## Components
 
 Each timestep (12 hours, 730 per year) [`time_loop!`](@ref) calls
