@@ -143,7 +143,7 @@ a change to the flux sums or the humidity limiters,
 **Benchmarks:**
 
 ```bash
-julia --project=. -t 2 benchmark/run_benchmarks.jl year
+julia --project=. -t 2,0 benchmark/run_benchmarks.jl year
 ```
 
 Two threads is the current recommendation: the temperature and humidity

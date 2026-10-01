@@ -1,13 +1,13 @@
 # Timing and allocation benchmarks for GREBClimate.jl.
 #
-#   julia --project=. -t 2 benchmark/run_benchmarks.jl [mode] [jld2_dir] [reps]
+#   julia --project=. -t 2,0 benchmark/run_benchmarks.jl [mode] [jld2_dir] [reps]
 #
 #   year    - time a 1-year control run (default)
 #   stages  - time each physics stage of one timestep
 #   threads - time `year` at -t 1, 2, 3, 4
 #   alloc   - bytes allocated by one tendencies! call
 #   years   - time a multi-year control+scenario run, e.g.:
-#               julia --project=. -t 2 benchmark/run_benchmarks.jl years --ctrl=10 --scnr=100
+#               julia --project=. -t 2,0 benchmark/run_benchmarks.jl years --ctrl=10 --scnr=100
 #             --ctrl=N, --scnr=N (default 10/10), --experiment=NAME (default full_model)
 
 using GREBClimate
@@ -157,7 +157,7 @@ function sweep_threads(jld2_dir::AbstractString; thread_counts=(1, 2, 3, 4), rep
     results = Dict{Int,Vector{Float64}}()
     for n in thread_counts
         println("--- -t $n ---")
-        cmd = `$JULIA_BIN --project=$REPO -t $n $script year $jld2_dir $reps`
+        cmd = `$JULIA_BIN --project=$REPO -t $n,0 $script year $jld2_dir $reps`
         output = read(cmd, String)
         print(output)
         runs = [parse(Float64, m.captures[1]) for m in eachmatch(r"run\s+\d+:\s*([\d.]+)\s*s", output)]
