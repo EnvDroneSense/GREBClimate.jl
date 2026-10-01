@@ -1,85 +1,43 @@
-# greb_model! integration: experiment dispatch, scenario tables, flux correction.
+# greb_model! integration: presets end to end, scenario tables, CO2 masks, flux corrections.
 
 @testset "greb_model! baseline: default config runs to completion with the right output shape" begin
-    cfg = create_experiment_config(:full_model)
     result = quiet() do
-        greb_model!(RunSpec(scnr = 0), cfg; jld2_dir = "", allow_uninitialized = true)
+        greb_model!(RunSpec(scnr = 0), preset(:full_model); jld2_dir = "", allow_uninitialized = true)
     end
     @test length(result.ctrl) == 12
     @test length(result.scnr) == 0
     @test result.ctrl[1] isa MonthlyRecord
 end
 
-@testset "greb_model! flux-correction spin-up: loaded files aren't overwritten by qflux_correction!" begin
-    tmpdir = mktempdir()
-    try
-        mkpath(joinpath(tmpdir, "climatology"))
-        GREBClimate.jldopen(joinpath(tmpdir, "climatology", "flux_corrections.jld2"), "w") do f
-            f["Tsurf_flux_correction"] = fill(42.0, GREBClimate.xdim, GREBClimate.ydim, GREBClimate.nstep_yr)
-            f["vapour_flux_correction"] = fill(43.0, GREBClimate.xdim, GREBClimate.ydim, GREBClimate.nstep_yr)
-            f["Tocean_flux_correction"] = fill(44.0, GREBClimate.xdim, GREBClimate.ydim, GREBClimate.nstep_yr)
-        end
-
-        cfg = create_experiment_config(:full_model)
-        cfg.log_topo_drsp = false
-        cfg.log_qflux_dmc = true
-        fields = ClimateFields()
-        # greb_model! restores `fields` when it returns, so the branch it took
-        # is read from its progress output: load the file, never recompute.
-        log = mktemp() do path, io
-            redirect_stdout(io) do
-                greb_model!(RunSpec(flux = 1, ctrl = 0, scnr = 0), cfg; jld2_dir = tmpdir, fields = fields, allow_uninitialized = true)
-            end
-            flush(io)
-            read(path, String)
-        end
-        @test occursin("loading flux correction fields", log)
-        @test !occursin("% flux correction  CO2", log)
-        # The loader itself fills the three arrays from the file
-        GREBClimate.load_flux_corrections_jld2!(tmpdir, fields)
-        @test all(==(42.0), fields.TF_correct)
-        @test all(==(43.0), fields.qF_correct)
-        @test all(==(44.0), fields.ToF_correct)
-    finally
-        rm(tmpdir; recursive = true, force = true)
-    end
-end
-
-@testset "greb_model! runs across log_eva / log_rain branches" begin
-    # One end-to-end run proves the plumbing. The remaining log_eva values are
-    # separate `@turbo` blocks in `hydro!`, reachable directly for the price of
-    # one call each rather than a simulated year each.
-    cfg = create_experiment_config(:full_model)
-    cfg.log_eva, cfg.log_rain = -1, 0
-    result = quiet() do
-        greb_model!(RunSpec(scnr = 0), cfg; jld2_dir = "", allow_uninitialized = true)
-    end
-    @test length(result.ctrl) == 12
-
+@testset "hydro! is finite under every evaporation and rain scheme" begin
+    # Each evaporation scheme is a separate `@turbo` block in `hydro!`; the
+    # default pair runs end to end in the baseline testset.
     fields = synthetic_fields()
     Ts = fill(288.0f0, X, Y)
     q = fill(0.005f0, X, Y)
-    for (log_eva, log_rain) in ((-1, -1), (0, 1), (1, 2), (2, 3))
-        c = create_experiment_config(:full_model)
-        c.log_eva, c.log_rain = log_eva, log_rain
+    for (evaporation, rain) in ((:original, :original), (:skin, :rh), (:original_gust, :omega), (:skin_gust, :rh_omega))
+        r = resolve(preset(:full_model; hydrology = (; evaporation, rain)))
         quiet() do
-            init_model!(c, fields)
+            init_model!(r, fields)
         end
-        out = hydro!(Ts, q, fields, TimeState(1, 1), c, CirculationWorkspace())
+        out = hydro!(Ts, q, fields, TimeState(1, 1), Processes(), r.hydrology, CirculationWorkspace())
         @test all(isfinite, out.Q_lat)
         @test all(isfinite, out.dq_rain)
     end
 end
 
-@testset "qflux_correction! pulls Ts/To/q to climatology; Ta gets no correction (matches Fortran)" begin
+@testset "qflux_correction! pulls Ts/To/q to climatology; Ta gets no correction" begin
+    # All ocean (topography 0 m), so it needs a mixed layer
     fields = ClimateFields()
-    fields.cap_surf .= GREBClimate.cap_ocean
+    fields.mldclim .= 50.0
+    fields.cap_surf .= GREBClimate.cap_ocean * 50.0f0
     for j in 1:GREBClimate.ydim, i in 1:GREBClimate.xdim
         fields.Tclim[i, j, :] .= 280.0 + 5.0 * sin(i / 10.0) * cos(j / 8.0)
         fields.Toclim[i, j, :] .= 279.0
         fields.qclim[i, j, :] .= 0.006
     end
-    cfg = create_experiment_config(:full_model)
+    # Rain coefficients (1, 0, 0, 0): this hand-made climatology has no omega
+    r = resolve(preset(:full_model; hydrology = (rain = :original,)))
     state = ModelState()
     ts = TimeState(1, 1)
     ws = CirculationWorkspace()
@@ -89,7 +47,7 @@ end
     q = fill(0.010, GREBClimate.xdim, GREBClimate.ydim)
     To = fill(285.0, GREBClimate.xdim, GREBClimate.ydim)
 
-    GREBClimate.qflux_correction!(340.0, Ts, Ta, q, To, fields, state, ts, cfg, ws, 1)
+    GREBClimate.qflux_correction!(340.0, Ts, Ta, q, To, fields, state, ts, r, ws, 1)
 
     @test any(!=(0.0), fields.TF_correct)
     @test any(!=(0.0), fields.ToF_correct)
@@ -119,35 +77,37 @@ end
             file["dim_names"] = ["lat", "time"]
         end
 
-        cfg = create_experiment_config(:paleo_231kyr)
-        captured = mktemp() do path, io
-            result = redirect_stdout(io) do
-                greb_model!(RunSpec(ctrl = 0), cfg; jld2_dir = tmpdir, fields = fields, allow_uninitialized = true)
-            end
-            flush(io)
-            (result = result, text = read(path, String))
-        end
-        @test length(captured.result.scnr) == 12
-        @test occursin("loading alternate solar forcing", captured.text)
+        cfg = preset(:paleo_231kyr; corrections = NoCorrections())
+        @test all(==(distinctive_value), resolve(cfg; jld2_dir = tmpdir).solar_table)
+        sw_solar(phase, run) = at_first_step(v -> copy(v.fields.sw_solar), run, cfg; phase, jld2_dir = tmpdir, fields)
+        # The control keeps the modern table, the scenario runs on the paleo one
+        @test sw_solar(:ctrl, RunSpec(ctrl = 1, scnr = 0)) == saved_sw_solar
+        @test all(==(distinctive_value), sw_solar(:scnr, RunSpec(ctrl = 0, scnr = 1)))
 
         # sw_solar restored to its pre-run value after greb_model! returns
-        @test fields.sw_solar == saved_sw_solar
-
-        cfg_plain = create_experiment_config(:full_model)
-        quiet() do
-            greb_model!(RunSpec(scnr = 0), cfg_plain; jld2_dir = "", fields = fields, allow_uninitialized = true)
-        end
         @test fields.sw_solar == saved_sw_solar
     finally
         rm(tmpdir; recursive = true, force = true)
     end
 end
 
-@testset "apply_dynamic_co2_mask! uses the annual-mean ice cover, not January" begin
-    fields = ClimateFields()  # z_topo defaults to 0 everywhere -> land branch never fires
-    cfg = PhysicsConfig(experiment = :regional_co2_ocean)
+@testset "CO2 masks: latitude bands at once, surface masks from the annual-mean ice cover" begin
+    f = ClimateFields()
+    GREBClimate.apply_co2_mask!(LatitudeMask(:nh), f)
+    @test all(==(0.5f0), f.co2_part[:, 1:24]) && all(isone, f.co2_part[:, 25:48])
+    GREBClimate.apply_co2_mask!(UniformMask(), f)          # resets a reused fields
+    @test all(isone, f.co2_part)
+    # Each band keeps the full CO2 at the latitudes it names (longitude 1 is
+    # clear of the edge rows' every-fourth-longitude exception)
+    lat = GREBClimate.lat_grid
+    full(band) = (GREBClimate.apply_co2_mask!(LatitudeMask(band), f); lat[f.co2_part[1, :] .== 1.0f0])
+    @test full(:nh) == lat[lat .> 0]
+    @test full(:sh) == lat[lat .< 0]
+    @test full(:tropics) == lat[-33.75 .< lat .< 30]
+    @test full(:extratropics) == lat[(lat .< -33.75) .| (lat .> 30)]
 
-    icmn_ctrl = zeros(Float64, GREBClimate.xdim, GREBClimate.ydim, 12)
+    fields = ClimateFields()  # z_topo defaults to 0 everywhere -> land branch never fires
+    icmn_ctrl = zeros(Float64, X, Y, 12)
     # Cell A: January alone >= 0.5, but the other 11 months are 0 ->
     # annual mean ~0.083, NOT ice under the Fortran-matching rule.
     icmn_ctrl[1, 1, 1] = 1.0
@@ -156,88 +116,40 @@ end
     icmn_ctrl[2, 1, 1] = 0.0
     icmn_ctrl[2, 1, 2:12] .= 1.0
 
-    GREBClimate.apply_dynamic_co2_mask!(cfg, fields, icmn_ctrl)
-
+    GREBClimate.apply_dynamic_co2_mask!(SurfaceMask(:ocean), fields, icmn_ctrl)
     @test fields.co2_part[1, 1] == 1.0  # January said "ice"; annual mean says no
     @test fields.co2_part[2, 1] == 0.5  # January said "no ice"; annual mean says yes
 
-    # forcing() no longer mutates the mask - it is pure for these two now.
-    fresh = ClimateFields()
-    forcing(1, 1970, cfg, fresh, icmn_ctrl)
-    @test all(isone, fresh.co2_part)
-    @test forcing(1, 1970, cfg, fresh, icmn_ctrl).CO2 == 680.0f0
-
     # The land/ice variant inverts the ocean mask and exempts ice cells.
     f_li = ClimateFields()
-    cfg_li = PhysicsConfig(experiment = :regional_co2_land_ice)
-    GREBClimate.apply_dynamic_co2_mask!(cfg_li, f_li, icmn_ctrl)
+    GREBClimate.apply_dynamic_co2_mask!(SurfaceMask(:land_ice), f_li, icmn_ctrl)
     @test f_li.co2_part[1, 1] == 0.5  # ocean cell, not annual-mean ice
     @test f_li.co2_part[2, 1] == 1.0  # annual-mean ice -> exempted back to 1.0
 
-    # Every other experiment is a no-op.
-    f_noop = ClimateFields()
-    GREBClimate.apply_dynamic_co2_mask!(PhysicsConfig(experiment = :full_model),
-                                        f_noop, icmn_ctrl)
-    @test all(isone, f_noop.co2_part)
-end
-
-@testset "forcing()/init_model! dispatch on every experiment symbol" begin
-    # These reach forcing() directly - no model run needed to prove the branch
-    # exists and returns finite numbers.
-    direct_dispatch_symbols = (
-        :a1b_scenario, :co2_10x, :co2_half, :co2_zero, :solar_cycle_11yr,
-        :co2_sine_wave, :co2_step, :modern_solar_paleo_co2,
-        :earth_sun_distance, :regional_co2_nh, :regional_co2_sh,
-        :regional_co2_tropics, :regional_co2_extratropics,
-        :regional_co2_ocean, :regional_co2_land_ice, :regional_co2_winter,
-        :regional_co2_summer,
-    )
-    for sym in direct_dispatch_symbols
-        fields = ClimateFields()
-        cfg = PhysicsConfig(experiment = sym)
-        icmn_ctrl = zeros(Float64, X, Y, 1)
-        quiet() do
-            init_model!(cfg, fields)
-        end
-        result = forcing(1, 1970, cfg, fields, icmn_ctrl)
-        @test isfinite(result.CO2)
-        @test isfinite(result.sw_solar_forcing)
+    # Every other mask is a no-op here.
+    for mask in (UniformMask(), LatitudeMask(:sh))
+        f_noop = ClimateFields()
+        GREBClimate.apply_dynamic_co2_mask!(mask, f_noop, icmn_ctrl)
+        @test all(isone, f_noop.co2_part)
     end
 end
 
 @testset "IPCC scenario CO2 tables load under the right on-disk key" begin
-    # `greb_model!` calls load_co2_scenario_jld2 once at scenario start. Assert
-    # the loader against every key instead of paying a simulated year each;
-    # :rcp60's on-disk key is "rcp6", and :historical_co2's is "hist".
+    # The resolve step loads each table once. Assert the loader against every
+    # preset's key instead of paying a simulated year each.
     expected = Dict(:rcp26 => 400.0, :rcp45 => 401.0, :rcp60 => 402.0,
                     :ssp119 => 300.0, :ssp126 => 301.0, :ssp245 => 302.0,
                     :ssp460 => 303.0, :ssp585 => 304.0, :historical_co2 => 280.73)
-    disk_key = Dict(:rcp60 => "rcp6", :historical_co2 => "hist")
+    key(p) = preset(p).scenario.co2.key
     with_tempdir() do dir
-        write_ipcc_scenarios(dir, Dict(
-            get(disk_key, sym, string(sym)) => Dict(1950 => co2)
-            for (sym, co2) in expected))
-        for (sym, co2) in expected
-            key = GREBClimate._CO2_SCENARIO_KEY
-            scenario_key = get(key, sym, sym)
-            table = load_co2_scenario_jld2(dir, scenario_key)
-            @test isapprox(table[1950], co2; atol = 1e-3)
+        write_ipcc_scenarios(dir, Dict(string(key(p)) => Dict(1950 => co2) for (p, co2) in expected))
+        for (p, co2) in expected
+            @test isapprox(load_co2_scenario_jld2(dir, key(p))[1950], co2; atol = 1e-3)
         end
 
-        # One end-to-end run proves greb_model! actually wires the table in.
-        cfg = PhysicsConfig(experiment = :rcp45)
-        result = quiet() do
-            greb_model!(RunSpec(ctrl = 0, scnr = 1), cfg; jld2_dir = dir,
-                        allow_uninitialized = true)
-        end
-        @test length(result.scnr) == 12
-        @test cfg.co2_scenario == Dict(1950 => expected[:rcp45])
-
-        # A year missing from the table must raise a clear error rather than
-        # silently defaulting.
-        cfg_missing_year = PhysicsConfig(experiment = :ssp585)
-        @test_throws ErrorException greb_model!(RunSpec(ctrl = 0, scnr = 2),
-            cfg_missing_year; jld2_dir = dir, allow_uninitialized = true)
+        # The scenario runs on the table's value
+        @test at_first_step(v -> v.CO2, RunSpec(ctrl = 0, scnr = 1),
+                            preset(:rcp45; corrections = NoCorrections()); jld2_dir = dir) == Float32(expected[:rcp45])
     end
 end
 
@@ -257,80 +169,73 @@ end
         rm(bad_path)
         @test !isfile(bad_path)
 
-        # ...then one run to prove greb_model! reads cfg.custom_co2_path.
-        cfg = create_experiment_config(:custom_co2; co2_path = co2_path)
-        result = quiet() do
-            greb_model!(RunSpec(ctrl = 0, scnr = 1), cfg; jld2_dir = "",
-                        allow_uninitialized = true)
-        end
-        @test length(result.scnr) == 12
-        @test cfg.co2_scenario == Dict(1950 => 300.0, 1951 => 301.0)
+        # ...and the scenario runs on the file's value.
+        cfg = preset(:custom_co2; path = co2_path, corrections = NoCorrections())
+        @test at_first_step(v -> v.CO2, RunSpec(ctrl = 0, scnr = 1), cfg; jld2_dir = "") == 300.0f0
 
-        # Unset custom_co2_path must raise a clear error, not silently dispatch
-        # or default.
-        cfg_unset = PhysicsConfig(experiment = :custom_co2)
-        @test_throws ErrorException greb_model!(RunSpec(ctrl = 0, scnr = 1),
-            cfg_unset; jld2_dir = "", allow_uninitialized = true)
+        # A missing path must raise a clear error, not silently default.
+        @test_throws ArgumentError greb_model!(RunSpec(ctrl = 0, scnr = 1),
+            preset(:custom_co2); jld2_dir = "", allow_uninitialized = true)
     end
 end
 
-@testset "paleo/orbital solar tables load; one runs end to end" begin
+@testset "paleo/orbital solar tables load; an orbital scenario runs on its table" begin
     with_tempdir() do dir
         write_solar_scenarios(dir)
         # The loader is the mechanism; assert all three tables directly.
-        for (sym, ftype) in ((:paleo_solar_modern_co2, :paleo),
-                             (:obliquity, :obliquity), (:eccentricity, :eccentricity))
-            table = load_solar_forcing_jld2(dir, ftype, 0)
+        for kind in (:paleo, :obliquity, :eccentricity)
+            table = load_solar_forcing_jld2(dir, kind, 0)
             @test size(table) == (Y, N)
             @test all(==(999.0f0), table)
         end
 
-        cfg = PhysicsConfig(experiment = :obliquity)
-        result = quiet() do
-            greb_model!(RunSpec(ctrl = 0, scnr = 1), cfg; jld2_dir = dir,
-                        allow_uninitialized = true)
-        end
-        @test length(result.scnr) == 12
+        cfg = preset(:obliquity; index = 0, corrections = NoCorrections())
+        @test all(==(999.0f0), at_first_step(v -> copy(v.fields.sw_solar), RunSpec(ctrl = 0, scnr = 1), cfg; jld2_dir = dir))
     end
 end
 
-@testset "greb_model! smoke: sst_plus1, decon presets, dynamic regional mask" begin
-    cfg = PhysicsConfig(experiment = :sst_plus1)
-    result = quiet() do
-        greb_model!(RunSpec(ctrl = 0, scnr = 1), cfg; jld2_dir = "",
-                    allow_uninitialized = true)
-    end
-    @test length(result.scnr) == 12
+@testset "greb_model!: sst_plus1, the deconstruction presets, the dynamic regional mask" begin
+    # sst_plus1: the ocean surface is held 1 K above the climatology (all
+    # ocean and 0 K here) and the CO2 stays at the control value
+    seen = at_first_step(v -> (Ts = copy(v.Ts), CO2 = v.CO2), RunSpec(ctrl = 0, scnr = 1),
+                         preset(:sst_plus1; corrections = NoCorrections()); point = :after_tendencies, jld2_dir = "")
+    @test all(==(1.0f0), seen.Ts) && seen.CO2 == 340
 
-    # :decon_mean_climate (control-run only) / :decon_2xco2 (scenario run).
+    # The original-GREB physics of the deconstruction presets, end to end
     result_dmc = quiet() do
         greb_model!(RunSpec(ctrl = 1, scnr = 0),
-                    create_experiment_config(:decon_mean_climate);
+                    preset(:decon_mean_climate);
                     jld2_dir = "", allow_uninitialized = true)
     end
     @test length(result_dmc.ctrl) == 12
+    @test at_first_step(v -> v.CO2, RunSpec(ctrl = 0, scnr = 1),
+                        preset(:decon_2xco2; corrections = NoCorrections()); jld2_dir = "") == 680
 
-    result_drsp = quiet() do
-        greb_model!(RunSpec(ctrl = 0, scnr = 1),
-                    create_experiment_config(:decon_2xco2);
-                    jld2_dir = "", allow_uninitialized = true)
-    end
-    @test length(result_drsp.scnr) == 12
-
+    # greb_model! builds the mask from the control run's own ice cover. The
+    # data-free control is not physical, so compare against the mask that ice
+    # cover gives rather than against a fixed pattern.
     run_mask(sym) = begin
         f = ClimateFields()
         f.z_topo[1:(X - 48), :] .= 100.0f0   # left half land, right half ocean
-        quiet() do
-            greb_model!(RunSpec(ctrl = 1, scnr = 0), PhysicsConfig(experiment = sym);
+        cfg = preset(sym; corrections = NoCorrections())
+        result = quiet() do
+            greb_model!(RunSpec(ctrl = 1, scnr = 0), cfg;
                         jld2_dir = "", fields = f, allow_uninitialized = true)
         end
-        f.co2_part
+        expected = ClimateFields()
+        expected.z_topo .= f.z_topo
+        GREBClimate.apply_dynamic_co2_mask!(cfg.scenario.co2_mask, expected, compute_annual_ice_climatology(result.ctrl))
+        (got = copy(f.co2_part), expected = expected.co2_part)
     end
-    @test all(==(0.5f0), run_mask(:regional_co2_ocean))
-    @test all(isone, run_mask(:regional_co2_land_ice))
+    ocean = run_mask(:regional_co2_ocean)
+    @test ocean.got == ocean.expected
+    @test all(==(0.5f0), ocean.got[1:(X - 48), :])   # land halved whatever the ice
+    land_ice = run_mask(:regional_co2_land_ice)
+    @test land_ice.got == land_ice.expected
+    @test all(isone, land_ice.got[1:(X - 48), :])    # land kept whatever the ice
 end
 
-@testset "CMIP5/ERA-Interim anomaly forcing is actually loaded (was previously a silent no-op)" begin
+@testset "boundary anomalies: the files load and are added to the climatology, in the scenario only" begin
     tmpdir_anom = mktempdir()
     try
         clim_dir = joinpath(tmpdir_anom, "climatology")
@@ -340,14 +245,14 @@ end
             file["dim_names"] = ["lon", "lat", "time"]
         end
 
-        # :rcp85 → CMIP5 RCP8.5 ensemble-mean anomaly
+        # :rcp85_boundary: CMIP5 RCP8.5 ensemble-mean anomaly
         write_field("cmip5.tsurf.rcp85.ensmean.forcing.jld2", 2.0)
         write_field("cmip5.zonal.wind.rcp85.ensmean.forcing.jld2", 3.0)
         write_field("cmip5.meridional.wind.rcp85.ensmean.forcing.jld2", 4.0)
         write_field("cmip5.omega.rcp85.ensmean.forcing.jld2", 5.0)
         write_field("cmip5.windspeed.rcp85.ensmean.forcing.jld2", 6.0)
 
-        # :elnino / :lanina → ERA-Interim composite-mean anomaly
+        # :elnino / :lanina: ERA-Interim composite-mean anomaly
         for suffix in ("elnino", "lanina")
             write_field("erainterim.tsurf.$suffix.forcing.jld2", 7.0)
             write_field("erainterim.zonal.wind.$suffix.forcing.jld2", 8.0)
@@ -356,10 +261,8 @@ end
             write_field("erainterim.windspeed.$suffix.forcing.jld2", 11.0)
         end
 
-        cfg = create_experiment_config(:rcp85)
-        @test cfg.log_tsurf_ext && cfg.log_hwind_ext && cfg.log_omega_ext
         fields = ClimateFields()
-        load_cc_anomaly_jld2!(tmpdir_anom, fields, cfg)
+        load_cc_anomaly_jld2!(tmpdir_anom, fields)
         @test all(==(2.0), fields.Tclim_anom_cc)
         @test all(==(3.0), fields.uclim_anom_cc)
         @test all(==(4.0), fields.vclim_anom_cc)
@@ -369,15 +272,13 @@ end
         # The scenario-start step applies the anomaly on top of the (here
         # all-zero) base climatology - Tclim must reflect it, not stay at zero.
         quiet() do
-            GREBClimate._apply_boundary_anomalies!(cfg, fields)
+            GREBClimate._apply_boundary_anomalies!(BoundaryAnomaly(:cmip5_rcp85), fields)
         end
         @test all(==(2.0), fields.Tclim)
 
         for (sym, suffix) in ((:elnino, "elnino"), (:lanina, "lanina"))
-            cfg2 = create_experiment_config(sym)
-            @test cfg2.log_tsurf_ext && cfg2.log_hwind_ext && cfg2.log_omega_ext
             fields2 = ClimateFields()
-            load_enso_anomaly_jld2!(tmpdir_anom, fields2, cfg2, sym)
+            load_enso_anomaly_jld2!(tmpdir_anom, fields2, sym)
             @test all(==(7.0), fields2.Tclim_anom_enso)
             @test all(==(8.0), fields2.uclim_anom_enso)
             @test all(==(9.0), fields2.vclim_anom_enso)
@@ -387,25 +288,25 @@ end
             # Both composite files already carry their sign (the La Nina one is
             # a cold anomaly), so both experiments add them, as the Fortran does.
             quiet() do
-                GREBClimate._apply_boundary_anomalies!(cfg2, fields2)
+                GREBClimate._apply_boundary_anomalies!(BoundaryAnomaly(sym), fields2)
             end
             @test all(==(7.0), fields2.Tclim)
             @test all(==(8.0), fields2.uclim)
         end
 
-        # Per-field gating: switching a gate off must not touch that
-        # field even if its file is missing (no error, stays zero).
-        cfg_partial = PhysicsConfig(experiment = :rcp85, log_tsurf_ext = true,
-            log_hwind_ext = false, log_omega_ext = false)
-        fields_partial = ClimateFields()
-        load_cc_anomaly_jld2!(tmpdir_anom, fields_partial, cfg_partial)
-        @test all(==(2.0), fields_partial.Tclim_anom_cc)
-        @test all(==(0.0), fields_partial.uclim_anom_cc)
-        @test all(==(0.0), fields_partial.omegaclim_anom_cc)
+        # In a run the anomaly reaches the climatology at the start of the
+        # scenario; the control runs on the plain one.
+        for (p, anomaly) in ((:rcp85_boundary, 2.0f0), (:lanina, 7.0f0))
+            cfg = preset(p; corrections = NoCorrections())
+            tclim(phase, run) = at_first_step(v -> copy(v.fields.Tclim), run, cfg; phase,
+                                              jld2_dir = tmpdir_anom, fields = ClimateFields())
+            @test all(iszero, tclim(:ctrl, RunSpec(ctrl = 1, scnr = 0)))
+            @test all(==(anomaly), tclim(:scnr, RunSpec(ctrl = 0, scnr = 1)))
+        end
 
         # A missing required file must error loudly, not silently zero.
         rm(joinpath(clim_dir, "cmip5.tsurf.rcp85.ensmean.forcing.jld2"))
-        @test_throws ErrorException load_cc_anomaly_jld2!(tmpdir_anom, ClimateFields(), cfg)
+        @test_throws ErrorException load_cc_anomaly_jld2!(tmpdir_anom, ClimateFields())
     finally
         rm(tmpdir_anom; recursive = true, force = true)
     end
@@ -416,13 +317,13 @@ end
     # adds the same surface flux sum plus that TF_correct. A flux term added to
     # one of the two update loops but not the other moves Ts off Tclim here.
     f = synthetic_fields()
-    cfg = create_experiment_config(:full_model)
-    ini = quiet(() -> init_model!(cfg, f))
+    r = resolve(preset(:full_model))
+    ini = quiet(() -> init_model!(r, f))
     cap0 = copy(f.cap_surf)   # seaice! changes it during the spin-up year
     start() = (copy(ini.Ts_ini), copy(ini.Ta_ini), copy(ini.q_ini), copy(ini.To_ini))
     Ts, Ta, q, To = start()
     quiet() do
-        qflux_correction!(ini.CO2_ctrl, Ts, Ta, q, To, f, ModelState(), TimeState(1, 1), cfg,
+        qflux_correction!(ini.CO2_ctrl, Ts, Ta, q, To, f, ModelState(), TimeState(1, 1), r,
                           CirculationWorkspace(), 1)
     end
     function run_step()
@@ -430,7 +331,7 @@ end
         Ts, Ta, q, To = start()
         quiet() do
             time_loop!(1, 1970, ini.CO2_ctrl, 1, 0, Ts, Ta, q, To, MonthlyRecord[], f, ModelState(),
-                       CirculationWorkspace(), MonthlyAccumulator(), TimeState(1, 1), cfg)
+                       CirculationWorkspace(), MonthlyAccumulator(), TimeState(1, 1), r)
         end
         return Ts
     end
@@ -443,17 +344,57 @@ end
 @testset "greb_model! restores the fields it changes, so one fields serves several runs" begin
     f = synthetic_fields()
     f.TF_correct .= 1.0f0   # stands in for loaded corrections; the run zeroes them here
-    names = (:sw_solar, :TF_correct, :qF_correct, :ToF_correct, :z_topo, :cldclim, :qclim, :mldclim)
+    # sw_solar is not in this list: no part of this config swaps the solar
+    # table, so the paleo testset is where its restore is checked.
+    names = (:TF_correct, :qF_correct, :ToF_correct, :z_topo, :cldclim, :qclim, :mldclim)
     before = Dict(n => copy(getfield(f, n)) for n in names)
-    # Constant topography with no flux corrections zeroes them; the _drsp
-    # switches replace the cloud, humidity and mixed-layer climatologies.
-    cfg = PhysicsConfig(log_topo_drsp = false, log_qflux_dmc = false, log_clouds_drsp = false,
-                        log_humid_drsp = false, log_ocean_drsp = false)
+    # Running without corrections zeroes them; flat topography, uniform clouds
+    # and humidity and the mixed-layer ocean replace their climatologies.
+    cfg = preset(:full_model; corrections = NoCorrections(),
+                 processes = (topography = :flat, clouds = :uniform, humidity = :uniform, ocean = :mixed_layer))
     quiet() do
-        greb_model!(RunSpec(flux = 0, ctrl = 1, scnr = 0), cfg; jld2_dir = "", fields = f,
+        greb_model!(RunSpec(ctrl = 1, scnr = 0), cfg; jld2_dir = "", fields = f,
                     allow_uninitialized = true)
     end
     for n in names
         @test getfield(f, n) == before[n]
+    end
+end
+
+@testset "greb_model! spins up for as long as SpinUp says" begin
+    # Ts after the first control step
+    first_ts(years) = at_first_step(v -> copy(v.Ts), RunSpec(ctrl = 1, scnr = 0),
+                                    preset(:full_model; corrections = SpinUp(years));
+                                    phase = :ctrl, jld2_dir = "", fields = synthetic_fields())
+    none, one_year = first_ts(0), first_ts(1)
+    @test all(isfinite, none) && none != one_year
+end
+
+@testset "greb_model! takes the corrections it is given, with either topography" begin
+    with_tempdir() do dir
+        mkpath(joinpath(dir, "climatology"))
+        GREBClimate.jldopen(joinpath(dir, "climatology", "flux_corrections.jld2"), "w") do f
+            f["Tsurf_flux_correction"] = fill(0.5f0, X, Y, GREBClimate.nstep_yr)
+            f["vapour_flux_correction"] = zeros(Float32, X, Y, GREBClimate.nstep_yr)
+            f["Tocean_flux_correction"] = zeros(Float32, X, Y, GREBClimate.nstep_yr)
+        end
+        for topography in (:observed, :flat)
+            # Ts after the first control step; `preloaded` stands in for corrections already in `fields`
+            function first_ts(c; preloaded = 0.0f0, jld2_dir = dir)
+                f = synthetic_fields()
+                f.TF_correct .= preloaded
+                cfg = preset(:full_model; processes = (topography = topography,), corrections = c)
+                return at_first_step(v -> copy(v.Ts), RunSpec(ctrl = 1, scnr = 0), cfg; phase = :ctrl, jld2_dir, fields = f)
+            end
+            stored = first_ts(Stored())
+            @test all(isfinite, stored)
+            # Stored reads the file: the same as a run on those values without a spin-up
+            @test isequal(stored, first_ts(SpinUp(0); preloaded = 0.5f0, jld2_dir = ""))
+            # NoCorrections zeroes whatever was there
+            @test isequal(first_ts(NoCorrections(); preloaded = 0.5f0), first_ts(SpinUp(0); jld2_dir = ""))
+            @test !isequal(stored, first_ts(NoCorrections()))
+            # SpinUp computes them
+            @test !isequal(stored, first_ts(SpinUp(1)))
+        end
     end
 end

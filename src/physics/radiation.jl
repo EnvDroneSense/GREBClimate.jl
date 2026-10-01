@@ -1,11 +1,11 @@
 """
-    SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, cfg::PhysicsConfig, ws::CirculationWorkspace)
+    SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, p::Processes, ws::CirculationWorkspace)
 
 Computes ice cover, surface/atmospheric/combined albedo, and net shortwave
 flux from `Ts` and the current cloud climatology. Returns
 `(SW, albedo, ice_cover)`.
 """
-function SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, cfg::PhysicsConfig, ws::CirculationWorkspace)
+function SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, p::Processes, ws::CirculationWorkspace)
     # Reuse workspace buffers
     ice_cover = ws.ice_cover_buf # output: ice fraction
     a_surf = ws.a_surf_buf       # surface albedo
@@ -27,7 +27,7 @@ function SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, c
             ifelse(T < To_ice2,
                 1.0f0 - (T - To_ice1) * inv_To_ice_range,
                 0.0f0))
-        ice_cover[i, j] = ifelse(z_topo[i, j] >= 0.0f0, land_expr, ocean_expr)
+        ice_cover[i, j] = ifelse(@is_land(z_topo[i, j]), land_expr, ocean_expr)
     end
 
     # 2. Atmospheric albedo
@@ -35,7 +35,7 @@ function SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, c
     ityr = timestate.ityr
 
     # 3. Surface albedo
-    if cfg.log_ice
+    if p.ice_albedo
         @turbo for i in 1:xdim, j in 1:ydim
             T = Ts[i, j]
             # Land albedo expression
@@ -47,7 +47,7 @@ function SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, c
                 ifelse(T >= To_ice2, a_no_ice,
                     a_no_ice + da_ice * (1.0f0 - (T - To_ice1) * inv_To_ice_range)))
             # Choose based on topography
-            a_surf[i, j] = ifelse(z_topo[i, j] >= 0.0f0, land_alb, ocean_alb)
+            a_surf[i, j] = ifelse(@is_land(z_topo[i, j]), land_alb, ocean_alb)
             # Glacier override: if glacier mask > 0.5, set to ice albedo
             a_surf[i, j] = ifelse(glacier[i, j] > 0.5f0, a_no_ice + da_ice, a_surf[i, j])
         end
@@ -73,16 +73,16 @@ function SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, c
 end
 
 """
-    LWradiation!(Ts, Ta, q, CO2, fields::ClimateFields, timestate, cfg::PhysicsConfig, ws::CirculationWorkspace)
+    LWradiation!(Ts, Ta, q, CO2, fields::ClimateFields, timestate, p::Processes, ws::CirculationWorkspace)
 
 Computes atmospheric emissivity from CO₂/water-vapor/cloud columns, then
-surface/upward/downward longwave flux. If `cfg.log_atmos_dmc` is false, only
+surface/upward/downward longwave flux. Without an atmosphere (`p.atmosphere = false`) only
 `LW_down` is zeroed - `LW_up` is snapshotted beforehand and keeps its full
 value (decouples surface from atmospheric downwelling feedback without
 touching the atmosphere's own emission term). Returns
 `(LW_surf, LW_up, LW_down, em)`.
 """
-function LWradiation!(Ts, Ta, q, CO2, fields::ClimateFields, timestate, cfg::PhysicsConfig, ws::CirculationWorkspace)
+function LWradiation!(Ts, Ta, q, CO2, fields::ClimateFields, timestate, p::Processes, ws::CirculationWorkspace)
     # Extract workspace buffers
     e_co2 = ws.e_co2_buf      # CO₂ [ppm scaled by pressure]
     e_vapor = ws.e_vapor_buf  # water vapour [kg/m²]
@@ -117,7 +117,7 @@ function LWradiation!(Ts, Ta, q, CO2, fields::ClimateFields, timestate, cfg::Phy
         end
     end
 
-    if !cfg.log_atmos_dmc
+    if !p.atmosphere
         LW_down .= 0.0f0
     end
 

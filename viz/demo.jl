@@ -13,7 +13,7 @@ fields = load_greb_jld2!(dir; dataset=:ncep)
 
 @info "running GREB (3 yr flux spin-up, 5 yr control, 15 yr 2xCO2 scenario)"
 res = redirect_stdout(devnull) do
-    greb_model!(RunSpec(flux=3, ctrl=5, scnr=15), create_experiment_config(:co2_double);
+    greb_model!(RunSpec(ctrl=5, scnr=15), preset(:co2_double);
                 jld2_dir=dir, fields=deepcopy(fields))
 end
 

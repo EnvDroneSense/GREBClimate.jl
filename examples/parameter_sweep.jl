@@ -15,7 +15,7 @@ using GREBClimate
 using Statistics
 
 """
-    parameter_sweep(jld2_dir; co2_grid=default_co2_grid(), flux=3, ctrl=5, scnr=100)
+    parameter_sweep(jld2_dir; co2_grid=default_co2_grid(), spinup=3, ctrl=5, scnr=100)
 
 Run the :custom_co2 experiment at each CO2 level (ppm) in `co2_grid`, with the
 control held at the model's 340 ppm baseline. Each grid point gets its own
@@ -30,7 +30,7 @@ below is the mean over the scenario's final 12 records, i.e. its final year.
 """
 function parameter_sweep(jld2_dir::AbstractString;
                           co2_grid::AbstractVector{<:Real}=default_co2_grid(),
-                          flux::Int=3, ctrl::Int=5, scnr::Int=100)
+                          spinup::Int=3, ctrl::Int=5, scnr::Int=100)
 
     if !isdir(jld2_dir)
         @warn """
@@ -46,7 +46,7 @@ function parameter_sweep(jld2_dir::AbstractString;
 
     scnr >= 12 || throw(ArgumentError("scnr must be >= 12 to take a final-year mean, got $scnr"))
 
-    run = RunSpec(flux=flux, ctrl=ctrl, scnr=scnr)
+    run = RunSpec(ctrl=ctrl, scnr=scnr)
     results = NamedTuple{(:co2, :Ts_anom, :ice_anom, :precip_anom),
                           Tuple{Float64,Float64,Float64,Float64}}[]
 
@@ -57,7 +57,7 @@ function parameter_sweep(jld2_dir::AbstractString;
     mktempdir() do tmpdir
         for (i, co2) in enumerate(co2_grid)
             println("[$i/$(length(co2_grid))] CO2 = $(round(co2, digits=1)) ppm ",
-                    "(flux=$flux, ctrl=$ctrl, scnr=$scnr years)...")
+                    "(spinup=$spinup, ctrl=$ctrl, scnr=$scnr years)...")
 
             co2_path = joinpath(tmpdir, "co2_$(i).txt")
             open(co2_path, "w") do io
@@ -66,7 +66,7 @@ function parameter_sweep(jld2_dir::AbstractString;
                 end
             end
 
-            cfg = create_experiment_config(:custom_co2; co2_path=co2_path)
+            cfg = preset(:custom_co2; path=co2_path, corrections=SpinUp(spinup))
             fields = deepcopy(fields_template)   # each grid point mutates its own state
 
             try

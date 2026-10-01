@@ -2,10 +2,11 @@
 #
 # MAINTAINER TOOL - not part of the package. Needs the local dataset.
 #
-# Runs a few fixed configurations and saves every monthly record field of the
-# control and scenario runs; after a change, runs them again and compares with
-# exact equality. A refactor that claims "no change to results" must report 0
-# differing values here.
+# Runs every experiment preset, plus one case with switches off, and saves every
+# monthly record field of the control and scenario runs; after a change, runs
+# them again and compares with exact equality (NaN equals NaN). A refactor that
+# claims "no change to results" must report 0 differing values here. A snapshot
+# is about 250 MB and a run takes a few minutes.
 #
 # Snapshots are only comparable on the same machine and Julia version:
 # `@turbo` code differs between CPUs (AVX2, AVX-512) and Julia releases. Take
@@ -23,27 +24,36 @@ const DATA_DIR = something(greb_data_dir(; allow_download=false),
                            joinpath(@__DIR__, "..", "..", "greb_input_data"))
 isdir(DATA_DIR) || error("dataset not found at $DATA_DIR")
 
-# flux = 1 so the flux-correction spin-up loop is exercised, not only the run loop.
-const RUN = RunSpec(flux=1, ctrl=1, scnr=1)
+# One spin-up year, so the flux-correction loop is exercised, then a control
+# and a scenario year. Case names are the preset names; a snapshot must hold
+# every case of the current run, so retake it when a case is renamed.
+const RUN = RunSpec(ctrl=1, scnr=1)
 
-function _decon_cfg()
-    cfg = create_experiment_config(:full_model)
-    cfg.log_crcl_dmc = false   # the humidity-circulation selection in time_loop!
-    cfg.log_hydro_dmc = false
-    return cfg
+case(name; kw...) = preset(name; corrections=SpinUp(1), kw...)
+
+# A fixed two-year CO2 path for the :custom_co2 preset
+function _custom_co2_file()
+    path = joinpath(mktempdir(), "custom_co2.txt")
+    write(path, "1950 400\n1951 420\n")
+    return path
 end
 
-# name => config constructor
-const CASES = (
-    "full_model" => () -> create_experiment_config(:full_model),
-    "decon_crcl_hydro_off" => _decon_cfg,
-    "elnino" => () -> create_experiment_config(:elnino),
-)
+# name => config constructor: every preset, then two switch cases
+function _cases()
+    cases = Pair{String,Function}[]
+    for p in preset_names()
+        mk = p === :custom_co2 ? () -> case(p; path=_custom_co2_file()) : () -> case(p)
+        push!(cases, string(p) => mk)
+    end
+    push!(cases, "flat_topography" => () -> preset(:co2_double; processes=(topography=:flat,), corrections=Stored()))
+    push!(cases, "decon_crcl_hydro_off" => () -> case(:full_model; processes=(transport=false, hydrology=:none)))
+    return sort!(cases; by=first)
+end
 
 function run_cases()
     fields = load_greb_jld2!(DATA_DIR; dataset=:ncep)
     snap = Dict{String,Array{Float32,3}}()
-    for (name, mkcfg) in CASES
+    for (name, mkcfg) in _cases()
         result = redirect_stdout(devnull) do
             greb_model!(RUN, mkcfg(); jld2_dir=DATA_DIR, fields=deepcopy(fields))
         end
@@ -77,7 +87,14 @@ function main(args)
     nt == Threads.nthreads() || error("snapshot taken with $nt threads; rerun with -t $nt")
     jv == string(VERSION) || @warn "snapshot taken on Julia $jv; exact equality is not expected across versions"
     new = run_cases()
-    keys(old) == keys(new) || error("snapshot and current run hold different arrays")
+    missing_now = setdiff(keys(old), keys(new))
+    isempty(missing_now) || error("the current run lacks $(length(missing_now)) arrays of the snapshot, e.g. $(first(missing_now))")
+    old_cases = Set(first(split(k, '/')) for k in keys(old))
+    added = setdiff(keys(new), keys(old))
+    new_cases = sort!(unique(c for c in (first(split(k, '/')) for k in added) if !(c in old_cases)))
+    new_fields = sort!(unique(last(split(k, '/')) for k in added if first(split(k, '/')) in old_cases))
+    isempty(new_cases) || println("  cases not in the snapshot (not compared): ", join(new_cases, ", "))
+    isempty(new_fields) || println("  record fields not in the snapshot (not compared): ", join(new_fields, ", "))
     total = 0
     for k in sort!(collect(keys(old)))
         a, b = old[k], new[k]

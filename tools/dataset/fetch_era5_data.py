@@ -14,9 +14,9 @@ Usage:
         [--raw-dir era5_raw] [--out-dir era5_greb]
     julia --project=. tools/dataset/convert_greb_to_jld2.jl era5_greb greb_input_data_era5
 
-Diagnostic fields (cloud_cover, t700, t1000, rh700) are fetched as raw netCDF
-but not converted or written as GREB inputs; they are for a separate
-cloud-feedback experiment and are not used by this script.
+With --diagnostics, the diagnostic fields (cloud_cover, t700, t1000, rh700) are
+also fetched as raw netCDF. They are not converted or written as GREB inputs;
+they are for a separate cloud-feedback experiment.
 """
 
 import argparse
@@ -39,16 +39,13 @@ GREB_FIELDS = {
     "omega": ("vertical_velocity", "w", "pressure-levels", [850, 700, 600, 500]),
 }
 
-# Fetched and converted for a separate cloud-feedback experiment; not written as GREB inputs.
+# Fetched only with --diagnostics, for a separate cloud-feedback experiment; not written as GREB inputs.
 DIAGNOSTIC_FIELDS = {
     "cloud_cover": ("total_cloud_cover", "tcc", "single-levels", None),
     "t700": ("temperature", "t", "pressure-levels", 700),
     "t1000": ("temperature", "t", "pressure-levels", 1000),
     "rh700": ("relative_humidity", "r", "pressure-levels", 700),
 }
-
-ALL_FIELDS = {**GREB_FIELDS, **DIAGNOSTIC_FIELDS}
-
 
 def fetch_field(client, name, variable, family, level, start_year, end_year, raw_dir):
     """Download one field's monthly-means netCDF if not already present."""
@@ -148,6 +145,8 @@ def main():
     ap.add_argument("--end-year", type=int, default=2020)
     ap.add_argument("--raw-dir", default="era5_raw", help="directory for downloaded netCDF files")
     ap.add_argument("--out-dir", default="era5_greb", help="directory for generated GREB .bin files")
+    ap.add_argument("--diagnostics", action="store_true",
+                    help="also fetch the diagnostic fields (not written as GREB inputs)")
     args = ap.parse_args()
 
     os.makedirs(args.raw_dir, exist_ok=True)
@@ -157,7 +156,8 @@ def main():
 
     client = cdsapi.Client()
     raw_paths = {}
-    for name, (variable, _ncvar, family, level) in ALL_FIELDS.items():
+    wanted = {**GREB_FIELDS, **(DIAGNOSTIC_FIELDS if args.diagnostics else {})}
+    for name, (variable, _ncvar, family, level) in wanted.items():
         raw_paths[name] = fetch_field(client, name, variable, family, level,
                                        args.start_year, args.end_year, args.raw_dir)
 

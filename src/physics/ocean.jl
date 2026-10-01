@@ -1,24 +1,23 @@
 """
-    seaice!(Ts0, fields::ClimateFields, timestate, cfg::PhysicsConfig)
+    seaice!(Ts0, fields::ClimateFields, timestate, p::Processes)
 
 Updates `fields.cap_surf` (surface heat capacity) for ocean points based on
-`Ts0`-derived ice fraction, blending land/open-ocean/ice capacities. No-op if
-`cfg.log_ocean_dmc` is false; skips the ice-albedo blend if `cfg.log_ice` is
-false.
+`Ts0`-derived ice fraction, blending land/open-ocean/ice capacities. No-op
+with `p.ocean = :none`; skips the ice blend with `p.ice_albedo = false`.
 """
-function seaice!(Ts0, fields::ClimateFields, timestate, cfg::PhysicsConfig)
+function seaice!(Ts0, fields::ClimateFields, timestate, p::Processes)
     mld = @view fields.mldclim[:, :, timestate.ityr]
     z_topo = fields.z_topo
     glacier = fields.glacier
     cap_surf = fields.cap_surf
 
-    if !cfg.log_ocean_dmc
+    if p.ocean === :none
         return nothing   # No ice feedback: skip sea ice calculation
     end
 
     # Compute ice‑dependent heat capacity for ocean points
     @turbo for i in 1:xdim, j in 1:ydim
-        is_ocean = z_topo[i, j] < 0.0f0
+        is_ocean = !@is_land(z_topo[i, j])
         T = Ts0[i, j]
         mld_val = mld[i, j]
         cap_open = cap_ocean * mld_val
@@ -36,9 +35,9 @@ function seaice!(Ts0, fields::ClimateFields, timestate, cfg::PhysicsConfig)
     end
 
     # Override for experiments without ice‑albedo feedback
-    if !cfg.log_ice
+    if !p.ice_albedo
         @turbo for i in 1:xdim, j in 1:ydim
-            cap_surf[i, j] = ifelse(z_topo[i, j] > 0.0f0, cap_land, cap_ocean * mld[i, j])
+            cap_surf[i, j] = ifelse(@is_land(z_topo[i, j]), cap_land, cap_ocean * mld[i, j])
         end
     end
 
@@ -48,20 +47,20 @@ function seaice!(Ts0, fields::ClimateFields, timestate, cfg::PhysicsConfig)
 end
 
 """
-    deep_ocean!(Ts, To, fields::ClimateFields, timestate, cfg::PhysicsConfig, ws::CirculationWorkspace)
+    deep_ocean!(Ts, To, fields::ClimateFields, timestate, p::Processes, ws::CirculationWorkspace)
 
 Computes surface/deep-ocean coupling tendencies (`dT_ocean`, `dTo`) from
 mixed-layer-depth entrainment/detrainment and turbulent mixing, active only
-where the point is ocean and above the sea-ice threshold. Returns zeros if
-`cfg.log_ocean_dmc`/`cfg.log_ocean_drsp` disable ocean coupling.
+where the point is ocean and above the sea-ice threshold. Returns zeros
+unless `p.ocean` is `:full`.
 """
-function deep_ocean!(Ts, To, fields::ClimateFields, timestate, cfg::PhysicsConfig, ws::CirculationWorkspace)
+function deep_ocean!(Ts, To, fields::ClimateFields, timestate, p::Processes, ws::CirculationWorkspace)
     # Use pre-allocated zero buffers
     dT_ocean = ws.dT_ocean_buf
     dTo = ws.dTo_buf
 
     # no deep-ocean coupling
-    if !cfg.log_ocean_dmc || !cfg.log_ocean_drsp
+    if p.ocean !== :full
         fill!(dT_ocean, 0.0f0)
         fill!(dTo, 0.0f0)
         return (dT_ocean=dT_ocean, dTo=dTo)
@@ -80,7 +79,7 @@ function deep_ocean!(Ts, To, fields::ClimateFields, timestate, cfg::PhysicsConfi
 
     # ── Entrainment & detrainment & turbulent mixing ──────
     @turbo for i in 1:xdim, j in 1:ydim
-        is_ocean = z_topo[i, j] < 0.0f0
+        is_ocean = !@is_land(z_topo[i, j])
         # Entrainment/detrainment require Ts >= To_ice2
         active = is_ocean & (Ts[i, j] >= To_ice2)
         h_now = mld_now[i, j]

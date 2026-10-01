@@ -1,6 +1,6 @@
 # Physics kernels: tendencies!, hydro!, SWradiation!, diffusion/advection/circulation.
 
-@testset "tendencies! Q_sens honors log_atmos_dmc gate" begin
+@testset "tendencies! Q_sens honors the atmosphere switch" begin
     # Q_sens = ct_sens * (Ta - Ts) is checkable directly against a
     # hand-computed value without reimplementing the rest of the
     # physics pipeline.
@@ -8,24 +8,36 @@
     state = ModelState()
     ws = CirculationWorkspace()
     ts = TimeState(1, 1)
-    cfg = create_experiment_config(:full_model)
+    r = resolve(preset(:full_model))
 
     Ts = fill(288.0, GREBClimate.xdim, GREBClimate.ydim)
     Ta = fill(280.0, GREBClimate.xdim, GREBClimate.ydim)
     To = fill(285.0, GREBClimate.xdim, GREBClimate.ydim)
     q = fill(0.006, GREBClimate.xdim, GREBClimate.ydim)
 
-    tend = tendencies!(340.0, Ts, Ta, To, q, fields, state, ws, ts, cfg)
+    tend = tendencies!(340.0, Ts, Ta, To, q, fields, state, ws, ts, r)
     @test tend.Q_sens ≈ GREBClimate.ct_sens .* (Ta .- Ts)
     @test all(isfinite, tend.SW)
     @test all(isfinite, tend.LW_surf)
     @test all(isfinite, tend.dTa_crcl)
     @test all(isfinite, tend.dq_crcl)
 
-    cfg_off = create_experiment_config(:full_model)
-    cfg_off.log_atmos_dmc = false
-    tend_off = tendencies!(340.0, Ts, Ta, To, q, fields, state, ws, ts, cfg_off)
+    r_off = resolve(preset(:full_model; processes = (atmosphere = false,)))
+    tend_off = tendencies!(340.0, Ts, Ta, To, q, fields, state, ws, ts, r_off)
     @test all(iszero, tend_off.Q_sens)
+end
+
+@testset "land is topography above 0 m, in every kernel" begin
+    @test GREBClimate.is_land.([-1.0f0, 0.0f0, 0.1f0]) == [false, false, true]
+
+    # At 270 K land and ocean give different ice cover; a cell at exactly 0 m
+    # goes with the ocean
+    fields = ClimateFields()
+    fields.z_topo[1, 1], fields.z_topo[2, 1], fields.z_topo[3, 1] = -1.0f0, 0.0f0, 1.0f0
+    sw = SWradiation!(fill(270.0f0, X, Y), fields, ModelState(), TimeState(1, 1), Processes(), CirculationWorkspace())
+    @test sw.ice_cover[2, 1] == sw.ice_cover[1, 1]
+    @test sw.ice_cover[3, 1] > sw.ice_cover[1, 1]
+    @test sw.albedo[2, 1] == sw.albedo[1, 1]
 end
 
 @testset "diffusion!/advection!/circulation! per-cell snapshot (incl. date-line wraparound)" begin
@@ -36,14 +48,14 @@ end
     fields.wz_air .= wz
     fields.wz_vapor .= wz
     for it in 1:GREBClimate.nstep_yr, k in 1:ydim_, i in 1:xdim_
-        fields.uclim_p[i, k, it] = 0.5 + 0.0001 * i
-        fields.uclim_m[i, k, it] = 0.3 + 0.0001 * k
-        fields.vclim_p[i, k, it] = 0.4 + 0.0002 * i
-        fields.vclim_m[i, k, it] = 0.2 + 0.0002 * k
+        fields.uclim_neg[i, k, it] = 0.5 + 0.0001 * i
+        fields.uclim_pos[i, k, it] = 0.3 + 0.0001 * k
+        fields.vclim_neg[i, k, it] = 0.4 + 0.0002 * i
+        fields.vclim_pos[i, k, it] = 0.2 + 0.0002 * k
     end
     ws = CirculationWorkspace()
     ts = TimeState(1, 1)
-    cfg = create_experiment_config(:full_model)
+    p = Processes()
 
     test_is = [1, 2, 3, 50, 94, 95, 96]
     test_ks = [1, 11, 48]
@@ -74,7 +86,7 @@ end
     diffusion!(view(T1, :, :), GREBClimate.z_air, fields, ws, ts)
     @test ws.dX_diff == dX_diff_f32
 
-    advection!(T1, GREBClimate.z_air, fields, ws, ts, cfg)
+    advection!(T1, GREBClimate.z_air, fields, ws, ts, p)
     dX_adv_ref = Dict(
         (1,1)=>99.99281072836801, (2,1)=>37.62423619149657, (3,1)=>6.428217314852662,
         (50,1)=>-4.182755344492395, (94,1)=>11.771946283998448, (95,1)=>60.257791236566284,
@@ -91,7 +103,7 @@ end
     end
 
     dX_out = zeros(xdim_, ydim_)
-    circulation!(T1, GREBClimate.z_air, dX_out, fields, ws, ts, cfg)
+    circulation!(T1, GREBClimate.z_air, dX_out, fields, ws, ts, p)
     dX_out_ref = Dict(
         (1,1)=>4824.155681112328, (2,1)=>4609.661409972268, (3,1)=>4395.402855867866,
         (50,1)=>-98.5576039612888, (94,1)=>-4172.300403641432, (95,1)=>-4369.7800972827745,
@@ -108,42 +120,24 @@ end
     end
 end
 
-@testset "hydro! errors on invalid log_eva" begin
+@testset "hydro! errors on an unknown evaporation scheme" begin
     Ts = fill(290.0, GREBClimate.xdim, GREBClimate.ydim)
     q = fill(0.005, GREBClimate.xdim, GREBClimate.ydim)
-    cfg = create_experiment_config(:full_model)
-    cfg.log_eva = 99
-    @test_throws ErrorException hydro!(Ts, q, ClimateFields(), TimeState(1, 1), cfg, CirculationWorkspace())
+    h = ResolvedHydrology(:fitted, :bogus, 1, 0, 0, 0)
+    @test_throws ErrorException hydro!(Ts, q, ClimateFields(), TimeState(1, 1), Processes(), h, CirculationWorkspace())
 end
 
-@testset "hydro! log_eva==1 gust includes Fortran's carried-over +2.0²/+3.0² base term" begin
-    mkfields(topo) = begin
-        fields = ClimateFields()
-        fields.z_topo .= topo
-        fields.mldclim .= 50.0
-        fields.Tclim .= 280.0
-        fields.Toclim .= 285.0
-        fields.qclim .= 0.006
-        fields.cldclim .= 0.5
-        fields.swetclim .= 1.0
-        fields.uclim .= 0.0
-        fields.vclim .= 0.0
-        fields.omegaclim .= 0.0
-        fields.omegastdclim .= 0.0
-        fields.wsclim .= 0.0
-        fields
-    end
-    cfg = create_experiment_config(:full_model)
-    cfg.log_eva = 1
+@testset "hydro! :original_gust evaporation: latent heat flux over land and ocean" begin
+    r = resolve(preset(:full_model; hydrology = (evaporation = :original_gust,)))
     Ts = fill(290.0f0, GREBClimate.xdim, GREBClimate.ydim)
     q = fill(0.008f0, GREBClimate.xdim, GREBClimate.ydim)
     ts = TimeState(1, 1)
 
     for (topo, gust, coeff) in ((1.0, 4.0 + 144.0, 0.04), (-1.0, 9.0 + 50.41, 0.73))
-        fields = mkfields(topo)
-        init_model!(cfg, fields)
+        fields = constant_fields(z_topo = topo)
+        init_model!(r, fields)
         ws = CirculationWorkspace()
-        result = hydro!(Ts, q, fields, ts, cfg, ws)
+        result = hydro!(Ts, q, fields, ts, Processes(), r.hydrology, ws)
 
         qs = 3.75e-3 * exp(17.08085 * (290.0 - 273.15) / (290.0 - 273.15 + 234.175)) * fields.wz_air[1, 1]
         expected = (q[1, 1] - qs) * sqrt(gust) * GREBClimate.cq_latent * GREBClimate.ρ_air * coeff * GREBClimate.ce * 1.0
@@ -151,36 +145,20 @@ end
     end
 end
 
-@testset "hydro! doesn't apply an extra -0.9q clamp to dq_rain" begin
-    fields = ClimateFields()
-    fields.z_topo .= 1.0
-    fields.mldclim .= 50.0
-    fields.Tclim .= 280.0
-    fields.Toclim .= 285.0
-    fields.qclim .= 0.006
-    fields.cldclim .= 0.5
-    fields.swetclim .= 1.0
-    fields.uclim .= 0.0
-    fields.vclim .= 0.0
-    fields.omegaclim .= 0.0
-    fields.omegastdclim .= 0.0
-    fields.wsclim .= 0.0
-    cfg = create_experiment_config(:full_model)
-    cfg.log_rain = 0  # disable the (unrelated) rain-limit clamp
-    init_model!(cfg, fields)
-
-    cfg.c_q = 1000.0
-    cfg.c_rq = 0.0; cfg.c_omega = 0.0; cfg.c_omegastd = 0.0
+@testset "hydro! fitted rain: dq_rain and Q_lat_air values, with no limit on rain" begin
+    fields = constant_fields(z_topo = 1.0)
+    init_model!(resolve(preset(:full_model)), fields)
+    # c_q is large enough that any per-step limit on rain inside hydro! would
+    # change the result: the fitted scheme applies none
+    h = ResolvedHydrology(:fitted, :original, 1000, 0, 0, 0)
 
     Ts = fill(290.0f0, GREBClimate.xdim, GREBClimate.ydim)
     q = fill(0.008f0, GREBClimate.xdim, GREBClimate.ydim)
     ts = TimeState(1, 1)
     ws = CirculationWorkspace()
-    result = hydro!(Ts, q, fields, ts, cfg, ws)
+    result = hydro!(Ts, q, fields, ts, Processes(), h, ws)
 
-    expected_dq_rain = cfg.c_q * GREBClimate.cq_rain * q[1, 1]
-    min_dq_that_would_have_clamped = -0.9 * q[1, 1] / GREBClimate.Δt
-    @test expected_dq_rain < min_dq_that_would_have_clamped  # sanity: the old clamp would have fired
+    expected_dq_rain = h.c_q * GREBClimate.cq_rain * q[1, 1]
     @test isapprox(result.dq_rain[1, 1], expected_dq_rain; rtol = 1e-5)
     @test isapprox(result.Q_lat_air[1, 1], -expected_dq_rain * GREBClimate.cq_latent * GREBClimate.r_qviwv; rtol = 1e-5)
 end
@@ -188,23 +166,18 @@ end
 # The allocation budget for SWradiation! (and every other kernel) lives in
 # test_invariants.jl, alongside the return-type checks.
 
-@testset "log_hydro_dmc==false freezes humidity entirely (not just eva/rain)" begin
-    # With log_hydro_dmc off, q must never move from its initial
-    # climatological value
-    if !isdir(DATA_DIR)
-        @test_skip "greb_input_data/ not present"
-    else
-        fields = load_greb_jld2!(DATA_DIR; dataset = :ncep)
-        cfg = create_experiment_config(:full_model)
-        cfg.log_hydro_dmc = false
-        # The initial humidity as init_model! sets it for this configuration;
-        # greb_model! restores `fields` afterwards, so it cannot be read there.
-        q_ini = quiet(() -> init_model!(deepcopy(cfg), deepcopy(fields))).q_ini
-        result = quiet() do
-            greb_model!(RunSpec(scnr = 0), cfg; jld2_dir = DATA_DIR, fields = fields)
-        end
-        for rec in result.ctrl
-            @test all(isapprox.(rec.q, q_ini; atol = 1e-7))
-        end
+@testset "hydrology = :none: humidity stays put, whatever the humidity correction" begin
+    # Evaporation, rain and transport are zero with the water cycle off, so the
+    # only term left to move q is the flux correction. SpinUp(0) keeps the one
+    # set here.
+    fields = synthetic_fields()
+    fields.qF_correct .= 1.0f-4
+    cfg = preset(:full_model; processes = (hydrology = :none,), corrections = SpinUp(0))
+    q_ini = quiet(() -> init_model!(resolve(cfg), deepcopy(fields))).q_ini
+    result = quiet() do
+        greb_model!(RunSpec(scnr = 0), cfg; jld2_dir = "", fields = fields, allow_uninitialized = true)
+    end
+    for rec in result.ctrl
+        @test rec.q == q_ini
     end
 end

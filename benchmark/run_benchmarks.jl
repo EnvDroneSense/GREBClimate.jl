@@ -21,8 +21,8 @@ function _require_data(jld2_dir::AbstractString)
     return false
 end
 
-"Time a 1-year `:full_model` control run `reps` times; returns seconds per run."
-function time_1yr(jld2_dir::AbstractString; cfg=create_experiment_config(:full_model), reps::Int=3)
+"Time a 1-year `:full_model` control run (stored corrections, no spin-up) `reps` times; returns seconds per run."
+function time_1yr(jld2_dir::AbstractString; cfg=preset(:full_model; corrections=Stored()), reps::Int=3)
     _require_data(jld2_dir) || return nothing
     reps >= 1 || throw(ArgumentError("reps must be at least 1, got $reps"))
 
@@ -31,15 +31,14 @@ function time_1yr(jld2_dir::AbstractString; cfg=create_experiment_config(:full_m
 
     # Warm-up, so compilation is not timed.
     redirect_stdout(devnull) do
-        greb_model!(RunSpec(flux=0, scnr=0), deepcopy(cfg); jld2_dir=jld2_dir, fields=deepcopy(fields))
+        greb_model!(RunSpec(scnr=0), cfg; jld2_dir=jld2_dir, fields=deepcopy(fields))
     end
 
     times = Float64[]
     for r in 1:reps
         fields_r = deepcopy(fields)  # the model mutates fields
-        cfg_r = deepcopy(cfg)
         t = @elapsed redirect_stdout(devnull) do
-            greb_model!(RunSpec(flux=0, scnr=0), cfg_r; jld2_dir=jld2_dir, fields=fields_r)
+            greb_model!(RunSpec(scnr=0), cfg; jld2_dir=jld2_dir, fields=fields_r)
         end
         push!(times, t)
         println("  run $r: ", round(t, digits=3), " s")
@@ -52,14 +51,14 @@ end
 
 """
 Time a `ctrl`-year control run followed by a `scnr`-year scenario run, `reps`
-times; returns seconds per run. Unlike `time_1yr` (fixed 1-year control
+times on the stored flux corrections (no spin-up); returns seconds per run. Unlike `time_1yr` (fixed 1-year control
 run, no scenario), this is for checking long-run cost and stability.
 
-`cfg`'s experiment: `forcing()` takes a fast path for `:full_model` that holds CO2 
-constant across the whole scenario regardless of `scnr`. For an actual multi-year 
-forced change, pass a `cfg` from an experiment with a real CO2 trajectory.
+`experiment` is a preset name. `:full_model` holds CO2 constant across the
+whole scenario regardless of `scnr`; for an actual multi-year forced change,
+pass a preset with a real CO2 trajectory.
 """
-function time_years(jld2_dir::AbstractString; cfg=create_experiment_config(:full_model),
+function time_years(jld2_dir::AbstractString; experiment::Symbol=:full_model,
         ctrl::Int=10, scnr::Int=10, reps::Int=1)
     _require_data(jld2_dir) || return nothing
     reps >= 1 || throw(ArgumentError("reps must be at least 1, got $reps"))
@@ -68,20 +67,20 @@ function time_years(jld2_dir::AbstractString; cfg=create_experiment_config(:full
     total_years = ctrl + scnr
 
     println("Threads.nthreads() = ", Threads.nthreads())
-    println("ctrl=$ctrl scnr=$scnr ($total_years simulated years/rep), experiment=$(cfg.experiment)")
+    println("ctrl=$ctrl scnr=$scnr ($total_years simulated years/rep), experiment=$experiment")
+    cfg = preset(experiment; corrections=Stored())  # no spin-up, as in time_1yr
     fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
 
     # Warm-up with a minimal run.
     redirect_stdout(devnull) do
-        greb_model!(RunSpec(ctrl=1, scnr=0), deepcopy(cfg); jld2_dir=jld2_dir, fields=deepcopy(fields))
+        greb_model!(RunSpec(ctrl=1, scnr=0), cfg; jld2_dir=jld2_dir, fields=deepcopy(fields))
     end
 
     times = Float64[]
     for r in 1:reps
         fields_r = deepcopy(fields)  # the model mutates fields
-        cfg_r = deepcopy(cfg)
         t = @elapsed redirect_stdout(devnull) do
-            greb_model!(RunSpec(ctrl=ctrl, scnr=scnr), cfg_r; jld2_dir=jld2_dir, fields=fields_r)
+            greb_model!(RunSpec(ctrl=ctrl, scnr=scnr), cfg; jld2_dir=jld2_dir, fields=fields_r)
         end
         push!(times, t)
         println("  run $r: ", round(t, digits=3), " s  (",
@@ -96,16 +95,17 @@ function time_years(jld2_dir::AbstractString; cfg=create_experiment_config(:full
 end
 
 "Time each physics stage of one timestep; returns `(name, seconds per call)`."
-function time_stages(jld2_dir::AbstractString; cfg=create_experiment_config(:full_model), reps::Int=2000)
+function time_stages(jld2_dir::AbstractString; cfg=preset(:full_model), reps::Int=2000)
     _require_data(jld2_dir) || return nothing
     reps >= 1 || throw(ArgumentError("reps must be at least 1, got $reps"))
 
     fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
-    init_model!(cfg, fields)
+    r = resolve(cfg; jld2_dir)
+    p = r.config.processes
+    CO2 = init_model!(r, fields).CO2_ctrl
     state = ModelState()
     ws = CirculationWorkspace()
     timestate = TimeState(1, 1)
-    CO2 = cfg.co2_concentration
 
     ityr = timestate.ityr
     Ts = copy(fields.Tclim[:, :, ityr])
@@ -114,12 +114,12 @@ function time_stages(jld2_dir::AbstractString; cfg=create_experiment_config(:ful
     q = copy(fields.qclim[:, :, ityr])
 
     stages = [
-        ("circulation!(Ta)", () -> circulation!(Ta, GREBClimate.z_air, ws.dTa_crcl, fields, ws, timestate, cfg)),
-        ("circulation!(q)", () -> circulation!(q, GREBClimate.z_vapor, ws.dq_crcl, fields, ws, timestate, cfg)),
-        ("SWradiation!", () -> SWradiation!(Ts, fields, state, timestate, cfg, ws)),
-        ("LWradiation!", () -> LWradiation!(Ts, Ta, q, CO2, fields, timestate, cfg, ws)),
-        ("hydro!", () -> hydro!(Ts, q, fields, timestate, cfg, ws)),
-        ("deep_ocean!", () -> deep_ocean!(Ts, To, fields, timestate, cfg, ws)),
+        ("circulation!(Ta)", () -> circulation!(Ta, GREBClimate.z_air, ws.dTa_crcl, fields, ws, timestate, p)),
+        ("circulation!(q)", () -> circulation!(q, GREBClimate.z_vapor, ws.dq_crcl, fields, ws, timestate, p)),
+        ("SWradiation!", () -> SWradiation!(Ts, fields, state, timestate, p, ws)),
+        ("LWradiation!", () -> LWradiation!(Ts, Ta, q, CO2, fields, timestate, p, ws)),
+        ("hydro!", () -> hydro!(Ts, q, fields, timestate, p, r.hydrology, ws)),
+        ("deep_ocean!", () -> deep_ocean!(Ts, To, fields, timestate, p, ws)),
     ]
 
     for (_, f) in stages
@@ -190,13 +190,12 @@ const TENDENCIES_ALLOC_BUDGET = 256  # kept in sync with test/test_invariants.jl
 function check_allocations(jld2_dir::AbstractString)
     _require_data(jld2_dir) || return nothing
 
-    cfg = create_experiment_config(:full_model)
+    r = resolve(preset(:full_model))
     fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
-    init_model!(cfg, fields)
+    CO2 = init_model!(r, fields).CO2_ctrl
     state = ModelState()
     ws = CirculationWorkspace()
     timestate = TimeState(1, 1)
-    CO2 = cfg.co2_concentration
 
     ityr = timestate.ityr
     Ts = copy(fields.Tclim[:, :, ityr])
@@ -204,8 +203,8 @@ function check_allocations(jld2_dir::AbstractString)
     To = copy(fields.Toclim[:, :, ityr])
     q = copy(fields.qclim[:, :, ityr])
 
-    tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, timestate, cfg)  # warm-up
-    bytes = @allocated tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, timestate, cfg)
+    tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, timestate, r)  # warm-up
+    bytes = @allocated tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, timestate, r)
 
     verdict = bytes <= TENDENCIES_ALLOC_BUDGET ? "within" : "OVER"
     println("tendencies! allocations (single-workspace path): ", bytes, " bytes ",
@@ -220,11 +219,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
         ("year", String[])
     elseif ARGS[1] in _MODES
         (ARGS[1], ARGS[2:end])
-    elseif isdir(ARGS[1])
-        ("year", ARGS)          # legacy form: bare directory, no mode
     else
-        error("unknown mode $(repr(ARGS[1])); expected one of $(join(_MODES, ", ")) " *
-              "or a path to an existing dataset directory")
+        error("unknown mode $(repr(ARGS[1])); expected one of $(join(_MODES, ", "))")
     end
 
     # `--name=value` flags (only `years` uses them today) can appear anywhere
@@ -248,7 +244,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
         ctrl = haskey(flags, "ctrl") ? parse_nonneg_int("ctrl", flags["ctrl"]) : 10
         scnr = haskey(flags, "scnr") ? parse_nonneg_int("scnr", flags["scnr"]) : 10
         experiment = Symbol(get(flags, "experiment", "full_model"))
-        time_years(jld2_dir; cfg=create_experiment_config(experiment),
+        time_years(jld2_dir; experiment,
             ctrl=ctrl, scnr=scnr, reps=something(reps, 1))
     end
 end

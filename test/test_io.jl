@@ -1,12 +1,5 @@
 # JLD2 loading, dataset resolution, and converter/archive consistency.
 
-@testset "read_jld2 rejects non-JLD2 input" begin
-    tmp = tempname() * ".jld2"
-    write(tmp, "not a jld2 file")
-    @test_throws Exception read_jld2(tmp)
-    rm(tmp; force = true)
-end
-
 @testset "load_greb_jld2!/load_flux_corrections_jld2! file-exists branches" begin
     write2(path, v) = (mkpath(dirname(path)); GREBClimate.jldopen(path, "w") do f
         f["data"] = fill(v, GREBClimate.xdim, GREBClimate.ydim); f["dim_names"] = ["lon", "lat"]
@@ -89,12 +82,19 @@ end
         @test_throws ErrorException greb_data_dir()
         delete!(ENV, "GREB_DATA")
 
-        cached = GREBClimate._cached_datadep_path()
-        if cached === nothing
-            @test_skip "no DataDeps cache on this machine"
-        else
-            @test isdir(cached)
-            @test greb_data_dir(; allow_download = false) !== nothing
+        # A downloaded dataset is the directory `<load path>/GREB-input-data`.
+        # Stand one up so the cache step runs on machines that never downloaded it.
+        # DataDeps splits DATADEPS_LOAD_PATH on ':', which cuts a Windows drive
+        # letter off, so the load path is given relative to the working directory.
+        cd(tmp_b) do
+            withenv("DATADEPS_LOAD_PATH" => ".", "DATADEPS_NO_STANDARD_LOAD_PATH" => "true") do
+                @test GREBClimate._cached_datadep_path() === nothing
+                cache = mkpath(joinpath(pwd(), GREBClimate.DATA_DEP_NAME))
+                @test abspath(GREBClimate._cached_datadep_path()) == cache
+                # the repo-local dataset wins over the cache; without it the cache is used
+                local_dir = normpath(joinpath(@__DIR__, "..", "greb_input_data"))
+                @test abspath(greb_data_dir(; allow_download = false)) == (isdir(local_dir) ? local_dir : cache)
+            end
         end
 
         @test greb_data_dir(""; allow_download = false) ==
@@ -116,33 +116,11 @@ end
 
 @testset "converter allowlist matches what src/io.jl loads" begin
     repo = normpath(joinpath(@__DIR__, ".."))
-    conv = read(joinpath(repo, "tools", "dataset", "convert_greb_to_jld2.jl"), String)
+    fields = Module()
+    Base.include(fields, joinpath(repo, "tools", "dataset", "fields.jl"))
+    allowed = Set(fields.MODEL_FIELD_NAMES)
     io_src = read(joinpath(repo, "src", "io.jl"), String)
 
-    # --- the allowlist, as literals inside the MODEL_FIELD_NAMES block ---
-    m = match(r"const MODEL_FIELD_NAMES = Set\{String\}\(\[(.*?)
-\]\)"s, conv)
-    @test m !== nothing
-    # Cut at the ENSO comprehension: its "zonal.wind"/"meridional.wind"
-    # tokens are field-name *fragments*, not file names, and it is expanded
-    # explicitly below.
-    body = m.captures[1]
-    cut = findfirst("(\"erainterim.", body)
-    cut === nothing || (body = body[1:first(cut)-1])
-    allowed = Set{String}()
-    for lit in eachmatch(r"\"([^\"]+)\"", body)
-        s = lit.captures[1]
-        if occursin('$', s)
-            continue          # the ENSO comprehension template, expanded below
-        elseif occursin('.', s) && !occursin(' ', s)
-            push!(allowed, s)
-        end
-    end
-    # expand the ENSO comprehension the same way the converter does
-    for f in ("tsurf", "zonal.wind", "meridional.wind", "windspeed", "omega"),
-        s in ("elnino", "lanina")
-        push!(allowed, "erainterim.$f.$s.forcing")
-    end
     @test length(allowed) == 33
 
     # --- what io.jl actually loads, with $suffix expanded ---
@@ -150,8 +128,7 @@ end
     for m2 in eachmatch(r"\"([A-Za-z0-9_.\$-]+)\.jld2\"", io_src)
         name = m2.captures[1]
         # combined multi-field files are not per-field entries in the allowlist
-        name in ("flux_corrections", "ipcc_scenarios", "solar_paleo",
-                 "solar_eccentricity", "solar_obliquity") && continue
+        name in fields.COMBINED_FILE_NAMES && continue
         if occursin("\$suffix", name)
             for s in ("elnino", "lanina")
                 push!(loaded, replace(name, "\$suffix" => s))

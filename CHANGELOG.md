@@ -5,6 +5,106 @@ Notable changes to GREBClimate.jl, following
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-01
+
+### Added
+
+- A new configuration API: `Config` with a `Scenario` (CO2 path and mask,
+  sunlight, surface forcing, control CO2, start year, output form), a
+  `Processes` set (one option per process, each with an explicit meaning when
+  off, replacing the overlapping mean-climate and 2xCO2 switch sets), a
+  `Hydrology` scheme (named options instead of integer codes; `mscm_hydrology()`
+  for the original GREB scheme) and `Corrections` (`SpinUp(years)`, `Stored()`,
+  `NoCorrections()`). `preset(name)` builds every experiment; run it with
+  `greb_model!(run, config)`, where the spin-up length comes from `SpinUp`.
+  Results are identical to the former experiments. Any topography works with
+  any corrections; every preset spins up for 3 years unless told otherwise,
+  except `:decon_mean_climate` (below). `preset(name; processes = (ocean =
+  :none,))` changes single options of a preset's physics. Scenario parts
+  combine freely (for example `Scenario(co2 = ConstantCO2(500), solar =
+  SolarConstant(10))`). `resolve(config)` returns a `ResolvedConfig` with the
+  CO2 or solar table and the rain coefficients the configuration refers to.
+  Preset names that changed: `:rcp85` is `:rcp85_boundary`, `:co2_step` is
+  `:co2_abrupt_reverse`, `:a1b_scenario` is `:a1b`; `:constant_topo` has no
+  preset (use `preset(:co2_double; processes = (topography = :flat,),
+  corrections = Stored())`).
+- `:rcp85`: RCP8.5 CO2 from the dataset's table, like the other IPCC presets
+  (control at 280 ppm). The boundary-anomaly run is `:rcp85_boundary`.
+- A regression test that the MSCM configuration (`mscm_hydrology()`,
+  `moisture_convergence = false`) reproduces the MSCM 2xCO2 response: year 1
+  global mean 0.5946 K in both.
+- `MonthlyRecord` has two more fields: `olr`, the longwave leaving to space
+  (positive upward), and `lwdown`, the longwave the air sends to the surface
+  (positive downward), both in W/m2. Code that builds a `MonthlyRecord` by hand
+  or relies on its 13 fields has to add them.
+- `greb_model!(...; observer = f)` (experimental): `f(point, view)` is called
+  before and after every step's state update of the control and scenario runs
+  with the model's state and flows, for diagnostics that need per-step values.
+  Without it the run is unchanged. `GREBClimate.BudgetCheck()` is an observer
+  that checks each store changes by the sum of its flows and counts the cells
+  the model's limiters held; `tools/diagnostics/budget.jl` prints its result
+  and the global-mean flows of a run.
+
+### Removed
+
+- `PhysicsConfig`, `create_experiment_config` and `set_hydrology_parameters!`:
+  use `preset`/`Config` (above). `RunSpec` has no `flux` field; the spin-up
+  length is `SpinUp(years)` in the config. The never-read `log_vapor_dmc`
+  switch is gone with the struct.
+- `Config.modules` (never usable: `resolve` refused any value) and the unused
+  `crcl` array of `CirculationWorkspace`, which has one field fewer.
+
+### Changed
+
+- The physics functions take the part of the configuration they read instead
+  of a `PhysicsConfig`: `SWradiation!`, `LWradiation!`, `seaice!`,
+  `deep_ocean!`, `advection!`, `circulation!` take a `Processes`; `hydro!`
+  takes a `Processes` and a `ResolvedHydrology`; `tendencies!`, `time_loop!`,
+  `qflux_correction!` and `init_model!` take a `ResolvedConfig`.
+  `forcing(it, year, resolved_config)` dispatches on the scenario's parts.
+  `load_cc_anomaly_jld2!` and `load_enso_anomaly_jld2!` load every anomaly
+  field and take no configuration.
+- `ClimateFields`: the winds split by sign are named for what they hold,
+  `uclim_pos`/`uclim_neg` and `vclim_pos`/`vclim_neg` (formerly `uclim_m`,
+  `uclim_p`, `vclim_m`, `vclim_p`, where `_m` held the positive part).
+- `GREBClimate.derive_fields!(fields, processes)` computes every field that
+  follows from the input maps (heat capacity, pressure weights, rain limit,
+  deep-ocean depth, radiation-temperature offset, wind split); `init_model!`
+  calls it, and it can be called again after changing a map. One land test,
+  `GREBClimate.is_land(z) = z > 0`, replaces the four spellings in the
+  kernels: a cell at exactly 0 m is ocean everywhere (no such cell exists in
+  the dataset, so results are unchanged). The regional CO2 bands are written
+  as latitudes instead of row numbers.
+- Documentation: the Configuration page (formerly Physics Switches) shows
+  the configuration types' own docstrings and a preset table generated from
+  the presets; the API reference is split into sections.
+- Source layout: the configuration lives in `src/config/`, `forcing()` in
+  `src/forcing/`, `circulation.jl` in `src/physics/`.
+
+### Changes to model results
+
+- `:decon_2xco2` runs the MSCM physics (`mscm_hydrology()`, no moisture
+  convergence) on its own 3-year spin-up, like `:decon_mean_climate`. With the
+  default hydrology `humidity = :uniform` gave a non-finite run, because the
+  imposed humidity is above saturation over cold, high ground and the fitted
+  rain scheme rains it out at once. All processes on, the year-50 response is
+  now 2.46 K (2.95 K before). Pass `hydrology = Hydrology()` and
+  `processes = (moisture_convergence = true,)` for the former physics.
+- `:decon_mean_climate` runs the MSCM physics (`mscm_hydrology()`, no moisture
+  convergence) on the stored flux corrections. It spun up new corrections for
+  every configuration before, which pulled each one back to the observed
+  climate, so a switched-off process left the global mean unchanged.
+- `:obliquity` and `:eccentricity` default to the table row nearest today
+  (obliquity row 95, 22.5 degrees; eccentricity row 32, 0.02) instead of row 0,
+  the most extreme one, whose eccentricity run failed (NaN) in year 4.
+  `SolarTable(kind)` has the same default.
+- Switching CO2 off (`Processes(co2 = false)`, formerly `log_co2_dmc = false`)
+  sets 0 ppm in the scenario too; it applied only to the control before, and
+  `:decon_mean_climate` ran its scenario at 340 ppm.
+- A failed run no longer looks like a frozen planet: the 40 K floor on `Ts`
+  and `Ta` turned non-finite values into exactly 40 K. They now stay NaN.
+  Results of runs that stay finite are unchanged.
+
 ## [1.0.2] - 2026-09-30
 
 ### Added

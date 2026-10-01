@@ -14,6 +14,8 @@ const VAR_INFO = Dict(
     :lw     => (label="Surface longwave",       unit="W/m²"),
     :qlat   => (label="Latent heat flux",       unit="W/m²"),
     :qsens  => (label="Sensible heat flux",     unit="W/m²"),
+    :olr    => (label="Outgoing longwave",      unit="W/m²"),
+    :lwdown => (label="Downward longwave",      unit="W/m²"),
 )
 
 "Label and unit of a record field; unknown fields get their bare name."

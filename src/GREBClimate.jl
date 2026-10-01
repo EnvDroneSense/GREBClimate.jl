@@ -10,21 +10,29 @@ module GREBClimate
 # lives in `notebooks/GREB_explorer.jl`; see the package docs or README for
 # usage.
 #
-# Files below are included in dependency order: constants -> config -> data
-# -> state -> io -> physics/{radiation,hydrology,ocean} -> circulation ->
-# tendencies -> output -> postprocess -> model.
+# Files below are included in dependency order: constants ->
+# config/{processes,scenario,presets} -> data -> state -> io -> config/resolve
+# -> physics/{radiation,hydrology,ocean,circulation} -> tendencies -> budgets
+# -> forcing -> output -> postprocess -> model.
 # =============================================================================
 
 using LoopVectorization   # @turbo SIMD
 using JLD2
 using DataDeps: DataDeps, DataDep, register, unpack, @datadep_str
 
-export PhysicsConfig, RunSpec, CirculationWorkspace, MonthlyAccumulator, TimeState, MonthlyRecord
+export Config, preset, preset_names, Scenario, Processes, Hydrology, mscm_hydrology
+export resolve, ResolvedConfig, ResolvedHydrology
+export Corrections, SpinUp, Stored, NoCorrections
+export CO2Path, ConstantCO2, CO2Table, CO2File, A1BRamp, CO2SineWave, CO2Step, SeasonalCO2
+export CO2Mask, UniformMask, LatitudeMask, SurfaceMask
+export Solar, ModernSolar, SolarConstant, SolarCycle, SolarTable, EarthSunDistance
+export SurfaceForcing, NoSurfaceForcing, BoundaryAnomaly, SSTOffset
+export RunSpec, CirculationWorkspace, MonthlyAccumulator, TimeState, MonthlyRecord
 export ClimateFields, ModelState, SurfaceState
 export greb_data_dir
 export read_jld2, load_solar_forcing_jld2, load_flux_corrections_jld2!, load_greb_jld2!
 export load_co2_scenario_jld2, load_custom_co2_scenario, load_cc_anomaly_jld2!, load_enso_anomaly_jld2!
-export create_experiment_config, set_hydrology_parameters!, init_model!
+export init_model!, apply_co2_mask!, apply_dynamic_co2_mask!
 export SWradiation!, LWradiation!, hydro!, convergence!, seaice!, deep_ocean!
 export diffusion!, advection!, circulation!, tendencies!, forcing
 export diagnostics!, output!, time_loop!
@@ -33,15 +41,20 @@ export qflux_correction!, greb_model!
 export xdim, ydim, nstep_yr
 
 include("core/constants.jl")
-include("core/config.jl")
+include("config/processes.jl")
+include("config/scenario.jl")
+include("config/presets.jl")
 include("data.jl")
 include("core/state.jl")
 include("io.jl")
+include("config/resolve.jl")
 include("physics/radiation.jl")
 include("physics/hydrology.jl")
 include("physics/ocean.jl")
-include("circulation.jl")
+include("physics/circulation.jl")
 include("core/tendencies.jl")
+include("core/budgets.jl")
+include("forcing/forcing.jl")
 include("core/output.jl")
 include("core/postprocess.jl")
 include("core/model.jl")
@@ -59,12 +72,11 @@ using Logging: with_logger, NullLogger
 @compile_workload begin
     with_logger(NullLogger()) do
         redirect_stdout(devnull) do
-            cfg = create_experiment_config(:full_model)
-            greb_model!(RunSpec(flux=0, scnr=0), cfg; jld2_dir="", allow_uninitialized=true)
-
-            cfg_eva0 = create_experiment_config(:full_model)
-            cfg_eva0.log_eva = 0
-            greb_model!(RunSpec(flux=0, scnr=0), cfg_eva0; jld2_dir="", allow_uninitialized=true)
+            greb_model!(RunSpec(scnr=0), preset(:full_model; corrections=NoCorrections());
+                        jld2_dir="", allow_uninitialized=true)
+            greb_model!(RunSpec(scnr=0), preset(:full_model; hydrology=(evaporation=:skin,),
+                                                 corrections=NoCorrections());
+                        jld2_dir="", allow_uninitialized=true)
         end
     end
 end

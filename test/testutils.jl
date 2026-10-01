@@ -73,11 +73,62 @@ function synthetic_fields()
     f.Toclim .= 283.0f0
     f.cldclim .= 0.5f0
     f.swetclim .= 0.4f0
-    f.uclim_p .= max.(f.uclim, 0.0f0)
-    f.uclim_m .= min.(f.uclim, 0.0f0)
-    f.vclim_p .= max.(f.vclim, 0.0f0)
-    f.vclim_m .= min.(f.vclim, 0.0f0)
+    GREBClimate.split_winds!(f)
     return f
 end
 
 gmean(x) = sum(x) / length(x)
+
+"""
+A `ClimateFields` that is the same in every cell and at every step: topography
+`z_topo` everywhere (above 0 m is land), a 50 m mixed layer, and the given
+soil wetness, winds and vertical velocity. For checking a kernel against a
+hand calculation.
+"""
+function constant_fields(; z_topo, swet = 1.0, u = 0.0, v = 0.0, omega = 0.0, omegastd = 0.0, ws = 0.0)
+    f = ClimateFields()
+    f.z_topo .= z_topo
+    f.mldclim .= 50.0
+    f.Tclim .= 280.0
+    f.Toclim .= 285.0
+    f.qclim .= 0.006
+    f.cldclim .= 0.5
+    f.swetclim .= swet
+    f.uclim .= u
+    f.vclim .= v
+    f.omegaclim .= omega
+    f.omegastdclim .= omegastd
+    f.wsclim .= ws
+    return f
+end
+
+"A `MonthlyRecord` with every field filled with `v`; a keyword sets one field to another value."
+uniform_record(v; kw...) = MonthlyRecord(map(n -> fill(Float32(get(kw, n, v)), X, Y), fieldnames(MonthlyRecord)))
+
+struct StopRun <: Exception end
+
+"""
+Run `greb_model!(run, config; kwargs...)` up to the first step of `phase`
+(`:ctrl` or `:scnr`), return `f(view)` of the observer's view there, and stop
+the run. `point` is `:after_tendencies` (state before the step's update) or
+`:after_step`. For what is already decided at the first step - the CO2, the
+solar table, the climatology in use - without paying for the rest of the year.
+The observer is not called during the spin-up, so pass `NoCorrections()` or
+`SpinUp(0)` unless the spin-up is what is being tested.
+"""
+function at_first_step(f, run, config; phase = :scnr, point = :after_step, kwargs...)
+    seen = nothing
+    function observer(pt, view)
+        (view.phase === phase && pt === point) || return nothing
+        seen = f(view)
+        throw(StopRun())
+    end
+    try
+        quiet() do
+            greb_model!(run, config; allow_uninitialized = true, observer, kwargs...)
+        end
+    catch e
+        e isa StopRun || rethrow()
+    end
+    return seen
+end

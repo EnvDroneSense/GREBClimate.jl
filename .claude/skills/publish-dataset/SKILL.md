@@ -26,7 +26,7 @@ a machine with no local copy:
 julia --project=. tools/dataset/package_dataset.jl greb_input_data greb_input_data-v1.tar.gz
 ```
 
-It validates the tree against the converter's `MODEL_FIELD_NAMES` allowlist
+It validates the tree against the `MODEL_FIELD_NAMES` allowlist in `tools/dataset/fields.jl`
 **before** building — so a stray field cannot silently add ~13 MB to every
 user's download — then prints the file count, size and SHA256.
 

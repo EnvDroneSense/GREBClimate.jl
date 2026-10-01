@@ -36,5 +36,5 @@ downloads and caches on first use; see [Input data](@ref).
 | [Input data](@ref) | Where the dataset comes from, how it is found, and its layout |
 | [Model overview](@ref) | What the model computes and how a run is structured |
 | [Plots and notebook](@ref) | The `viz/` plotting toolbox and the Pluto explorer |
-| [Physics Switches](@ref) | Every `PhysicsConfig` field and experiment preset |
+| [Configuration](@ref) | The parts of a configuration, their options, and the experiment presets |
 | [API Reference](@ref) | Every exported function and type |
