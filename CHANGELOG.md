@@ -49,6 +49,8 @@ Notable changes to GREBClimate.jl, following
   use `preset`/`Config` (above). `RunSpec` has no `flux` field; the spin-up
   length is `SpinUp(years)` in the config. The never-read `log_vapor_dmc`
   switch is gone with the struct.
+- `Config.modules` (never usable: `resolve` refused any value) and the unused
+  `crcl` array of `CirculationWorkspace`, which has one field fewer.
 
 ### Changed
 

@@ -2,21 +2,19 @@
 
 """
     Config(; scenario=Scenario(), processes=Processes(), hydrology=Hydrology(),
-             corrections=SpinUp(3), modules=())
+             corrections=SpinUp(3))
 
 Everything a run needs besides its length ([`RunSpec`](@ref)) and the data:
 what the experiment imposes ([`Scenario`](@ref)), which physics runs
 ([`Processes`](@ref)), the hydrology scheme ([`Hydrology`](@ref)), how the flux
-corrections are obtained ([`Corrections`](@ref)) and optional add-on modules
-(none yet). The default is the full model under constant 340 ppm. Build named
-experiments with [`preset`](@ref).
+corrections are obtained ([`Corrections`](@ref)). The default is the full model
+under constant 340 ppm. Build named experiments with [`preset`](@ref).
 """
 Base.@kwdef struct Config
     scenario::Scenario = Scenario()
     processes::Processes = Processes()
     hydrology::Hydrology = Hydrology()
     corrections::Corrections = SpinUp(3)
-    modules::Tuple = ()
 end
 
 """

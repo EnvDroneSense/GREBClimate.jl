@@ -57,7 +57,6 @@ julia> resolve(mscm_hydrology()).c_q
 ```
 """
 function resolve(config::Config; jld2_dir::AbstractString="")
-    isempty(config.modules) || throw(ArgumentError("add-on modules are not available yet"))
     s = config.scenario
     return ResolvedConfig(config, resolve(config.hydrology), _co2_table(s.co2, jld2_dir),
                           _solar_table(s.solar, jld2_dir))
