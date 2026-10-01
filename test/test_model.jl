@@ -141,7 +141,6 @@ end
                     :ssp119 => 300.0, :ssp126 => 301.0, :ssp245 => 302.0,
                     :ssp460 => 303.0, :ssp585 => 304.0, :historical_co2 => 280.73)
     key(p) = preset(p).scenario.co2.key
-    @test key(:rcp60) === :rcp6 && key(:historical_co2) === :hist
     with_tempdir() do dir
         write_ipcc_scenarios(dir, Dict(string(key(p)) => Dict(1950 => co2) for (p, co2) in expected))
         for (p, co2) in expected

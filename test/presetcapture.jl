@@ -1,6 +1,7 @@
-# What each experiment preset imposes, captured without the dataset. Used by
-# test_presets.jl and by tools/validation/preset_reference.jl, which writes the
-# reference in test/data/preset_reference.jl. Needs testutils.jl.
+# What each experiment preset is: the forcing it imposes and the physics it
+# runs, captured without the dataset. Used by test_presets.jl and by
+# tools/validation/preset_reference.jl, which writes the reference in
+# test/data/preset_reference.jl. Needs testutils.jl.
 
 const PRESETS = preset_names()
 const SAMPLE_STEPS = (1, 200, 400, 600)   # step of the year: winter, summer, summer, winter
@@ -29,6 +30,10 @@ _boundary_name(::SurfaceForcing) = :none
 _boundary_name(b::BoundaryAnomaly) = b.source === :cmip5_rcp85 ? :rcp85 : b.source
 _boundary_name(::SSTOffset) = :sst_plus1
 
+# A config part as field = value pairs, so the reference still parses when a
+# part gains a field
+_parts(x) = NamedTuple{fieldnames(typeof(x))}(Tuple(getfield(x, f) for f in fieldnames(typeof(x))))
+
 function capture_preset(p::Symbol)
     config = preset(p)
     s = config.scenario
@@ -53,7 +58,10 @@ function capture_preset(p::Symbol)
         push!(solar, f.sw_solar_forcing)
     end
     return (co2_ctrl = ini.CO2_ctrl, start_year = s.start_year, output = s.output,
-            co2_table = co2_table, solar_table = _solar_name(s.solar), boundary = _boundary_name(s.surface),
+            co2_table = co2_table, solar_table = _solar_name(s.solar),
+            solar_row = s.solar isa SolarTable ? s.solar.index : nothing, boundary = _boundary_name(s.surface),
+            processes = _parts(config.processes), hydrology = _parts(config.hydrology),
+            corrections = repr(config.corrections),
             static_mask = rle(vec(static_mask)), dynamic_mask = rle(vec(fields.co2_part)),
             co2 = rle(co2), solar = rle(solar))
 end

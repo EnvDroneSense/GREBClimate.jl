@@ -1,11 +1,12 @@
-### Preset reference for the configuration refactor ###
+### Preset reference ###
 #
 # MAINTAINER TOOL - not part of the package. No dataset needed.
 #
-# Writes test/data/preset_reference.jl: what every experiment preset imposes
-# (control CO2, CO2 masks, start year, output mode, loaded tables, boundary
-# forcing, and the CO2 and solar multiplier over 150 scenario years), captured
-# from the current code by test/presetcapture.jl. test/test_presets.jl checks
+# Writes test/data/preset_reference.jl: what every experiment preset is
+# (control CO2, CO2 masks, start year, output mode, loaded tables and table row,
+# boundary forcing, the CO2 and solar multiplier over 150 scenario years, and
+# its processes, hydrology and corrections), captured from the current code by
+# test/presetcapture.jl. test/test_presets.jl checks
 # the package against it. Regenerate only on purpose, when a preset is meant
 # to change, and say so in the commit.
 #
