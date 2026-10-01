@@ -12,12 +12,13 @@
 # gzip runs with -n so no timestamp is embedded. Rebuilding from an identical
 # tree gives a byte-identical archive, so the recorded SHA256 stays valid.
 #
-# Requires `tar`, `gzip` and `sha256sum` (Git Bash / WSL / any Unix).
+# Requires GNU `tar` and `gzip` (Git Bash / WSL / any Unix).
 # =============================================================================
 
 using SHA
 
 const REPO = normpath(joinpath(@__DIR__, "..", ".."))
+include(joinpath(@__DIR__, "fields.jl"))
 
 """
 Fixed timestamp stamped on every archive entry, so the archive depends only on
@@ -34,30 +35,8 @@ be present, and nothing else may be. Returns the file count and total bytes.
 function validate_dataset(dir::AbstractString)
     isdir(dir) || error("dataset directory not found: $dir")
 
-    # MODEL_FIELD_NAMES lives in the converter; read it rather than duplicating.
-    conv = read(joinpath(REPO, "tools", "dataset", "convert_greb_to_jld2.jl"), String)
-    m = match(r"const MODEL_FIELD_NAMES = Set\{String\}\(\[(.*?)\n\]\)"s, conv)
-    m === nothing && error("could not parse MODEL_FIELD_NAMES from the converter")
-    body = m.captures[1]
-    cut = findfirst("(\"erainterim.", body)
-    cut === nothing || (body = body[1:first(cut)-1])
-
-    expected = Set{String}()
-    for lit in eachmatch(r"\"([^\"]+)\"", body)
-        s = lit.captures[1]
-        occursin('$', s) && continue
-        occursin('.', s) && !occursin(' ', s) && push!(expected, s)
-    end
-    for f in ("tsurf", "zonal.wind", "meridional.wind", "windspeed", "omega"),
-        s in ("elnino", "lanina")
-        push!(expected, "erainterim.$f.$s.forcing")
-    end
-
-    # Combined multi-field files the converter writes but that are not per-field
-    # allowlist entries.
-    combined = Set(["flux_corrections", "ipcc_scenarios", "solar_paleo",
-                    "solar_eccentricity", "solar_obliquity",
-                    "historical_emissions_population"])
+    expected = MODEL_FIELD_NAMES
+    combined = Set(COMBINED_FILE_NAMES)
 
     present, nbytes, nfiles = Set{String}(), 0, 0
     for (root, _, files) in walkdir(dir), f in files

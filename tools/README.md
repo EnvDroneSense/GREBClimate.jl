@@ -16,7 +16,6 @@ Where a new script goes:
 | If it... | Folder |
 |:---------|:-------|
 | produces or publishes `greb_input_data/` | `dataset/` |
-| turns an external record into a forcing-series file the model reads | `forcing/` |
 | runs the model to measure a property of the model | `diagnostics/` |
 | runs the model and compares with observed data | `validation/` |
 

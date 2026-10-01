@@ -116,33 +116,11 @@ end
 
 @testset "converter allowlist matches what src/io.jl loads" begin
     repo = normpath(joinpath(@__DIR__, ".."))
-    conv = read(joinpath(repo, "tools", "dataset", "convert_greb_to_jld2.jl"), String)
+    fields = Module()
+    Base.include(fields, joinpath(repo, "tools", "dataset", "fields.jl"))
+    allowed = Set(fields.MODEL_FIELD_NAMES)
     io_src = read(joinpath(repo, "src", "io.jl"), String)
 
-    # --- the allowlist, as literals inside the MODEL_FIELD_NAMES block ---
-    m = match(r"const MODEL_FIELD_NAMES = Set\{String\}\(\[(.*?)
-\]\)"s, conv)
-    @test m !== nothing
-    # Cut at the ENSO comprehension: its "zonal.wind"/"meridional.wind"
-    # tokens are field-name *fragments*, not file names, and it is expanded
-    # explicitly below.
-    body = m.captures[1]
-    cut = findfirst("(\"erainterim.", body)
-    cut === nothing || (body = body[1:first(cut)-1])
-    allowed = Set{String}()
-    for lit in eachmatch(r"\"([^\"]+)\"", body)
-        s = lit.captures[1]
-        if occursin('$', s)
-            continue          # the ENSO comprehension template, expanded below
-        elseif occursin('.', s) && !occursin(' ', s)
-            push!(allowed, s)
-        end
-    end
-    # expand the ENSO comprehension the same way the converter does
-    for f in ("tsurf", "zonal.wind", "meridional.wind", "windspeed", "omega"),
-        s in ("elnino", "lanina")
-        push!(allowed, "erainterim.$f.$s.forcing")
-    end
     @test length(allowed) == 33
 
     # --- what io.jl actually loads, with $suffix expanded ---
@@ -150,8 +128,7 @@ end
     for m2 in eachmatch(r"\"([A-Za-z0-9_.\$-]+)\.jld2\"", io_src)
         name = m2.captures[1]
         # combined multi-field files are not per-field entries in the allowlist
-        name in ("flux_corrections", "ipcc_scenarios", "solar_paleo",
-                 "solar_eccentricity", "solar_obliquity") && continue
+        name in fields.COMBINED_FILE_NAMES && continue
         if occursin("\$suffix", name)
             for s in ("elnino", "lanina")
                 push!(loaded, replace(name, "\$suffix" => s))

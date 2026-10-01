@@ -37,7 +37,7 @@ Data/                                  # <input_dir>
 ```
 
 It converts only the fields the model reads - `MODEL_FIELD_NAMES` in
-`tools/dataset/convert_greb_to_jld2.jl` is the authoritative list - and warns about any
+`tools/dataset/fields.jl` is the authoritative list - and warns about any
 that are missing. `--all` converts every `.bin` present. `package_dataset.jl`
 checks the result against the same list before building the release archive.
 
