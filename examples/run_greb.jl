@@ -22,14 +22,14 @@ using GREBClimate
 using Statistics
 
 """
-    run_greb(jld2_dir; time_flux=3, time_ctrl=1, time_scnr=1)
+    run_greb(jld2_dir; time_spinup=3, time_ctrl=1, time_scnr=1)
 
 Load the JLD2 dataset from `jld2_dir`, run a GREB control+scenario simulation,
 print a summary and (if Plots.jl is available) save a global-mean Ts plot.
 Returns the result NamedTuple, or `nothing` if the data directory is missing.
 """
 function run_greb(jld2_dir::AbstractString;
-                  time_flux::Int=3, time_ctrl::Int=1, time_scnr::Int=1)
+                  time_spinup::Int=3, time_ctrl::Int=1, time_scnr::Int=1)
 
     # ── 1. locate + load input data ─────────────────────────────────────────
     if !isdir(jld2_dir)
@@ -45,10 +45,10 @@ function run_greb(jld2_dir::AbstractString;
     fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
 
     # ── 2. configure the experiment (replaces the interactive widgets) ──────
-    cfg = preset(:full_model; corrections=SpinUp(time_flux))
+    cfg = preset(:full_model; corrections=SpinUp(time_spinup))
 
     # ── 3. run the model ────────────────────────────────────────────────────
-    println("Running GREB (spin-up=$time_flux, ctrl=$time_ctrl, scnr=$time_scnr years)...")
+    println("Running GREB (spin-up=$time_spinup, ctrl=$time_ctrl, scnr=$time_scnr years)...")
     run = RunSpec(ctrl=time_ctrl, scnr=time_scnr)
     result = greb_model!(run, cfg; jld2_dir=jld2_dir, fields=fields)
     println("Run complete. control months: ", length(result.ctrl),

@@ -48,10 +48,10 @@ on a `:full_model` control run against the real dataset:
 | the model's own printed line | `1970  13.82  26.79  4.85` | `1970  -233.15  -233.15  -233.15` |
 | `mean(result.ctrl[1].Ts)` | 276.94 K | 40.0 K |
 
-These are `RunSpec()` numbers with its default `flux = 3` spin-up, measured
-2026-09-29 for v1.0.1. The earlier `flux = 0` default gave `1970  14.43 ...`
-and 276.64 K: without the spin-up the control ran on stored flux corrections
-and drifted warm. A healthy line above 14 °C now means the spin-up did not run.
+These are the numbers of `preset(:full_model)` with its default `SpinUp(3)`,
+measured 2026-09-29 for v1.0.1 and unchanged since. The earlier default (stored
+flux corrections, no spin-up) gave `1970  14.43 ...` and 276.64 K: the control
+ran on corrections that do not fit this configuration and drifted warm. A healthy line above 14 °C now means the spin-up did not run.
 
 The degenerate column dates from 2026-08-22 (`dfc9797`), when `min_T_K` went
 from 233.15 K (−40 °C, a physical floor that was silently clamping real
