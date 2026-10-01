@@ -75,9 +75,11 @@ own CO₂.
 
 The spin-up is part of the config: `corrections = SpinUp(3)`, the original
 GREB spin-up, is the default. `Stored()` uses the dataset's corrections
-without a spin-up; the control then drifts about +2 K over 5 years in a
-`:full_model` run, which shows up in the scenario anomaly. `NoCorrections()`
-runs without any.
+without a spin-up. They were computed with the MSCM physics, so with the
+default hydrology the control drifts (about +2 K over 5 years in a
+`:full_model` run), which shows up in the scenario anomaly. `NoCorrections()`
+runs without any; with the default hydrology such a run diverges within about
+15 years.
 
 ## 4. Inspect results
 

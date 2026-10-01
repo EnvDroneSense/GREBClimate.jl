@@ -135,6 +135,22 @@ end
     end
 end
 
+@testset "2xCO2 deconstruction: uniform humidity gives a finite response" begin
+    # 0.0052 kg/kg is above saturation over cold, high ground. The fitted rain
+    # scheme rains that out within the spin-up and the run goes non-finite;
+    # the preset's MSCM physics does not.
+    if !isdir(DATA_DIR)
+        @test_skip "greb_input_data/ not present"
+    else
+        result = quiet() do
+            greb_model!(RunSpec(ctrl = 1, scnr = 1), preset(:decon_2xco2; processes = (humidity = :uniform,));
+                        jld2_dir = DATA_DIR, fields = load_greb_jld2!(DATA_DIR; dataset = :ncep))
+        end
+        @test all(r -> all(isfinite, r.Ts), result.ctrl)
+        @test isapprox(area_mean(result.scnr), 0.675; atol = 1e-2)
+    end
+end
+
 @testset "orbital tables: the default rows are near modern; the rcp85 CO2 table loads" begin
     if !isdir(DATA_DIR)
         @test_skip "greb_input_data/ not present"

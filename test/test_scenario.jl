@@ -40,7 +40,9 @@ end
     @test preset(:co2_double; processes = (topography = :flat,)).processes == Processes(topography = :flat)
     # Flat topography spins up like everything else unless told otherwise
     @test preset(:co2_double; processes = (topography = :flat,)).corrections == SpinUp(3)
-    @test preset(:decon_2xco2).corrections == SpinUp(3)
+    # The response deconstruction runs the MSCM physics too, on its own spin-up
+    d = preset(:decon_2xco2)
+    @test (d.processes, d.hydrology, d.corrections) == (Processes(moisture_convergence = false), mscm_hydrology(), SpinUp(3))
     @test_throws ArgumentError preset(:co2_double; processes = (oceans = :none,))
     @test preset(:decon_2xco2).scenario == preset(:co2_double).scenario
     @test preset(:decon_mean_climate).scenario == preset(:full_model).scenario
