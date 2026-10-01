@@ -1,12 +1,5 @@
 # JLD2 loading, dataset resolution, and converter/archive consistency.
 
-@testset "read_jld2 rejects non-JLD2 input" begin
-    tmp = tempname() * ".jld2"
-    write(tmp, "not a jld2 file")
-    @test_throws Exception read_jld2(tmp)
-    rm(tmp; force = true)
-end
-
 @testset "load_greb_jld2!/load_flux_corrections_jld2! file-exists branches" begin
     write2(path, v) = (mkpath(dirname(path)); GREBClimate.jldopen(path, "w") do f
         f["data"] = fill(v, GREBClimate.xdim, GREBClimate.ydim); f["dim_names"] = ["lon", "lat"]

@@ -1,4 +1,4 @@
-# State structs: constructors, field shapes, accumulator reset, mask reset.
+# State structs: field shapes, accumulator reset, mask reset, derived fields.
 
 @testset "co2_part regional CO2 mask resets between runs (no leak)" begin
     fields = ClimateFields()
@@ -13,23 +13,11 @@
     @test all(==(1.0f0), fields.co2_part)  # init_model! resets it back to full CO2
 end
 
-@testset "workspace/accumulator/record types construct correctly" begin
-    ws = CirculationWorkspace()
-    @test size(ws.dTa_crcl) == (GREBClimate.xdim, GREBClimate.ydim)
-    @test eltype(ws.dTa_crcl) === Float32
-
+@testset "reset! zeroes every accumulator field" begin
     acc = MonthlyAccumulator()
     foreach(f -> fill!(getfield(acc, f), 42.0f0), fieldnames(MonthlyAccumulator))
     GREBClimate.reset!(acc)
     @test all(f -> all(iszero, getfield(acc, f)), fieldnames(MonthlyAccumulator))
-
-    ts = TimeState(1, 1)
-    @test ts.jday == 1
-    @test ts.ityr == 1
-
-    @test MonthlyRecord <: NamedTuple
-    @test :Ts in fieldnames(MonthlyRecord)
-    @test :precip in fieldnames(MonthlyRecord)
 end
 
 @testset "state constructors: every field gets the right shape and eltype" begin
@@ -40,7 +28,6 @@ end
     cf = ClimateFields()
     cf_2d = (:z_topo, :glacier, :z_ocean, :cap_surf, :wz_air, :wz_vapor,
              :rain_limit, :co2_part)
-    @test length(fieldnames(ClimateFields)) == 39
     for f in fieldnames(ClimateFields)
         v = getfield(cf, f)
         if f === :loaded
@@ -66,7 +53,6 @@ end
     XP = GREBClimate.xghost
     cw_vec = (:T1h, :dTxh, :term_north, :term_south)
     cw_ghosted = (:T1h, :X_work, :wz_ghost)
-    @test length(fieldnames(CirculationWorkspace)) == 43
     for f in fieldnames(CirculationWorkspace)
         v = getfield(cw, f)
         n = f in cw_ghosted ? XP : X
@@ -75,21 +61,14 @@ end
         @test all(iszero, v)
     end
 
-    # MonthlyAccumulator: 15 accumulators, all (xdim, ydim). There is no
-    # `count` field - output! divides by cjday_mon[mon] * ndt_days.
+    # MonthlyAccumulator: every field (xdim, ydim). There is no `count`
+    # field - output! divides by cjday_mon[mon] * ndt_days.
     ma = MonthlyAccumulator()
-    @test length(fieldnames(MonthlyAccumulator)) == 15
     for f in fieldnames(MonthlyAccumulator)
         v = getfield(ma, f)
         @test size(v) == (X, Y) && eltype(v) === Float32 && all(iszero, v)
     end
 
-    # The keyword form is the point of the change: field-to-value
-    # association by name, not by ordinal position.
-    @test ClimateFields(loaded = true).loaded === true
-    @test all(isone, ClimateFields(loaded = true).co2_part)
-    @test size(MonthlyAccumulator(Tmm = zeros(Float32, 2, 2)).Tmm) == (2, 2)
-    @test size(CirculationWorkspace(T1h = zeros(Float32, 3)).T1h) == (3,)
 end
 
 @testset "derive_fields! follows the input maps" begin

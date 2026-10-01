@@ -5,13 +5,8 @@
 # A config resolved with a stand-in CO2 table, without the dataset
 resolved(c; table = Dict(1950 => 400.0f0)) = ResolvedConfig(c, resolve(c.hydrology), table, nothing)
 
-@testset "preset names: renames applied, :constant_topo dropped, :rcp85 added" begin
-    names = preset_names()
-    @test :rcp85_boundary in names && :co2_abrupt_reverse in names && :a1b in names && :rcp85 in names
-    @test !(:co2_step in names) && !(:a1b_scenario in names) && !(:constant_topo in names)
-    @test length(names) == 42     # 42 former experiments, minus :constant_topo, plus :rcp85
-    @test preset(:rcp85).scenario == Scenario(co2 = CO2Table(:rcp85), control_co2 = 280)
-    @test_throws ArgumentError preset(:constant_topo)
+@testset "preset() refuses a name that is not a preset" begin
+    # The set of names itself is pinned by the preset reference (test_presets.jl)
     @test_throws ArgumentError preset(:not_a_preset)
 end
 
