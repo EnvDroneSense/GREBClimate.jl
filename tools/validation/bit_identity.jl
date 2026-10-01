@@ -25,10 +25,11 @@ const DATA_DIR = something(greb_data_dir(; allow_download=false),
 isdir(DATA_DIR) || error("dataset not found at $DATA_DIR")
 
 # One spin-up year, so the flux-correction loop is exercised, then a control
-# and a scenario year. Case names are the pre-2.0 experiment names, so a
-# snapshot taken before the configuration refactor still compares.
+# and a scenario year. Case names are the preset names. Snapshots saved before
+# the names were introduced (no "naming" key) used the pre-2.0 experiment names
+# and are renamed on load.
 const RUN = RunSpec(ctrl=1, scnr=1)
-const RENAMED = Dict("rcp85" => :rcp85_boundary, "co2_step" => :co2_abrupt_reverse, "a1b_scenario" => :a1b)
+const RENAMED = Dict("rcp85" => "rcp85_boundary", "co2_step" => "co2_abrupt_reverse", "a1b_scenario" => "a1b")
 
 case(name; kw...) = preset(name; corrections=SpinUp(1), kw...)
 
@@ -43,9 +44,8 @@ end
 function _cases()
     cases = Pair{String,Function}[]
     for p in preset_names()
-        name = something(findfirst(==(p), RENAMED), string(p))
         mk = p === :custom_co2 ? () -> case(p; path=_custom_co2_file()) : () -> case(p)
-        push!(cases, name => mk)
+        push!(cases, string(p) => mk)
     end
     # flat topography on the stored corrections (the former :constant_topo)
     push!(cases, "constant_topo" => () -> preset(:co2_double; processes=(topography=:flat,), corrections=Stored()))
@@ -80,17 +80,25 @@ function main(args)
             f["nthreads"] = Threads.nthreads()
             f["julia"] = string(VERSION)
             f["data"] = snap
+            f["naming"] = "presets"
         end
         println("saved $(length(snap)) arrays to $path")
         return 0
     end
-    old, nt, jv = GREBClimate.jldopen(path, "r") do f
-        f["data"], f["nthreads"], f["julia"]
+    old, nt, jv, renamed = GREBClimate.jldopen(path, "r") do f
+        f["data"], f["nthreads"], f["julia"], !haskey(f, "naming")
+    end
+    if renamed
+        rename(k) = (c = split(k, '/'; limit=2); string(get(RENAMED, c[1], c[1]), '/', c[2]))
+        old = Dict(rename(k) => v for (k, v) in old)
     end
     nt == Threads.nthreads() || error("snapshot taken with $nt threads; rerun with -t $nt")
     jv == string(VERSION) || @warn "snapshot taken on Julia $jv; exact equality is not expected across versions"
     new = run_cases()
-    keys(old) == keys(new) || error("snapshot and current run hold different arrays")
+    missing_now = setdiff(keys(old), keys(new))
+    isempty(missing_now) || error("the current run lacks $(length(missing_now)) arrays of the snapshot, e.g. $(first(missing_now))")
+    added = sort!(unique(first(split(k, '/')) for k in setdiff(keys(new), keys(old))))
+    isempty(added) || println("  cases not in the snapshot (not compared): ", join(added, ", "))
     total = 0
     for k in sort!(collect(keys(old)))
         a, b = old[k], new[k]

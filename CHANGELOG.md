@@ -26,6 +26,8 @@ Notable changes to GREBClimate.jl, following
   `:co2_abrupt_reverse`, `:a1b_scenario` is `:a1b`; `:constant_topo` has no
   preset (use `preset(:co2_double; processes = (topography = :flat,),
   corrections = Stored())`).
+- `:rcp85`: RCP8.5 CO2 from the dataset's table, like the other IPCC presets
+  (control at 280 ppm). The boundary-anomaly run is `:rcp85_boundary`.
 - A regression test that the MSCM configuration (`mscm_hydrology()`,
   `moisture_convergence = false`) reproduces the MSCM 2xCO2 response: year 1
   global mean 0.5946 K in both.
@@ -56,6 +58,10 @@ Notable changes to GREBClimate.jl, following
   convergence) on the stored flux corrections. It spun up new corrections for
   every configuration before, which pulled each one back to the observed
   climate, so a switched-off process left the global mean unchanged.
+- `:obliquity` and `:eccentricity` default to the table row nearest today
+  (obliquity row 95, 22.5 degrees; eccentricity row 32, 0.02) instead of row 0,
+  the most extreme one, whose eccentricity run failed (NaN) in year 4.
+  `SolarTable(kind)` has the same default.
 - Switching CO2 off (`Processes(co2 = false)`, formerly `log_co2_dmc = false`)
   sets 0 ppm in the scenario too; it applied only to the control before, and
   `:decon_mean_climate` ran its scenario at 340 ppm.

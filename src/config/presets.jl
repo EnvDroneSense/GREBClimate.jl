@@ -61,6 +61,7 @@ const _PRESET_SCENARIOS = Dict{Symbol,Scenario}(
     :elnino => Scenario(surface=BoundaryAnomaly(:elnino)),
     :lanina => Scenario(surface=BoundaryAnomaly(:lanina)),
     :rcp85_boundary => Scenario(surface=BoundaryAnomaly(:cmip5_rcp85)),
+    :rcp85 => Scenario(; co2=CO2Table(:rcp85), _TABLE...),
     :rcp26 => Scenario(; co2=CO2Table(:rcp26), _TABLE...),
     :rcp45 => Scenario(; co2=CO2Table(:rcp45), _TABLE...),
     :rcp60 => Scenario(; co2=CO2Table(:rcp6), _TABLE...),
@@ -102,14 +103,15 @@ const _PRESET_PHYSICS = Dict{Symbol,NamedTuple}(
 
 """
     preset(name; processes=nothing, hydrology=nothing, corrections=nothing,
-           index=0, pct=0, path="") -> Config
+           index=nothing, pct=0, path="") -> Config
 
 The [`Config`](@ref) of a named experiment ([`preset_names`](@ref) lists them).
 `processes` and `hydrology` change the preset's physics: a NamedTuple such as
 `(ocean = :none,)` changes those options, a [`Processes`](@ref) or
 [`Hydrology`](@ref) replaces them. `index` selects the table row of
-`:obliquity`/`:eccentricity`, `pct` the distance change of
-`:earth_sun_distance`, `path` the CO₂ file of `:custom_co2`.
+`:obliquity`/`:eccentricity` (default: the row nearest today, see
+[`SolarTable`](@ref)), `pct` the distance change of `:earth_sun_distance`,
+`path` the CO₂ file of `:custom_co2`.
 
 Every preset runs the default physics with a 3-year [`SpinUp`](@ref), except
 `:decon_mean_climate` (mean-climate deconstruction; run it with
@@ -125,11 +127,12 @@ ConstantCO2(680.0f0)
 """
 function preset(name::Symbol; processes::Union{Processes,NamedTuple,Nothing}=nothing,
     hydrology::Union{Hydrology,NamedTuple,Nothing}=nothing, corrections::Union{Corrections,Nothing}=nothing,
-    index::Integer=0, pct::Real=0, path::AbstractString="")
+    index::Union{Integer,Nothing}=nothing, pct::Real=0, path::AbstractString="")
     haskey(_PRESET_SCENARIOS, name) ||
         throw(ArgumentError("unknown preset :$name; known: $(join((":$p" for p in preset_names()), ", "))"))
     s = _PRESET_SCENARIOS[name]
-    s.solar isa SolarTable && s.solar.kind !== :paleo && (s = _with(s; solar=SolarTable(s.solar.kind, index)))
+    s.solar isa SolarTable && s.solar.kind !== :paleo && index !== nothing &&
+        (s = _with(s; solar=SolarTable(s.solar.kind, index)))
     s.solar isa EarthSunDistance && (s = _with(s; solar=EarthSunDistance(pct)))
     s.co2 isa CO2File && (s = _with(s; co2=CO2File(path)))
     defaults = get(_PRESET_PHYSICS, name, (;))

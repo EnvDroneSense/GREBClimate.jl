@@ -1,14 +1,8 @@
 # What each experiment preset imposes, captured without the dataset. Used by
 # test_presets.jl and by tools/validation/preset_reference.jl, which writes the
 # reference in test/data/preset_reference.jl. Needs testutils.jl.
-#
-# The reference is keyed by the pre-2.0 experiment names; PRESET_CONFIG maps
-# each to the configuration that replaces it.
 
-const RENAMED = Dict(:rcp85 => :rcp85_boundary, :co2_step => :co2_abrupt_reverse, :a1b_scenario => :a1b)
-const PRESETS = sort!([[get(Dict(v => k for (k, v) in RENAMED), p, p) for p in preset_names()]; :constant_topo])
-PRESET_CONFIG(p) = p === :constant_topo ? preset(:co2_double; processes = (topography = :flat,)) :
-                   preset(get(RENAMED, p, p))
+const PRESETS = preset_names()
 const SAMPLE_STEPS = (1, 200, 400, 600)   # step of the year: winter, summer, summer, winter
 const NYEARS = 150
 
@@ -36,7 +30,7 @@ _boundary_name(b::BoundaryAnomaly) = b.source === :cmip5_rcp85 ? :rcp85 : b.sour
 _boundary_name(::SSTOffset) = :sst_plus1
 
 function capture_preset(p::Symbol)
-    config = PRESET_CONFIG(p)
+    config = preset(p)
     s = config.scenario
     co2_table = _table_name(s.co2)
     # stand-in for the table the run loads

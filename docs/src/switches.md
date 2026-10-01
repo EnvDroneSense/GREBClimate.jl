@@ -56,12 +56,12 @@ at once instead of being ignored.
 | `:full_model` | 340 ppm throughout |
 | `:co2_double`, `:co2_quadruple`, `:co2_10x`, `:co2_half`, `:co2_zero` | 680, 1360, 3400, 170, 0 ppm |
 | `:co2_sine_wave`, `:co2_abrupt_reverse`, `:a1b` | [`CO2SineWave`](@ref), [`CO2Step`](@ref)`(680, 340, 1980)`, [`A1BRamp`](@ref) (control at 280 ppm) |
-| `:rcp26`, `:rcp45`, `:rcp60`, `:ssp119`, `:ssp126`, `:ssp245`, `:ssp460`, `:ssp585`, `:historical_co2` | CO₂ from the dataset's table (control at 280 ppm; `:historical_co2` starts in 1850) |
+| `:rcp26`, `:rcp45`, `:rcp60`, `:rcp85`, `:ssp119`, `:ssp126`, `:ssp245`, `:ssp460`, `:ssp585`, `:historical_co2` | CO₂ from the dataset's table (control at 280 ppm; `:historical_co2` starts in 1850) |
 | `:custom_co2` | CO₂ from a `year ppm` file: `preset(:custom_co2; path = "co2.txt")` |
 | `:solar_plus27`, `:solar_cycle_11yr` | Solar constant +27 W/m², or an 11-year cycle of ±1 W/m² |
 | `:paleo_231kyr`, `:paleo_solar_modern_co2`, `:modern_solar_paleo_co2` | Insolation 231 kyr ago and/or 200 ppm |
-| `:obliquity`, `:eccentricity`, `:earth_sun_distance` | Orbital insolation tables (`index = ...`) or a distance change (`pct = ...`); output absolute, start year 1 |
-| `:elnino`, `:lanina`, `:rcp85_boundary` | Boundary anomalies of surface temperature, winds and vertical velocity at 340 ppm |
+| `:obliquity`, `:eccentricity`, `:earth_sun_distance` | Orbital insolation tables (`index = ...`, default the row nearest today) or a distance change (`pct = ...`); output absolute, start year 1 |
+| `:elnino`, `:lanina`, `:rcp85_boundary` | Boundary anomalies of surface temperature, winds and vertical velocity at 340 ppm (`:rcp85_boundary`: the CMIP5 RCP8.5 change; `:rcp85` is the CO₂ path) |
 | `:sst_plus1` | Ocean surface held at climatology + 1 K |
 | `:regional_co2_nh`, `_sh`, `_tropics`, `_extratropics`, `_ocean`, `_land_ice`, `_winter`, `_summer` | 680 ppm in one region or season, 340 ppm elsewhere |
 | `:decon_mean_climate` | Mean-climate deconstruction: 340 ppm, MSCM physics, stored corrections. Switch processes off with `processes = (...)`; run with `RunSpec(scnr = 0)` |

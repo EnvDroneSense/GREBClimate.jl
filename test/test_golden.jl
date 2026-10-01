@@ -134,3 +134,17 @@ end
         @test abs(area_mean(control((ocean = :none,))) - area_mean(control((;)))) > 0.1
     end
 end
+
+@testset "orbital tables: the default rows are near modern; the rcp85 CO2 table loads" begin
+    if !isdir(DATA_DIR)
+        @test_skip "greb_input_data/ not present"
+    else
+        modern = quiet(() -> load_greb_jld2!(DATA_DIR; dataset = :ncep)).sw_solar
+        rms(a) = sqrt(sum(abs2, a .- modern) / length(a))
+        for p in (:eccentricity, :obliquity)
+            @test rms(resolve(preset(p); jld2_dir = DATA_DIR).solar_table) < 10   # W/m2; row 0 is over 200
+        end
+        table = resolve(preset(:rcp85); jld2_dir = DATA_DIR).co2_table
+        @test isapprox(table[2100], 1231.45; atol = 0.01)
+    end
+end

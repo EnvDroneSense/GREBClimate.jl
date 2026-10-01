@@ -5,13 +5,21 @@
 # A config resolved with a stand-in CO2 table, without the dataset
 resolved(c; table = Dict(1950 => 400.0f0)) = ResolvedConfig(c, resolve(c.hydrology), table, nothing)
 
-@testset "preset names: renames applied, :constant_topo dropped" begin
+@testset "preset names: renames applied, :constant_topo dropped, :rcp85 added" begin
     names = preset_names()
-    @test :rcp85_boundary in names && :co2_abrupt_reverse in names && :a1b in names
+    @test :rcp85_boundary in names && :co2_abrupt_reverse in names && :a1b in names && :rcp85 in names
     @test !(:co2_step in names) && !(:a1b_scenario in names) && !(:constant_topo in names)
-    @test length(names) == 41     # 42 former experiments, minus :constant_topo
+    @test length(names) == 42     # 42 former experiments, minus :constant_topo, plus :rcp85
+    @test preset(:rcp85).scenario == Scenario(co2 = CO2Table(:rcp85), control_co2 = 280)
     @test_throws ArgumentError preset(:constant_topo)
     @test_throws ArgumentError preset(:not_a_preset)
+end
+
+@testset "orbital presets default to the near-modern table row" begin
+    @test preset(:eccentricity).scenario.solar == SolarTable(:eccentricity, 32)
+    @test preset(:obliquity).scenario.solar == SolarTable(:obliquity, 95)
+    @test SolarTable(:obliquity) == SolarTable(:obliquity, 95)
+    @test SolarTable(:paleo).index == 0
 end
 
 @testset "parameterised presets carry their parameter" begin

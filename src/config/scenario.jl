@@ -159,20 +159,25 @@ struct SolarCycle <: Solar
 end
 
 """
-    SolarTable(kind, index = 0)
+    SolarTable(kind, index)
 
 Insolation from the dataset's solar scenario tables: `kind` is `:paleo` (231
 kyr ago), `:obliquity` or `:eccentricity`; `index` selects the table row of
-the last two.
+the last two. Obliquity row `k` is `-25 + k/2` degrees (`k` = 0, 5, ..., 230),
+eccentricity row `k` is `-0.30 + 0.01k` (`k` = 0, ..., 60; negative puts
+perihelion in July). The default is the row nearest today: 95 (22.5 degrees)
+and 32 (0.02).
 """
 struct SolarTable <: Solar
     kind::Symbol
     index::Int
-    function SolarTable(kind::Symbol, index::Integer=0)
+    function SolarTable(kind::Symbol, index::Integer=get(_MODERN_ROW, kind, 0))
         _check_option(:kind, kind, (:paleo, :obliquity, :eccentricity))
         return new(kind, index)
     end
 end
+
+const _MODERN_ROW = Dict(:obliquity => 95, :eccentricity => 32)
 
 """
     EarthSunDistance(pct)
