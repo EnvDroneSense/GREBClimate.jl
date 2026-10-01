@@ -1,6 +1,6 @@
 # State structs: field shapes, accumulator reset, mask reset, derived fields.
 
-@testset "co2_part regional CO2 mask resets between runs (no leak)" begin
+@testset "init_model! clears the CO2 mask an earlier run left in the same fields" begin
     fields = ClimateFields()
     quiet() do
         init_model!(resolve(preset(:regional_co2_nh)), fields)

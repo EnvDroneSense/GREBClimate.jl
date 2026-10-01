@@ -4,8 +4,8 @@
     # `tendencies!` runs circulation!(Ta) and circulation!(q) concurrently only
     # when `Threads.nthreads() > 1` AND `ws_a !== ws_q` (see src/core/tendencies.jl).
     # Thread count is fixed at Julia startup, so a single-threaded `Pkg.test()`
-    # can never reach that branch - it went untested until 2026-08-21. Spawning
-    # both counts explicitly keeps this honest however the suite is invoked.
+    # can never reach that branch. Spawning both counts explicitly covers it
+    # however the suite is invoked.
     utils = joinpath(@__DIR__, "testutils.jl")
     script = """
         using GREBClimate

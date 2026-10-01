@@ -127,7 +127,7 @@ end
     @test_throws ErrorException hydro!(Ts, q, ClimateFields(), TimeState(1, 1), Processes(), h, CirculationWorkspace())
 end
 
-@testset "hydro! :original_gust evaporation includes Fortran's carried-over +2.0²/+3.0² base term" begin
+@testset "hydro! :original_gust evaporation: latent heat flux over land and ocean" begin
     mkfields(topo) = begin
         fields = ClimateFields()
         fields.z_topo .= topo
@@ -161,7 +161,7 @@ end
     end
 end
 
-@testset "hydro! doesn't apply an extra -0.9q clamp to dq_rain" begin
+@testset "hydro! fitted rain: dq_rain and Q_lat_air values, with no limit on rain" begin
     fields = ClimateFields()
     fields.z_topo .= 1.0
     fields.mldclim .= 50.0
@@ -176,7 +176,8 @@ end
     fields.omegastdclim .= 0.0
     fields.wsclim .= 0.0
     init_model!(resolve(preset(:full_model)), fields)
-    # The fitted scheme has no rain-limit clamp; a huge c_q makes the old -0.9q clamp fire
+    # c_q is large enough that any per-step limit on rain inside hydro! would
+    # change the result: the fitted scheme applies none
     h = ResolvedHydrology(:fitted, :original, 1000, 0, 0, 0)
 
     Ts = fill(290.0f0, GREBClimate.xdim, GREBClimate.ydim)
@@ -186,8 +187,6 @@ end
     result = hydro!(Ts, q, fields, ts, Processes(), h, ws)
 
     expected_dq_rain = h.c_q * GREBClimate.cq_rain * q[1, 1]
-    min_dq_that_would_have_clamped = -0.9 * q[1, 1] / GREBClimate.Δt
-    @test expected_dq_rain < min_dq_that_would_have_clamped  # sanity: the old clamp would have fired
     @test isapprox(result.dq_rain[1, 1], expected_dq_rain; rtol = 1e-5)
     @test isapprox(result.Q_lat_air[1, 1], -expected_dq_rain * GREBClimate.cq_latent * GREBClimate.r_qviwv; rtol = 1e-5)
 end

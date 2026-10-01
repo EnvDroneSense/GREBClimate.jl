@@ -1,4 +1,4 @@
-# greb_model! integration: experiment dispatch, scenario tables, flux correction.
+# greb_model! integration: presets end to end, scenario tables, CO2 masks, flux corrections.
 
 @testset "greb_model! baseline: default config runs to completion with the right output shape" begin
     result = quiet() do
@@ -26,7 +26,7 @@ end
     end
 end
 
-@testset "qflux_correction! pulls Ts/To/q to climatology; Ta gets no correction (matches Fortran)" begin
+@testset "qflux_correction! pulls Ts/To/q to climatology; Ta gets no correction" begin
     # All ocean (topography 0 m), so it needs a mixed layer
     fields = ClimateFields()
     fields.mldclim .= 50.0
@@ -251,7 +251,7 @@ end
     @test all(isone, land_ice.got[1:(X - 48), :])    # land kept whatever the ice
 end
 
-@testset "CMIP5/ERA-Interim anomaly forcing is actually loaded (was previously a silent no-op)" begin
+@testset "boundary anomalies: the CMIP5 and ENSO files load and are added to the climatology" begin
     tmpdir_anom = mktempdir()
     try
         clim_dir = joinpath(tmpdir_anom, "climatology")
@@ -261,14 +261,14 @@ end
             file["dim_names"] = ["lon", "lat", "time"]
         end
 
-        # :rcp85 → CMIP5 RCP8.5 ensemble-mean anomaly
+        # :rcp85_boundary: CMIP5 RCP8.5 ensemble-mean anomaly
         write_field("cmip5.tsurf.rcp85.ensmean.forcing.jld2", 2.0)
         write_field("cmip5.zonal.wind.rcp85.ensmean.forcing.jld2", 3.0)
         write_field("cmip5.meridional.wind.rcp85.ensmean.forcing.jld2", 4.0)
         write_field("cmip5.omega.rcp85.ensmean.forcing.jld2", 5.0)
         write_field("cmip5.windspeed.rcp85.ensmean.forcing.jld2", 6.0)
 
-        # :elnino / :lanina → ERA-Interim composite-mean anomaly
+        # :el_nino / :la_nina: ERA-Interim composite-mean anomaly
         for suffix in ("elnino", "lanina")
             write_field("erainterim.tsurf.$suffix.forcing.jld2", 7.0)
             write_field("erainterim.zonal.wind.$suffix.forcing.jld2", 8.0)
