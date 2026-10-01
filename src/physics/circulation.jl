@@ -202,15 +202,15 @@ function _diffusion!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, ws::CirculationW
 end
 
 """
-    advection!(T1, h_scl, fields::ClimateFields, ws::CirculationWorkspace, timestate, cfg::PhysicsConfig)
+    advection!(T1, h_scl, fields::ClimateFields, ws::CirculationWorkspace, timestate, p::Processes)
 
 Meridional + zonal advection of `T1` (temperature or humidity), writing the
-tendency into `ws.dX_adv`. Gated by `cfg.log_hadv`/`cfg.log_vadv` depending on
-`h_scl`.
+tendency into `ws.dX_adv`. Gated by `p.heat_advection`/`p.vapour_advection`
+depending on `h_scl`.
 """
-function advection!(T1, h_scl, fields::ClimateFields, ws::CirculationWorkspace, timestate, cfg::PhysicsConfig)
+function advection!(T1, h_scl, fields::ClimateFields, ws::CirculationWorkspace, timestate, p::Processes)
     # Disable advection for water vapour or heat according to switches
-    if (h_scl == z_vapor && !cfg.log_vadv) || (h_scl == z_air && !cfg.log_hadv)
+    if (h_scl == z_vapor && !p.vapour_advection) || (h_scl == z_air && !p.heat_advection)
         fill!(ws.dX_adv, 0.0f0)
         return nothing
     end
@@ -362,26 +362,27 @@ function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateF
 end
 
 """
-    circulation!(X_in, h_scl, dX_out, fields::ClimateFields, ws::CirculationWorkspace, timestate, cfg::PhysicsConfig)
+    circulation!(X_in, h_scl, dX_out, fields::ClimateFields, ws::CirculationWorkspace, timestate, p::Processes)
 
 Sub-steps `X_in` through `ntime` iterations of [`diffusion!`](@ref),
-[`advection!`](@ref), and [`convergence!`](@ref) (each gated by the relevant
-`cfg.log_*` switch), writing the total change into `dX_out`. The sub-step
-loop is a genuine sequential recurrence and is not parallelized.
+[`advection!`](@ref), and [`convergence!`](@ref) (each gated by its
+[`Processes`](@ref) option), writing the total change into `dX_out`. Zero
+without an atmosphere or transport. The sub-step loop is a genuine sequential
+recurrence and is not parallelized.
 """
-function circulation!(X_in, h_scl, dX_out, fields::ClimateFields, ws::CirculationWorkspace, timestate, cfg::PhysicsConfig)
+function circulation!(X_in, h_scl, dX_out, fields::ClimateFields, ws::CirculationWorkspace, timestate, p::Processes)
     # Early exit if atmospheric processes disabled
-    if (!cfg.log_atmos_dmc || !cfg.log_crcl_dmc || !cfg.log_crcl_drsp)
+    if !p.atmosphere || !p.transport
         fill!(dX_out, 0.0f0)
         return nothing
     end
 
     # Precompute flags
-    do_diff_v = cfg.log_vdif && h_scl == z_vapor
-    do_diff_h = cfg.log_hdif && h_scl == z_air
-    do_adv_v = cfg.log_vadv && h_scl == z_vapor
-    do_adv_h = cfg.log_hadv && h_scl == z_air
-    do_conv = cfg.log_conv && h_scl == z_vapor
+    do_diff_v = p.vapour_diffusion && h_scl == z_vapor
+    do_diff_h = p.heat_diffusion && h_scl == z_air
+    do_adv_v = p.vapour_advection && h_scl == z_vapor
+    do_adv_h = p.heat_advection && h_scl == z_air
+    do_conv = p.moisture_convergence && h_scl == z_vapor
 
     # `wz` is static for the whole run, so its ghosted copy is built once per
     # call and reused across all `ntime` sub-steps.

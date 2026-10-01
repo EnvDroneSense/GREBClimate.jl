@@ -8,26 +8,26 @@ const _HYDRO_CE_OCEAN = 0.58f0 * ce
 const _HYDRO_CONST_LATENT = cq_latent * ρ_air * ce
 
 """
-    hydro!(Ts, q, fields::ClimateFields, timestate, cfg::PhysicsConfig, ws::CirculationWorkspace)
+    hydro!(Ts, q, fields::ClimateFields, timestate, p::Processes, h::ResolvedHydrology, ws::CirculationWorkspace)
 
-Computes latent heat flux and evaporation/rain tendencies. `cfg.log_eva`
-(-1/0/1/2) selects the wind-gust/coefficient parameterization used for
-evaporation; `cfg.log_rain` (via `cfg.c_q`/`c_rq`/`c_omega`/`c_omegastd`, set
-by [`set_hydrology_parameters!`](@ref)) controls the rain regression.
+Computes latent heat flux and evaporation/rain tendencies. `h.evaporation`
+selects the evaporation scheme; `h.rain` and its coefficients
+(`c_q`/`c_rq`/`c_omega`/`c_omegastd`) the rain regression. Returns zeros
+without an atmosphere or with `p.hydrology` other than `:full`.
 Returns `(Q_lat, Q_lat_air, dq_eva, dq_rain)`.
 """
-function hydro!(Ts, q, fields::ClimateFields, timestate, cfg::PhysicsConfig, ws::CirculationWorkspace)
-    c_q = cfg.c_q
-    c_rq = cfg.c_rq
-    c_omega = cfg.c_omega
-    c_omegastd = cfg.c_omegastd
+function hydro!(Ts, q, fields::ClimateFields, timestate, p::Processes, h::ResolvedHydrology, ws::CirculationWorkspace)
+    c_q = h.c_q
+    c_rq = h.c_rq
+    c_omega = h.c_omega
+    c_omegastd = h.c_omegastd
 
     fill!(ws.Q_lat_buf, 0.0f0)
     fill!(ws.Q_lat_air_buf, 0.0f0)
     fill!(ws.dq_eva_buf, 0.0f0)
     fill!(ws.dq_rain_buf, 0.0f0)
 
-    if !cfg.log_atmos_dmc || !cfg.log_hydro_dmc || !cfg.log_hydro_drsp
+    if !p.atmosphere || p.hydrology !== :full
         return (Q_lat=ws.Q_lat_buf, Q_lat_air=ws.Q_lat_air_buf,
             dq_eva=ws.dq_eva_buf, dq_rain=ws.dq_rain_buf)
     end
@@ -41,7 +41,7 @@ function hydro!(Ts, q, fields::ClimateFields, timestate, cfg::PhysicsConfig, ws:
     omega = @view fields.omegaclim[:, :, timestate.ityr]
     omegastd = @view fields.omegastdclim[:, :, timestate.ityr]
     rain_limit = fields.rain_limit
-    apply_rain_limit = cfg.log_rain == 1
+    apply_rain_limit = h.rain === :rh
 
     const_factor1 = _HYDRO_CONST_FACTOR1
     const_factor2 = _HYDRO_CONST_FACTOR2
@@ -59,7 +59,7 @@ function hydro!(Ts, q, fields::ClimateFields, timestate, cfg::PhysicsConfig, ws:
 
     # Saturation humidity, relative humidity, evaporation, precipitation, the
     # optional rain-limit clamp, and water-vapor tendencies
-    if cfg.log_eva == -1
+    if h.evaporation === :original
         @turbo for j in 1:ydim
             for i in 1:xdim
                 T = Ts[i, j] - 273.15f0
@@ -83,7 +83,7 @@ function hydro!(Ts, q, fields::ClimateFields, timestate, cfg::PhysicsConfig, ws:
                 Q_lat_air[i, j] = -drain * cq_latent * r_qviwv
             end
         end
-    elseif cfg.log_eva == 0
+    elseif h.evaporation === :skin
         ws_view = @view fields.wsclim[:, :, timestate.ityr]
         @turbo for j in 1:ydim
             for i in 1:xdim
@@ -118,7 +118,7 @@ function hydro!(Ts, q, fields::ClimateFields, timestate, cfg::PhysicsConfig, ws:
                 Q_lat_air[i, j] = -drain * cq_latent * r_qviwv
             end
         end
-    elseif cfg.log_eva == 1
+    elseif h.evaporation === :original_gust
         gust_land_1 = gust_land + 144.0f0
         gust_ocean_1 = gust_ocean + 50.41f0  # 7.1^2
         @turbo for j in 1:ydim
@@ -145,7 +145,7 @@ function hydro!(Ts, q, fields::ClimateFields, timestate, cfg::PhysicsConfig, ws:
                 Q_lat_air[i, j] = -drain * cq_latent * r_qviwv
             end
         end
-    elseif cfg.log_eva == 2
+    elseif h.evaporation === :skin_gust
         ws_view = @view fields.wsclim[:, :, timestate.ityr]
         gust_land_2 = 81.0f0  # 9.0^2
         gust_ocean_2 = 16.0f0  # 4.0^2
@@ -173,7 +173,7 @@ function hydro!(Ts, q, fields::ClimateFields, timestate, cfg::PhysicsConfig, ws:
             end
         end
     else
-        error("Unknown log_eva value: $(cfg.log_eva). Valid values: -1, 0, 1, 2")
+        error("Unknown evaporation scheme :$(h.evaporation)")
     end
 
     return (Q_lat=Q_lat,

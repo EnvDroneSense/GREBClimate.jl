@@ -19,6 +19,23 @@ Base.@kwdef struct Config
     modules::Tuple = ()
 end
 
+"""
+    RunSpec(; ctrl=1, scnr=1)
+
+Run lengths in years for [`greb_model!`](@ref): `ctrl` (control run) and
+`scnr` (scenario run). The spin-up length is part of the configuration
+([`SpinUp`](@ref)).
+
+```jldoctest
+julia> RunSpec(ctrl = 10, scnr = 30)
+RunSpec(10, 30)
+```
+"""
+Base.@kwdef struct RunSpec
+    ctrl::Int = 1
+    scnr::Int = 1
+end
+
 # The scenario of every named experiment. IPCC-table and A1B runs start from a
 # 280 ppm control; orbital runs start in year 1 and are returned absolute.
 const _TABLE = (control_co2=280,)

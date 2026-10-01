@@ -73,7 +73,7 @@ The result is a plain path, suitable for [`load_greb_jld2!`](@ref) and
 ```julia
 dir    = greb_data_dir()
 fields = load_greb_jld2!(dir; dataset = :ncep)
-result = greb_model!(RunSpec(), cfg; jld2_dir = dir, fields = fields)
+result = greb_model!(RunSpec(), preset(:co2_double); jld2_dir = dir, fields = fields)
 ```
 """
 function greb_data_dir(path::Union{Nothing,AbstractString} = nothing;

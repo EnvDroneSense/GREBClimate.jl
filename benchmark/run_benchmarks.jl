@@ -95,16 +95,17 @@ function time_years(jld2_dir::AbstractString; experiment::Symbol=:full_model,
 end
 
 "Time each physics stage of one timestep; returns `(name, seconds per call)`."
-function time_stages(jld2_dir::AbstractString; cfg=create_experiment_config(:full_model), reps::Int=2000)
+function time_stages(jld2_dir::AbstractString; cfg=preset(:full_model), reps::Int=2000)
     _require_data(jld2_dir) || return nothing
     reps >= 1 || throw(ArgumentError("reps must be at least 1, got $reps"))
 
     fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
-    init_model!(cfg, fields)
+    r = resolve(cfg; jld2_dir)
+    p = r.config.processes
+    CO2 = init_model!(r, fields).CO2_ctrl
     state = ModelState()
     ws = CirculationWorkspace()
     timestate = TimeState(1, 1)
-    CO2 = cfg.co2_concentration
 
     ityr = timestate.ityr
     Ts = copy(fields.Tclim[:, :, ityr])
@@ -113,12 +114,12 @@ function time_stages(jld2_dir::AbstractString; cfg=create_experiment_config(:ful
     q = copy(fields.qclim[:, :, ityr])
 
     stages = [
-        ("circulation!(Ta)", () -> circulation!(Ta, GREBClimate.z_air, ws.dTa_crcl, fields, ws, timestate, cfg)),
-        ("circulation!(q)", () -> circulation!(q, GREBClimate.z_vapor, ws.dq_crcl, fields, ws, timestate, cfg)),
-        ("SWradiation!", () -> SWradiation!(Ts, fields, state, timestate, cfg, ws)),
-        ("LWradiation!", () -> LWradiation!(Ts, Ta, q, CO2, fields, timestate, cfg, ws)),
-        ("hydro!", () -> hydro!(Ts, q, fields, timestate, cfg, ws)),
-        ("deep_ocean!", () -> deep_ocean!(Ts, To, fields, timestate, cfg, ws)),
+        ("circulation!(Ta)", () -> circulation!(Ta, GREBClimate.z_air, ws.dTa_crcl, fields, ws, timestate, p)),
+        ("circulation!(q)", () -> circulation!(q, GREBClimate.z_vapor, ws.dq_crcl, fields, ws, timestate, p)),
+        ("SWradiation!", () -> SWradiation!(Ts, fields, state, timestate, p, ws)),
+        ("LWradiation!", () -> LWradiation!(Ts, Ta, q, CO2, fields, timestate, p, ws)),
+        ("hydro!", () -> hydro!(Ts, q, fields, timestate, p, r.hydrology, ws)),
+        ("deep_ocean!", () -> deep_ocean!(Ts, To, fields, timestate, p, ws)),
     ]
 
     for (_, f) in stages
@@ -189,13 +190,12 @@ const TENDENCIES_ALLOC_BUDGET = 256  # kept in sync with test/test_invariants.jl
 function check_allocations(jld2_dir::AbstractString)
     _require_data(jld2_dir) || return nothing
 
-    cfg = create_experiment_config(:full_model)
+    r = resolve(preset(:full_model))
     fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
-    init_model!(cfg, fields)
+    CO2 = init_model!(r, fields).CO2_ctrl
     state = ModelState()
     ws = CirculationWorkspace()
     timestate = TimeState(1, 1)
-    CO2 = cfg.co2_concentration
 
     ityr = timestate.ityr
     Ts = copy(fields.Tclim[:, :, ityr])
@@ -203,8 +203,8 @@ function check_allocations(jld2_dir::AbstractString)
     To = copy(fields.Toclim[:, :, ityr])
     q = copy(fields.qclim[:, :, ityr])
 
-    tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, timestate, cfg)  # warm-up
-    bytes = @allocated tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, timestate, cfg)
+    tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, timestate, r)  # warm-up
+    bytes = @allocated tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, timestate, r)
 
     verdict = bytes <= TENDENCIES_ALLOC_BUDGET ? "within" : "OVER"
     println("tendencies! allocations (single-workspace path): ", bytes, " bytes ",

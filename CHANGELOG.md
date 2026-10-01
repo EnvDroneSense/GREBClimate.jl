@@ -15,18 +15,40 @@ Notable changes to GREBClimate.jl, following
   for the original GREB scheme) and `Corrections` (`SpinUp(years)`, `Stored()`,
   `NoCorrections()`). `preset(name)` builds every experiment; run it with
   `greb_model!(run, config)`, where the spin-up length comes from `SpinUp`.
-  Results are identical to the `PhysicsConfig` path. Any topography works with
+  Results are identical to the former experiments. Any topography works with
   any corrections; every preset spins up for 3 years unless told otherwise,
   except `:decon_mean_climate` (below). `preset(name; processes = (ocean =
-  :none,))` changes single options of a preset's physics. Not yet available:
-  free combinations of scenario parts that match no preset. Preset names that
-  changed: `:rcp85` is `:rcp85_boundary`, `:co2_step` is
+  :none,))` changes single options of a preset's physics. Scenario parts
+  combine freely (for example `Scenario(co2 = ConstantCO2(500), solar =
+  SolarConstant(10))`). `resolve(config)` returns a `ResolvedConfig` with the
+  CO2 or solar table and the rain coefficients the configuration refers to.
+  Preset names that changed: `:rcp85` is `:rcp85_boundary`, `:co2_step` is
   `:co2_abrupt_reverse`, `:a1b_scenario` is `:a1b`; `:constant_topo` has no
   preset (use `preset(:co2_double; processes = (topography = :flat,),
   corrections = Stored())`).
 - A regression test that the MSCM configuration (`mscm_hydrology()`,
   `moisture_convergence = false`) reproduces the MSCM 2xCO2 response: year 1
   global mean 0.5946 K in both.
+
+### Removed
+
+- `PhysicsConfig`, `create_experiment_config` and `set_hydrology_parameters!`:
+  use `preset`/`Config` (above). `RunSpec` has no `flux` field; the spin-up
+  length is `SpinUp(years)` in the config. The never-read `log_vapor_dmc`
+  switch is gone with the struct.
+
+### Changed
+
+- The physics functions take the part of the configuration they read instead
+  of a `PhysicsConfig`: `SWradiation!`, `LWradiation!`, `seaice!`,
+  `deep_ocean!`, `advection!`, `circulation!` take a `Processes`; `hydro!`
+  takes a `Processes` and a `ResolvedHydrology`; `tendencies!`, `time_loop!`,
+  `qflux_correction!` and `init_model!` take a `ResolvedConfig`.
+  `forcing(it, year, resolved_config)` dispatches on the scenario's parts.
+  `load_cc_anomaly_jld2!` and `load_enso_anomaly_jld2!` load every anomaly
+  field and take no configuration.
+- Source layout: the configuration lives in `src/config/`, `forcing()` in
+  `src/forcing/`, `circulation.jl` in `src/physics/`.
 
 ### Changes to model results
 

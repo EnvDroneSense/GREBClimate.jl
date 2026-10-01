@@ -146,7 +146,7 @@ end
 
 @testset "time_loop! integrates one timestep and clamps at min_T_K" begin
     fields = _time_loop_fields()
-    cfg = create_experiment_config(:full_model)
+    cfg = resolve(preset(:full_model))
     ini = init_model!(cfg, fields)
 
     state = ModelState()
@@ -177,7 +177,7 @@ end
     # A max-based floor inside @turbo turns NaN into min_T_K, which hides a
     # failed run behind a plausible-looking cold planet.
     fields = _time_loop_fields()
-    cfg = create_experiment_config(:full_model)
+    cfg = resolve(preset(:full_model))
     ini = init_model!(cfg, fields)
     Ts = copy(ini.Ts_ini)
     Ta = copy(ini.Ta_ini)

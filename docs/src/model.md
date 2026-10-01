@@ -44,27 +44,27 @@ terms, integrates the four prognostic fields, then updates sea ice.
 |:----------|:---------|:-----------------|
 | Shortwave radiation | [`SWradiation!`](@ref) | Ice cover and surface albedo from `Ts` (albedo rises linearly as the surface cools through a band just below freezing), then the absorbed solar flux. Cloud albedo scales with the ISCCP cloud-cover climatology. |
 | Longwave radiation | [`LWradiation!`](@ref) | Atmospheric emissivity from CO₂, water vapour and clouds (a 10-parameter log fit), then the up- and downward longwave fluxes. This is where the greenhouse effect lives. |
-| Hydrology | [`hydro!`](@ref) | Evaporation by a bulk formula (four variants, `log_eva`), precipitation from humidity, relative humidity and vertical velocity (`log_rain`), and the latent heat flux (Stassen et al., 2019). |
+| Hydrology | [`hydro!`](@ref) | Evaporation by a bulk formula (four variants, `Hydrology.evaporation`), precipitation from humidity, relative humidity and vertical velocity (`Hydrology.rain`), and the latent heat flux (Stassen et al., 2019). |
 | Circulation | [`circulation!`](@ref) | Transport of `Ta` and `q` by advection with the climatological 850 hPa winds and isotropic diffusion, plus moisture convergence for `q` from the vertical-velocity climatology. Runs 24 half-hour sub-steps per timestep, more near the poles; about 93% of the run time. |
 | Deep ocean | [`deep_ocean!`](@ref) | Heat exchange between the mixed layer (`Ts`) and the deep ocean (`To`) by entrainment, detrainment and turbulent mixing. |
 | Sea ice | [`seaice!`](@ref) | The surface heat capacity where sea ice forms; latent heat of freezing is neglected. |
-| Forcing | [`forcing`](@ref) | The scenario's CO₂ and solar multiplier for the current timestep, per experiment. |
+| Forcing | [`forcing`](@ref) | The scenario's CO₂ and solar multiplier for the current timestep, from its CO₂ path and sunlight parts. |
 
 ## A run
 
-[`greb_model!`](@ref) runs up to three phases, set by [`RunSpec`](@ref):
+[`greb_model!`](@ref) runs up to three phases:
 
 | Phase | CO₂ | Purpose |
 |:------|:----|:--------|
-| Flux-correction spin-up (`flux` years) | control | [`qflux_correction!`](@ref) derives the corrections for `Ts`, `To` and `q` that hold the control at the observed climatology; without them the model drifts by several K |
-| Control (`ctrl` years) | control: 340 ppm (280 for the IPCC scenarios) | The reference climate |
-| Scenario (`scnr` years) | set by [`forcing`](@ref) per experiment | The experiment |
+| Flux-correction spin-up ([`SpinUp`](@ref)`(years)` in the config) | control | [`qflux_correction!`](@ref) derives the corrections for `Ts`, `To` and `q` that hold the control at the observed climatology; without them the model drifts by several K |
+| Control (`ctrl` years of the [`RunSpec`](@ref)) | control: 340 ppm (280 for the IPCC scenarios) | The reference climate |
+| Scenario (`scnr` years) | set by [`forcing`](@ref) from the scenario | The experiment |
 
 The result holds monthly means (`MonthlyRecord`s) of 13 fields for the control
 and the scenario. The scenario is returned as an anomaly: each month minus the
 same calendar month of the control's final year, except for the orbital
 experiments and runs without a control. See the [Tutorial](@ref) for a run
-and the [Physics Switches](@ref) for the switches each component reads.
+and [Configuration](@ref) for the options each component reads.
 
 ## References
 

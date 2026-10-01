@@ -81,7 +81,7 @@ function output!(it, irec, mon, surf::SurfaceState, tend, ws::CirculationWorkspa
 end
 
 """
-    time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf, fields, state, ws, acc, timestate, cfg; ws_a=ws, ws_q=ws)
+    time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf, fields, state, ws, acc, timestate, r::ResolvedConfig; ws_a=ws, ws_q=ws)
 
 One full model timestep: computes [`tendencies!`](@ref), integrates
 `Ts`/`Ta`/`To`/`q` forward with flux corrections applied, runs
@@ -92,7 +92,7 @@ enable.
 """
 function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
     fields::ClimateFields, state::ModelState, ws::CirculationWorkspace, acc::MonthlyAccumulator,
-    timestate, cfg::PhysicsConfig; ws_a::CirculationWorkspace=ws, ws_q::CirculationWorkspace=ws)
+    timestate, r::ResolvedConfig; ws_a::CirculationWorkspace=ws, ws_q::CirculationWorkspace=ws)
     # Calendar lookup
     cal = it <= max_timesteps ? calendar_lookup[it] : (
         day=mod((it - 1) ÷ ndt_days, ndays_yr) + 1,
@@ -103,7 +103,7 @@ function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
     ityr = timestate.ityr
 
     # Compute tendencies
-    tend = tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, timestate, cfg; ws_a=ws_a, ws_q=ws_q)
+    tend = tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, timestate, r; ws_a=ws_a, ws_q=ws_q)
 
     # Correction views
     TF_corr = @view fields.TF_correct[:, :, ityr]
@@ -116,7 +116,7 @@ function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
     dq_eva_use = tend.dq_eva
     dq_rain_use = tend.dq_rain
     dq_crcl_use = tend.dq_crcl
-    hydro_on = cfg.log_hydro_dmc ? 1.0f0 : 0.0f0
+    hydro_on = r.config.processes.hydrology !== :none ? 1.0f0 : 0.0f0
 
     SW = tend.SW; LW_surf = tend.LW_surf; LW_down = tend.LW_down
     Q_lat = tend.Q_lat; Q_sens = tend.Q_sens; dTa_crcl = tend.dTa_crcl
@@ -152,7 +152,7 @@ function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
     end
 
     # Sea ice heat capacity
-    seaice!(Ts, fields, timestate, cfg)
+    seaice!(Ts, fields, timestate, r.config.processes)
 
 
     # Output and diagnostics

@@ -36,50 +36,48 @@ sweeps) in the same session.
 
 ## 2. Configure the experiment
 
-[`create_experiment_config`](@ref) returns a [`PhysicsConfig`](@ref) preset
-for a named experiment:
+[`preset`](@ref) returns the [`Config`](@ref) of a named experiment
+([`preset_names`](@ref) lists them):
 
 ```julia
-cfg = create_experiment_config(:full_model)   # or :co2_double, :elnino, :rcp85, ...
+cfg = preset(:full_model)   # or :co2_double, :elnino, :ssp585, ...
 ```
 
-`cfg` is a mutable struct - override individual switches after construction,
-e.g. `cfg.log_rain = 1` to pick a different hydrology parameterization.
-See the [Physics Switches](@ref) page for the full list of switches and
-what each one controls.
-
-Some experiments take extra keywords:
+A `Config` is immutable. Change a preset's physics with a NamedTuple of
+[`Processes`](@ref) or [`Hydrology`](@ref) options, or build a config from its
+parts; the [Configuration](@ref) page lists every option.
 
 ```julia
-cfg = create_experiment_config(:custom_co2; co2_path = "my_co2.txt")    # "year CO2" per line
-cfg = create_experiment_config(:decon_mean_climate; log_ocean_dmc = false)
-cfg = create_experiment_config(:decon_2xco2; log_clouds_drsp = false)
-cfg = create_experiment_config(:obliquity; orbital_index = 3)
-cfg = create_experiment_config(:earth_sun_distance; earth_sun_distance_pct = 1.5)
+cfg = preset(:co2_double; hydrology = (rain = :rh,))
+cfg = preset(:custom_co2; path = "my_co2.txt")                     # "year CO2" per line
+cfg = preset(:decon_mean_climate; processes = (ocean = :none,))
+cfg = preset(:decon_2xco2; processes = (clouds = :uniform,))
+cfg = preset(:obliquity; index = 3)
+cfg = preset(:earth_sun_distance; pct = 1.5)
+cfg = Config(scenario = Scenario(co2 = ConstantCO2(500)))
 ```
-
-The `log_*` keywords apply only to the two `:decon_*` experiments; passing one
-elsewhere warns.
 
 ## 3. Run the model
 
-[`greb_model!`](@ref) takes a [`RunSpec`](@ref) (how many years of
-flux-correction spin-up, control, and scenario to run) and the config:
+[`greb_model!`](@ref) takes a [`RunSpec`](@ref) (how many years of control
+and scenario to run) and the config:
 
 ```julia
-run = RunSpec(flux = 3, ctrl = 5, scnr = 15)
+run = RunSpec(ctrl = 5, scnr = 15)
 result = greb_model!(run, cfg; jld2_dir = jld2_dir, fields = fields)
 ```
 
 This runs, in order: a flux-correction spin-up that holds the control climate
 at the observed climatology, a control run, and a scenario run under the
-experiment's forcing. The spin-up and control run at 340 ppm CO₂ (280 ppm for
-the IPCC CO₂-table scenarios; `:rcp85` uses 340); the experiment sets only the
-scenario's CO₂.
+experiment's forcing. The spin-up and control run at the scenario's control
+CO₂, 340 ppm (280 ppm for the IPCC CO₂-table scenarios); the scenario sets its
+own CO₂.
 
-Without the spin-up (`flux = 0`) the control drifts: about +2 K over 5 years
-in a `:full_model` run, which then shows up in the scenario anomaly. `flux = 3`,
-the original GREB spin-up, is the default.
+The spin-up is part of the config: `corrections = SpinUp(3)`, the original
+GREB spin-up, is the default. `Stored()` uses the dataset's corrections
+without a spin-up; the control then drifts about +2 K over 5 years in a
+`:full_model` run, which shows up in the scenario anomaly. `NoCorrections()`
+runs without any.
 
 ## 4. Inspect results
 
@@ -95,7 +93,8 @@ a `(96, 48)` matrix of that month's mean.
 `result.ctrl` is in absolute units. `result.scnr` is an **anomaly**: each
 month minus the same calendar month of the control's final year. It stays
 absolute for the orbital experiments (`:obliquity`, `:eccentricity`,
-`:earth_sun_distance`) and when `ctrl = 0`.
+`:earth_sun_distance`, whose scenario `output` is `:absolute`) and when
+`ctrl = 0`.
 
 A plain `mean` over the grid over-weights the polar rows; weight by
 `cos(latitude)` for a global mean:
@@ -124,7 +123,7 @@ use them to check shapes and code paths, never climate numbers.
 ## Next steps
 
 - The [API Reference](@ref) lists every exported function and type.
-- The [Physics Switches](@ref) page documents every `PhysicsConfig` field.
+- The [Configuration](@ref) page documents every option and preset.
 - The [Model overview](@ref) explains what each component computes.
 - [Plots and notebook](@ref) shows how to plot a result and explore it interactively.
 - `benchmark/run_benchmarks.jl` micro-benchmarks the per-timestep physics
@@ -132,4 +131,4 @@ use them to check shapes and code paths, never climate numbers.
   runs a `--ctrl`/`--scnr`-year control+scenario run, for long-run cost and
   stability rather than one year).
 - `test/runtests.jl` doubles as executable documentation for individual
-  kernels' behavior under different config switches.
+  kernels' behavior under different configurations.

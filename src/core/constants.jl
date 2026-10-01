@@ -34,15 +34,6 @@ const min_T_K = 40.0f0              # numerical-stability floor [K]
 const max_humidity_change = 0.020f0 # Maximum humidity increment [kg/kg]
 const min_humidity_change = 0.9f0   # Fraction of humidity that can be removed
 
-# - Optimized Hydrology Parameter Lookup Table ────────────────────────
-const HYDRO_PARAMS = Dict(
-    -1 => (1.0f0, 0.0f0, 0.0f0, 0.0f0),                         # Original GREB
-    1 => (-1.391649f0, 3.018774f0, 0.0f0, 0.0f0),               # +Relative humidity
-    2 => (0.862162f0, 0.0f0, -29.02096f0, 0.0f0),               # +Omega convergence
-    3 => (-0.2685845f0, 1.4591853f0, -26.9858807f0, 0.0f0),     # +RH & Omega
-    0 => (-1.88f0, 2.25f0, -17.69f0, 59.07f0)                   # Best GREB (ERA-Interim)
-)
-
 # ── Natural constants ────────────────────────────────────────────
 const const_pi = Float32(pi)   # π (model precision)
 const σ = 5.6704f-8            # Stefan-Boltzmann constant [W/m²/K⁴]

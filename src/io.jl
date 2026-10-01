@@ -28,7 +28,8 @@ end
 Loads an alternate solar-forcing table for paleo/orbital experiments.
 `forcing_type` is `:paleo`, `:eccentricity`, or `:obliquity`; for the latter
 two, `index` selects the matching row by coordinate value. Used by
-`greb_model!` to temporarily swap `fields.sw_solar` for these experiments.
+[`resolve`](@ref) for a [`SolarTable`](@ref) scenario; `greb_model!` swaps it
+into `fields.sw_solar` for the scenario run.
 """
 function load_solar_forcing_jld2(jld2_dir::String, forcing_type::Symbol, index::Int=0)
 
@@ -140,44 +141,39 @@ function _load_anomaly_field!(climatology_dir::String, filename::String, target:
 end
 
 """
-    load_cc_anomaly_jld2!(jld2_dir::String, fields::ClimateFields, cfg::PhysicsConfig)
+    load_cc_anomaly_jld2!(jld2_dir::String, fields::ClimateFields)
 
 Loads the CMIP5 RCP8.5 ensemble-mean climate-change anomaly fields into
 `fields.Tclim_anom_cc`/`uclim_anom_cc`/`vclim_anom_cc`/`omegaclim_anom_cc`/
-`wsclim_anom_cc`, gated per-field by `cfg.log_tsurf_ext`/`log_hwind_ext`/
-`log_omega_ext`. Errors on a missing file rather than defaulting to zero, since this data
-*is* the `:rcp85` experiment's forcing.
+`wsclim_anom_cc`: the forcing of a `BoundaryAnomaly(:cmip5_rcp85)` scenario.
+Errors on a missing file rather than defaulting to zero.
 """
-function load_cc_anomaly_jld2!(jld2_dir::String, fields::ClimateFields, cfg::PhysicsConfig)
+function load_cc_anomaly_jld2!(jld2_dir::String, fields::ClimateFields)
     dir = joinpath(jld2_dir, "climatology")
-    cfg.log_tsurf_ext && _load_anomaly_field!(dir, "cmip5.tsurf.rcp85.ensmean.forcing.jld2", fields.Tclim_anom_cc)
-    if cfg.log_hwind_ext
-        _load_anomaly_field!(dir, "cmip5.zonal.wind.rcp85.ensmean.forcing.jld2", fields.uclim_anom_cc)
-        _load_anomaly_field!(dir, "cmip5.meridional.wind.rcp85.ensmean.forcing.jld2", fields.vclim_anom_cc)
-        _load_anomaly_field!(dir, "cmip5.windspeed.rcp85.ensmean.forcing.jld2", fields.wsclim_anom_cc)
-    end
-    cfg.log_omega_ext && _load_anomaly_field!(dir, "cmip5.omega.rcp85.ensmean.forcing.jld2", fields.omegaclim_anom_cc)
+    _load_anomaly_field!(dir, "cmip5.tsurf.rcp85.ensmean.forcing.jld2", fields.Tclim_anom_cc)
+    _load_anomaly_field!(dir, "cmip5.zonal.wind.rcp85.ensmean.forcing.jld2", fields.uclim_anom_cc)
+    _load_anomaly_field!(dir, "cmip5.meridional.wind.rcp85.ensmean.forcing.jld2", fields.vclim_anom_cc)
+    _load_anomaly_field!(dir, "cmip5.windspeed.rcp85.ensmean.forcing.jld2", fields.wsclim_anom_cc)
+    _load_anomaly_field!(dir, "cmip5.omega.rcp85.ensmean.forcing.jld2", fields.omegaclim_anom_cc)
 end
 
 """
-    load_enso_anomaly_jld2!(jld2_dir::String, fields::ClimateFields, cfg::PhysicsConfig, which::Symbol)
+    load_enso_anomaly_jld2!(jld2_dir::String, fields::ClimateFields, which::Symbol)
 
 Loads the ERA-Interim composite-mean El Niño (`which=:elnino`) or La Niña
-(`:lanina`) anomaly fields into `fields.*_anom_enso`, gated the same way as
-[`load_cc_anomaly_jld2!`](@ref).
+(`:lanina`) anomaly fields into `fields.*_anom_enso`, as
+[`load_cc_anomaly_jld2!`](@ref) does for RCP8.5.
 """
-function load_enso_anomaly_jld2!(jld2_dir::String, fields::ClimateFields, cfg::PhysicsConfig, which::Symbol)
+function load_enso_anomaly_jld2!(jld2_dir::String, fields::ClimateFields, which::Symbol)
     suffix = which == :elnino ? "elnino" :
              which == :lanina ? "lanina" :
              error("which must be :elnino or :lanina, got $which")
     dir = joinpath(jld2_dir, "climatology")
-    cfg.log_tsurf_ext && _load_anomaly_field!(dir, "erainterim.tsurf.$suffix.forcing.jld2", fields.Tclim_anom_enso)
-    if cfg.log_hwind_ext
-        _load_anomaly_field!(dir, "erainterim.zonal.wind.$suffix.forcing.jld2", fields.uclim_anom_enso)
-        _load_anomaly_field!(dir, "erainterim.meridional.wind.$suffix.forcing.jld2", fields.vclim_anom_enso)
-        _load_anomaly_field!(dir, "erainterim.windspeed.$suffix.forcing.jld2", fields.wsclim_anom_enso)
-    end
-    cfg.log_omega_ext && _load_anomaly_field!(dir, "erainterim.omega.$suffix.forcing.jld2", fields.omegaclim_anom_enso)
+    _load_anomaly_field!(dir, "erainterim.tsurf.$suffix.forcing.jld2", fields.Tclim_anom_enso)
+    _load_anomaly_field!(dir, "erainterim.zonal.wind.$suffix.forcing.jld2", fields.uclim_anom_enso)
+    _load_anomaly_field!(dir, "erainterim.meridional.wind.$suffix.forcing.jld2", fields.vclim_anom_enso)
+    _load_anomaly_field!(dir, "erainterim.windspeed.$suffix.forcing.jld2", fields.wsclim_anom_enso)
+    _load_anomaly_field!(dir, "erainterim.omega.$suffix.forcing.jld2", fields.omegaclim_anom_enso)
 end
 
 """
@@ -185,9 +181,9 @@ end
 
 Load all GREB input data from JLD2 formatted files, returning a fresh
 [`ClimateFields`](@ref). `dataset` (`:ncep`/`:era`) selects which
-climatology *files* to read; this is independent of `PhysicsConfig.log_clim`,
-which only selects hydrology regression *coefficients* in
-[`set_hydrology_parameters!`](@ref).
+climatology *files* to read; this is independent of `Hydrology.rain_fit`,
+which only selects the rain-regression *coefficients* (see
+[`Hydrology`](@ref)).
 """
 function load_greb_jld2!(jld2_dir::String; dataset::Symbol=:ncep)
     if !isdir(jld2_dir)

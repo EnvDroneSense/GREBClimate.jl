@@ -1,144 +1,139 @@
-# The CO2 and sunlight a scenario imposes at each timestep.
+# The CO2 and sunlight a scenario imposes at each timestep, and where its CO2
+# applies.
 
 """
-    forcing(it, year, cfg::PhysicsConfig, fields::ClimateFields, icmn_ctrl; nstep_yr=nstep_yr)
+    forcing(it, year, r::ResolvedConfig) -> (CO2, sw_solar_forcing)
 
-Returns `(CO2, sw_solar_forcing)` for the current timestep, computed
-according to `cfg.experiment`. Pure - the `regional_co2_*` masks are built
-once per run by [`apply_dynamic_co2_mask!`](@ref), not here. `:full_model`
-short-circuits before the experiment dispatch chain. The `:rcp26`/`:rcp45`/`:rcp60`/
-`:custom_co2`/`:ssp*`/`:historical_co2` experiments look `year` up in
-`cfg.co2_scenario`. With `cfg.log_co2_dmc` off, CO₂ is 0.
+The scenario's CO₂ (ppm) and solar multiplier at scenario step `it` in
+calendar `year`, from its [`CO2Path`](@ref) and [`Solar`](@ref) parts. CO₂ is
+0 with `Processes(co2 = false)`. Pure: where the CO₂ applies is set once per
+run by `apply_co2_mask!` and `apply_dynamic_co2_mask!`.
 """
-function forcing(it, year, cfg::PhysicsConfig, fields::ClimateFields, icmn_ctrl; nstep_yr=nstep_yr)
-    f = _experiment_forcing(it, year, cfg, nstep_yr)
-    return cfg.log_co2_dmc ? f : (CO2=0.0f0, sw_solar_forcing=f.sw_solar_forcing)
+function forcing(it, year, r::ResolvedConfig)
+    s = r.config.scenario
+    co2 = r.config.processes.co2 ? _co2_at(s.co2, it, year, r) : 0.0f0
+    return (CO2=co2, sw_solar_forcing=_solar_factor(s.solar, year))
 end
 
-function _experiment_forcing(it, year, cfg::PhysicsConfig, nstep_yr)
-    # Default CO₂ concentration
-    CO2 = cfg.co2_concentration
-    sw_solar_forcing = 1.0f0
+_co2_at(c::ConstantCO2, it, year, r) = c.ppm
 
-    # Fast path for the main experiment
-    if cfg.experiment == :full_model
-        return (CO2=CO2, sw_solar_forcing=sw_solar_forcing)
+function _co2_at(::Union{CO2Table,CO2File}, it, year, r)
+    yr = round(Int, year)
+    haskey(r.co2_table, yr) ||
+        error("No CO2 data for year $yr in the scenario's CO2 table (loaded $(length(r.co2_table)) years)")
+    return r.co2_table[yr]
+end
+
+# After 2100 the ramp falls back to 340 ppm, as the original code does
+function _co2_at(::A1BRamp, it, year, r)
+    CO2_1950 = 310.0f0
+    CO2_2000 = 370.0f0
+    CO2_2050 = 520.0f0
+    if year <= 2000
+        return CO2_1950 + 60.0f0 / 50.0f0 * (year - 1950)
+    elseif year <= 2050
+        return CO2_2000 + 150.0f0 / 50.0f0 * (year - 2000)
+    elseif year <= 2100
+        return CO2_2050 + 180.0f0 / 50.0f0 * (year - 2050)
     end
+    return 340.0f0
+end
 
-    # - Legacy experiments ───────────
-    if cfg.experiment == :constant_topo
-        CO2 = 680.0f0  # 2x340 ppm
+_co2_at(::CO2SineWave, it, year, r) = 340.0f0 + 170.0f0 + 170.0f0 * cos(2f0*Float32(π) * (year - 13.0f0) / 30.0f0)
 
-    elseif cfg.experiment == :a1b_scenario
-        CO2_1950 = 310.0f0;
-        CO2_2000 = 370.0f0;
-        CO2_2050 = 520.0f0
-        if year <= 2000
-            CO2 = CO2_1950 + 60.0f0 / 50.0f0 * (year - 1950)
-        elseif year <= 2050
-            CO2 = CO2_2000 + 150.0f0 / 50.0f0 * (year - 2000)
-        elseif year <= 2100
-            CO2 = CO2_2050 + 180.0f0 / 50.0f0 * (year - 2050)
+_co2_at(c::CO2Step, it, year, r) = year >= c.year ? c.after : c.before
+
+function _co2_at(c::SeasonalCO2, it, year, r)
+    step = mod(it - 1, nstep_yr) + 1
+    winter = step <= 181 || step >= 547
+    return winter == (c.season === :boreal_winter) ? c.inside : c.outside
+end
+
+_solar_factor(::Union{ModernSolar,SolarTable}, year) = 1.0f0
+_solar_factor(s::SolarConstant, year) = (1365.0f0 + s.dW) / 1365.0f0
+_solar_factor(s::SolarCycle, year) = (1365.0f0 + s.amplitude * sin(2f0*Float32(π) * year / s.period)) / 1365.0f0
+_solar_factor(s::EarthSunDistance, year) = (1.0f0 / (1.0f0 + 0.01f0 * s.pct))^2
+
+"""
+    apply_co2_mask!(mask::CO2Mask, fields::ClimateFields)
+
+Sets `fields.co2_part`, the fraction of the scenario CO₂ each cell gets: 1
+everywhere, then 0.5 outside a [`LatitudeMask`](@ref) band. A
+[`SurfaceMask`](@ref) needs the control run's ice cover and is set later by
+`apply_dynamic_co2_mask!`.
+"""
+function apply_co2_mask!(mask::CO2Mask, fields::ClimateFields)
+    fields.co2_part .= 1.0f0
+    _latitude_mask!(fields.co2_part, mask)
+    return nothing
+end
+
+_latitude_mask!(co2_part, ::CO2Mask) = co2_part
+
+# The band edges at every fourth longitude follow the original code
+function _latitude_mask!(co2_part, m::LatitudeMask)
+    if m.band === :nh
+        co2_part[:, 1:24] .= 0.5f0
+    elseif m.band === :sh
+        co2_part[:, 25:48] .= 0.5f0
+    elseif m.band === :tropics
+        co2_part[:, 1:15] .= 0.5f0
+        co2_part[:, 33:48] .= 0.5f0
+        for i in 4:4:96
+            co2_part[i, 33] = 1.0f0
+            co2_part[i, 15] = 1.0f0
         end
-
-    # - CO₂ scaling experiments ──────────────────────────────────────────────
-    elseif cfg.experiment == :co2_double || cfg.experiment == :decon_2xco2
-        CO2 = 680.0f0  # 2×CO₂
-
-    elseif cfg.experiment == :co2_quadruple
-        CO2 = 1360.0f0  # 4×CO₂
-
-    elseif cfg.experiment == :co2_10x
-        CO2 = 3400.0f0  # 10×CO₂
-
-    elseif cfg.experiment == :co2_half
-        CO2 = 170.0f0  # 0.5×CO₂
-
-    elseif cfg.experiment == :co2_zero
-        CO2 = 0.0f0  # 0×CO₂ (no greenhouse effect)
-
-    # - Solar forcing experiments ───────────────────────────────────────────
-    elseif cfg.experiment == :solar_plus27
-        CO2 = 340.0f0
-        sw_solar_forcing = (1365.0f0 + 27.0f0) / 1365.0f0
-
-    elseif cfg.experiment == :solar_cycle_11yr
-        CO2 = 340.0f0
-        sw_solar_forcing = (1365.0f0 + 1.0f0 * sin(2f0*Float32(π) * year / 11.0f0)) / 1365.0f0
-
-    # ── Time-varying CO₂ experiments ────────────
-    elseif cfg.experiment == :co2_sine_wave
-        CO2 = 340.0f0 + 170.0f0 + 170.0f0 * cos(2f0*Float32(π) * (year - 13.0f0) / 30.0f0)
-
-    elseif cfg.experiment == :co2_step
-        CO2 = year >= 1980 ? 340.0f0 : 680.0f0
-
-    # ── Paleoclimate experiments ────────────────────
-    elseif cfg.experiment == :paleo_231kyr
-        CO2 = 200.0f0
-
-    elseif cfg.experiment == :paleo_solar_modern_co2
-        CO2 = 340.0f0
-
-    elseif cfg.experiment == :modern_solar_paleo_co2
-        CO2 = 200.0f0
-
-    # ── Orbital forcing experiments ─────────────────
-    elseif cfg.experiment == :obliquity
-        CO2 = 340.0f0     # Solar forcing loaded externally
-
-    elseif cfg.experiment == :eccentricity
-        CO2 = 340.0f0     # Solar forcing loaded externally
-
-    elseif cfg.experiment == :earth_sun_distance
-        CO2 = 340.0f0     # Solar constant varies with Earth-Sun distance
-        sw_solar_forcing = (1.0f0 / (1.0f0 + 0.01f0 * cfg.earth_sun_distance_pct))^2
-
-    elseif cfg.experiment == :rcp85
-        CO2 = 340.0f0  # Handled by boundary conditions
-
-    # - IPCC RCP/SSP/historical/custom scenarios - CO₂ read from a per-year
-    #   lookup table (`cfg.co2_scenario`, populated at scenario start) ───────
-    elseif cfg.experiment in (:rcp26, :rcp45, :rcp60, :custom_co2,
-                               :ssp119, :ssp126, :ssp245, :ssp460, :ssp585, :historical_co2)
-        yr = round(Int, year)
-        haskey(cfg.co2_scenario, yr) ||
-            error("No CO2 data for year $yr in $(cfg.experiment) scenario table " *
-                  "(loaded $(length(cfg.co2_scenario)) years)")
-        CO2 = cfg.co2_scenario[yr]
-
-    # - Regional/partial CO₂ experiments - static masks ─────────────────────
-    elseif cfg.experiment in (:regional_co2_nh, :regional_co2_sh, :regional_co2_tropics, :regional_co2_extratropics)
-        CO2 = 680.0f0
-
-    # - Regional/partial CO₂ experiments - dynamic masks ────────────────────
-    # `:regional_co2_ocean`/`:regional_co2_land_ice` need a mask derived from
-    # the control run's ice cover; `apply_dynamic_co2_mask!` builds it once per
-    # run in `greb_model!`, so nothing is computed per timestep here.
-    elseif startswith(string(cfg.experiment), "regional_co2_")
-        if cfg.experiment == :regional_co2_ocean
-            # 2×CO₂ Ocean only - mask from apply_dynamic_co2_mask!
-            CO2 = 680.0f0
-
-        elseif cfg.experiment == :regional_co2_land_ice
-            # 2×CO₂ Land/Ice only - mask from apply_dynamic_co2_mask!
-            CO2 = 680.0f0
-
-        elseif cfg.experiment == :regional_co2_winter
-            # 2×CO₂ Boreal Winter only
-            ityr_step = mod(it - 1, nstep_yr) + 1
-            CO2 = (ityr_step <= 181 || ityr_step >= 547) ? 680.0f0 : 340.0f0
-
-        elseif cfg.experiment == :regional_co2_summer
-            # 2×CO₂ Boreal Summer only
-            ityr_step = mod(it - 1, nstep_yr) + 1
-            CO2 = (ityr_step <= 181 || ityr_step >= 547) ? 340.0f0 : 680.0f0
+    else
+        co2_part[:, 16:32] .= 0.5f0
+        for i in 4:4:96
+            co2_part[i, 32] = 1.0f0
+            co2_part[i, 16] = 1.0f0
         end
-
-        # - Forced boundary condition experiments (handled in scenario loop) ─────
-    elseif cfg.experiment == :elnino || cfg.experiment == :lanina
-        CO2 = 340.0f0
     end
+    return co2_part
+end
 
-    return (CO2=CO2, sw_solar_forcing=sw_solar_forcing)
+"""
+    apply_dynamic_co2_mask!(mask::CO2Mask, fields::ClimateFields, icmn_ctrl)
+
+Sets `fields.co2_part` for a [`SurfaceMask`](@ref) from the control run's
+annual-mean ice cover `icmn_ctrl`: `:ocean` halves CO₂ over land and over ice,
+`:land_ice` halves it over ice-free ocean. A no-op for every other mask.
+"""
+apply_dynamic_co2_mask!(::CO2Mask, fields::ClimateFields, icmn_ctrl) = nothing
+
+function apply_dynamic_co2_mask!(mask::SurfaceMask, fields::ClimateFields, icmn_ctrl)
+    co2_part = fields.co2_part
+    z_topo = fields.z_topo
+    co2_part .= 1.0f0
+
+    # Annual-mean ice cover, not month 1
+    icmn_ctrl1 = dropdims(sum(icmn_ctrl, dims=3), dims=3) ./ size(icmn_ctrl, 3)
+
+    if mask.surface === :ocean
+        # 2×CO₂ ocean only: halve CO₂ over land, and over annual-mean ice.
+        for j in 1:ydim, i in 1:xdim
+            if z_topo[i, j] > 0.0f0
+                co2_part[i, j] = 0.5f0
+            end
+        end
+        for j in 1:ydim, i in 1:xdim
+            if icmn_ctrl1[i, j] >= 0.5f0
+                co2_part[i, j] = 0.5f0
+            end
+        end
+    else
+        # 2×CO₂ land/ice only: halve CO₂ over ocean, then exempt annual-mean ice.
+        for j in 1:ydim, i in 1:xdim
+            if z_topo[i, j] <= 0.0f0
+                co2_part[i, j] = 0.5f0
+            end
+        end
+        for j in 1:ydim, i in 1:xdim
+            if icmn_ctrl1[i, j] >= 0.5f0
+                co2_part[i, j] = 1.0f0
+            end
+        end
+    end
+    return nothing
 end

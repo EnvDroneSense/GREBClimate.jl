@@ -20,13 +20,12 @@ GREBClimate.jl/
 │   ├── GREBClimate.jl          # module shell + include order
 │   ├── core/                   # the model's backbone
 │   │   ├── constants.jl        # grid/physical constants
-│   │   ├── config.jl           # PhysicsConfig, RunSpec, experiment presets
 │   │   ├── state.jl            # ClimateFields, ModelState, workspaces
 │   │   ├── tendencies.jl       # per-timestep physics pipeline
 │   │   ├── output.jl           # diagnostics!/output!/time_loop!
 │   │   ├── postprocess.jl      # monthly climatology/anomalies
 │   │   └── model.jl            # init_model!/qflux_correction!/greb_model!
-│   ├── config/                 # Config parts: processes.jl, scenario.jl, presets.jl
+│   ├── config/                 # Config parts, presets, RunSpec, resolve()
 │   ├── forcing/                # forcing(): CO2 and sunlight per timestep
 │   ├── physics/                # radiation.jl, hydrology.jl, ocean.jl, circulation.jl
 │   ├── data.jl                 # greb_data_dir(): dataset location + DataDep
@@ -141,7 +140,7 @@ function's behaviour or signature, check whether an example needs updating.
 First check that the input data is complete and where `greb_data_dir()`
 expects it, and that your Julia and package versions meet the requirements.
 Then open an issue with the Julia version (`versioninfo()`), the OS, the
-experiment configuration (`create_experiment_config` call and any switches you
+experiment configuration (`preset`/`Config` call and any options you
 changed), and the full error or the unexpected output. A `RunSpec` short enough
 to reproduce quickly helps a lot.
 

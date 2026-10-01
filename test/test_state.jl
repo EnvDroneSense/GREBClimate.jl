@@ -3,12 +3,12 @@
 @testset "co2_part regional CO2 mask resets between runs (no leak)" begin
     fields = ClimateFields()
     quiet() do
-        init_model!(PhysicsConfig(experiment = :regional_co2_nh), fields)
+        init_model!(resolve(preset(:regional_co2_nh)), fields)
     end
     @test any(!=(1.0f0), fields.co2_part)  # regional run actually changed the mask
 
     quiet() do
-        init_model!(create_experiment_config(:full_model), fields)
+        init_model!(resolve(preset(:full_model)), fields)
     end
     @test all(==(1.0f0), fields.co2_part)  # init_model! resets it back to full CO2
 end
