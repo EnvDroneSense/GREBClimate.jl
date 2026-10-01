@@ -51,7 +51,7 @@ end
 
 """
 Time a `ctrl`-year control run followed by a `scnr`-year scenario run, `reps`
-times; returns seconds per run. Unlike `time_1yr` (fixed 1-year control
+times on the stored flux corrections (no spin-up); returns seconds per run. Unlike `time_1yr` (fixed 1-year control
 run, no scenario), this is for checking long-run cost and stability.
 
 `experiment` is a preset name. `:full_model` holds CO2 constant across the
@@ -68,7 +68,7 @@ function time_years(jld2_dir::AbstractString; experiment::Symbol=:full_model,
 
     println("Threads.nthreads() = ", Threads.nthreads())
     println("ctrl=$ctrl scnr=$scnr ($total_years simulated years/rep), experiment=$experiment")
-    cfg = preset(experiment)
+    cfg = preset(experiment; corrections=Stored())  # no spin-up, as in time_1yr
     fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
 
     # Warm-up with a minimal run.
