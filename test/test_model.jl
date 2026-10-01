@@ -1,9 +1,8 @@
 # greb_model! integration: experiment dispatch, scenario tables, flux correction.
 
 @testset "greb_model! baseline: default config runs to completion with the right output shape" begin
-    cfg = create_experiment_config(:full_model)
     result = quiet() do
-        greb_model!(RunSpec(scnr = 0), cfg; jld2_dir = "", allow_uninitialized = true)
+        greb_model!(RunSpec(scnr = 0), preset(:full_model); jld2_dir = "", allow_uninitialized = true)
     end
     @test length(result.ctrl) == 12
     @test length(result.scnr) == 0
@@ -20,15 +19,13 @@ end
             f["Tocean_flux_correction"] = fill(44.0, GREBClimate.xdim, GREBClimate.ydim, GREBClimate.nstep_yr)
         end
 
-        cfg = create_experiment_config(:full_model)
-        cfg.log_topo_drsp = false
-        cfg.log_qflux_dmc = true
+        cfg = preset(:full_model; corrections = Stored())
         fields = ClimateFields()
         # greb_model! restores `fields` when it returns, so the branch it took
         # is read from its progress output: load the file, never recompute.
         log = mktemp() do path, io
             redirect_stdout(io) do
-                greb_model!(RunSpec(flux = 1, ctrl = 0, scnr = 0), cfg; jld2_dir = tmpdir, fields = fields, allow_uninitialized = true)
+                greb_model!(RunSpec(ctrl = 0, scnr = 0), cfg; jld2_dir = tmpdir, fields = fields, allow_uninitialized = true)
             end
             flush(io)
             read(path, String)
@@ -49,10 +46,9 @@ end
     # One end-to-end run proves the plumbing. The remaining log_eva values are
     # separate `@turbo` blocks in `hydro!`, reachable directly for the price of
     # one call each rather than a simulated year each.
-    cfg = create_experiment_config(:full_model)
-    cfg.log_eva, cfg.log_rain = -1, 0
     result = quiet() do
-        greb_model!(RunSpec(scnr = 0), cfg; jld2_dir = "", allow_uninitialized = true)
+        greb_model!(RunSpec(scnr = 0), preset(:full_model; hydrology = (rain = :fitted, evaporation = :original));
+                    jld2_dir = "", allow_uninitialized = true)
     end
     @test length(result.ctrl) == 12
 
@@ -119,7 +115,7 @@ end
             file["dim_names"] = ["lat", "time"]
         end
 
-        cfg = create_experiment_config(:paleo_231kyr)
+        cfg = preset(:paleo_231kyr)
         captured = mktemp() do path, io
             result = redirect_stdout(io) do
                 greb_model!(RunSpec(ctrl = 0), cfg; jld2_dir = tmpdir, fields = fields, allow_uninitialized = true)
@@ -133,9 +129,8 @@ end
         # sw_solar restored to its pre-run value after greb_model! returns
         @test fields.sw_solar == saved_sw_solar
 
-        cfg_plain = create_experiment_config(:full_model)
         quiet() do
-            greb_model!(RunSpec(scnr = 0), cfg_plain; jld2_dir = "", fields = fields, allow_uninitialized = true)
+            greb_model!(RunSpec(scnr = 0), preset(:full_model); jld2_dir = "", fields = fields, allow_uninitialized = true)
         end
         @test fields.sw_solar == saved_sw_solar
     finally
@@ -295,9 +290,8 @@ end
 end
 
 @testset "greb_model! smoke: sst_plus1, decon presets, dynamic regional mask" begin
-    cfg = PhysicsConfig(experiment = :sst_plus1)
     result = quiet() do
-        greb_model!(RunSpec(ctrl = 0, scnr = 1), cfg; jld2_dir = "",
+        greb_model!(RunSpec(ctrl = 0, scnr = 1), preset(:sst_plus1); jld2_dir = "",
                     allow_uninitialized = true)
     end
     @test length(result.scnr) == 12
@@ -305,14 +299,14 @@ end
     # :decon_mean_climate (control-run only) / :decon_2xco2 (scenario run).
     result_dmc = quiet() do
         greb_model!(RunSpec(ctrl = 1, scnr = 0),
-                    create_experiment_config(:decon_mean_climate);
+                    preset(:decon_mean_climate);
                     jld2_dir = "", allow_uninitialized = true)
     end
     @test length(result_dmc.ctrl) == 12
 
     result_drsp = quiet() do
         greb_model!(RunSpec(ctrl = 0, scnr = 1),
-                    create_experiment_config(:decon_2xco2);
+                    preset(:decon_2xco2);
                     jld2_dir = "", allow_uninitialized = true)
     end
     @test length(result_drsp.scnr) == 12
@@ -456,12 +450,12 @@ end
     f.TF_correct .= 1.0f0   # stands in for loaded corrections; the run zeroes them here
     names = (:sw_solar, :TF_correct, :qF_correct, :ToF_correct, :z_topo, :cldclim, :qclim, :mldclim)
     before = Dict(n => copy(getfield(f, n)) for n in names)
-    # Constant topography with no flux corrections zeroes them; the _drsp
-    # switches replace the cloud, humidity and mixed-layer climatologies.
-    cfg = PhysicsConfig(log_topo_drsp = false, log_qflux_dmc = false, log_clouds_drsp = false,
-                        log_humid_drsp = false, log_ocean_drsp = false)
+    # Running without corrections zeroes them; flat topography, uniform clouds
+    # and humidity and the mixed-layer ocean replace their climatologies.
+    cfg = preset(:full_model; corrections = NoCorrections(),
+                 processes = (topography = :flat, clouds = :uniform, humidity = :uniform, ocean = :mixed_layer))
     quiet() do
-        greb_model!(RunSpec(flux = 0, ctrl = 1, scnr = 0), cfg; jld2_dir = "", fields = f,
+        greb_model!(RunSpec(ctrl = 1, scnr = 0), cfg; jld2_dir = "", fields = f,
                     allow_uninitialized = true)
     end
     for n in names

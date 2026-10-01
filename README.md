@@ -79,17 +79,17 @@ using GREBClimate
 
 dir    = greb_data_dir()
 fields = load_greb_jld2!(dir; dataset=:ncep)            # returns the data; pass it on
-cfg    = create_experiment_config(:co2_double)          # any experiment preset
-result = greb_model!(RunSpec(flux=3, ctrl=5, scnr=15), cfg; jld2_dir=dir, fields=fields)
+cfg    = preset(:co2_double)                            # preset_names() lists them all
+result = greb_model!(RunSpec(ctrl=5, scnr=15), cfg; jld2_dir=dir, fields=fields)
 ```
 
-A run has three phases, set by `RunSpec` in years:
+A run has three phases, in years:
 
 | Phase | What it does |
 |:------|:-------------|
-| `flux` | Spin-up that derives the flux corrections holding the control at the observed climate. Default 3 years; with `flux=0` the control drifts. |
-| `ctrl` | Control run at 340 ppm CO₂ (280 ppm for the IPCC CO₂-table scenarios; `:rcp85` uses 340) |
-| `scnr` | Scenario run under the experiment's forcing |
+| Spin-up | Derives the flux corrections holding the control at the observed climate: `corrections = SpinUp(3)` in the config, the default. `Stored()` uses the dataset's corrections, `NoCorrections()` lets the control drift. |
+| `ctrl` (`RunSpec`) | Control run at 340 ppm CO₂ (280 ppm for the IPCC CO₂-table scenarios; `:rcp85_boundary` uses 340) |
+| `scnr` (`RunSpec`) | Scenario run under the experiment's forcing |
 
 `result.ctrl` and `result.scnr` are vectors of monthly means, each a `NamedTuple` of 96×48 fields (`Ts, Ta, To, q, albedo, ice, precip, evap, qcrcl, sw, lw, qlat, qsens`). `result.scnr` is an **anomaly** against the control's final year, except for the orbital experiments and runs with `ctrl=0`. The [Tutorial](https://EnvDroneSense.github.io/GREBClimate.jl/dev/tutorial/) covers configuration switches, experiment keywords and reading the results; [`examples/run_greb.jl`](examples/run_greb.jl) is a runnable script.
 

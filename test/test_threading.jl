@@ -11,9 +11,9 @@
         using GREBClimate
         using Test
         include(raw"$(utils)")
-        cfg = create_experiment_config(:full_model)
+        cfg = preset(:full_model; corrections = NoCorrections())
         result = quiet() do
-            greb_model!(RunSpec(flux = 0, ctrl = 1, scnr = 0), cfg;
+            greb_model!(RunSpec(ctrl = 1, scnr = 0), cfg;
                         jld2_dir = "", fields = synthetic_fields(),
                         allow_uninitialized = true)
         end
@@ -57,7 +57,7 @@ end
             using GREBClimate
             result = redirect_stdout(devnull) do
                 fields = load_greb_jld2!(raw"$(DATA_DIR)"; dataset = :ncep)
-                greb_model!(RunSpec(flux = 1, ctrl = 1, scnr = 0), create_experiment_config(:full_model);
+                greb_model!(RunSpec(ctrl = 1, scnr = 0), preset(:full_model; corrections = SpinUp(1));
                             jld2_dir = raw"$(DATA_DIR)", fields = fields)
             end
             finite = all(r -> all(isfinite, r.Ts) && all(isfinite, r.Ta), result.ctrl)

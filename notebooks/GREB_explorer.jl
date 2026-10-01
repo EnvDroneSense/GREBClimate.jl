@@ -44,7 +44,7 @@ begin
 end;
 
 # ╔═╡ 81e2898f-92b5-4bfa-837d-82319d446a7b
-md"""Experiment $(@bind experiment Select(sort(collect(keys(GREBClimate._EXPERIMENT_OVERRIDES))), default=:co2_double))"""
+md"""Experiment $(@bind experiment Select(preset_names(), default=:co2_double))"""
 
 # ╔═╡ 5e5b94a6-59d6-4f92-9978-c0ca505a5f2e
 md"""Control years $(@bind n_ctrl Slider(1:30, default=5, show_value=true))
@@ -55,7 +55,7 @@ Run the model $(@bind go CheckBox(default=false))"""
 
 # ╔═╡ 79fdb975-0f02-43f7-9a05-39e8f5408c5f
 result = go ? redirect_stdout(devnull) do
-    greb_model!(RunSpec(flux=3, ctrl=n_ctrl, scnr=n_scnr), create_experiment_config(experiment);
+    greb_model!(RunSpec(ctrl=n_ctrl, scnr=n_scnr), preset(experiment);
                 jld2_dir=data_dir, fields=deepcopy(fields))   # the model mutates fields
 end : nothing;
 

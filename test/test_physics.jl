@@ -188,18 +188,17 @@ end
 # The allocation budget for SWradiation! (and every other kernel) lives in
 # test_invariants.jl, alongside the return-type checks.
 
-@testset "log_hydro_dmc==false freezes humidity entirely (not just eva/rain)" begin
-    # With log_hydro_dmc off, q must never move from its initial
+@testset "hydrology = :none freezes humidity entirely (not just evaporation and rain)" begin
+    # With the water cycle off, q must never move from its initial
     # climatological value
     if !isdir(DATA_DIR)
         @test_skip "greb_input_data/ not present"
     else
         fields = load_greb_jld2!(DATA_DIR; dataset = :ncep)
-        cfg = create_experiment_config(:full_model)
-        cfg.log_hydro_dmc = false
+        cfg = preset(:full_model; processes = (hydrology = :none,))
         # The initial humidity as init_model! sets it for this configuration;
         # greb_model! restores `fields` afterwards, so it cannot be read there.
-        q_ini = quiet(() -> init_model!(deepcopy(cfg), deepcopy(fields))).q_ini
+        q_ini = quiet(() -> init_model!(GREBClimate._lower(cfg), deepcopy(fields))).q_ini
         result = quiet() do
             greb_model!(RunSpec(scnr = 0), cfg; jld2_dir = DATA_DIR, fields = fields)
         end

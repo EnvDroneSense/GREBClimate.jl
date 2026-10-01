@@ -46,7 +46,7 @@ function parameter_sweep(jld2_dir::AbstractString;
 
     scnr >= 12 || throw(ArgumentError("scnr must be >= 12 to take a final-year mean, got $scnr"))
 
-    run = RunSpec(flux=flux, ctrl=ctrl, scnr=scnr)
+    run = RunSpec(ctrl=ctrl, scnr=scnr)
     results = NamedTuple{(:co2, :Ts_anom, :ice_anom, :precip_anom),
                           Tuple{Float64,Float64,Float64,Float64}}[]
 
@@ -66,7 +66,7 @@ function parameter_sweep(jld2_dir::AbstractString;
                 end
             end
 
-            cfg = create_experiment_config(:custom_co2; co2_path=co2_path)
+            cfg = preset(:custom_co2; path=co2_path, corrections=SpinUp(flux))
             fields = deepcopy(fields_template)   # each grid point mutates its own state
 
             try

@@ -17,9 +17,8 @@
         @test_skip "RUN_GOLDEN=0"
     else
         fields = load_greb_jld2!(DATA_DIR; dataset = :ncep)
-        cfg = create_experiment_config(:full_model)
         result = quiet() do
-            greb_model!(RunSpec(flux = 0), cfg; jld2_dir = DATA_DIR, fields = fields)
+            greb_model!(RunSpec(), preset(:full_model; corrections = Stored()); jld2_dir = DATA_DIR, fields = fields)
         end
 
         gmean(x) = sum(x) / length(x)
@@ -72,7 +71,8 @@
         # One spin-up year, then the control: exercises qflux_correction!.
         # Reuses `fields`, which greb_model! restores after the run above.
         flux_result = quiet() do
-            greb_model!(RunSpec(flux = 1, ctrl = 1, scnr = 0), cfg; jld2_dir = DATA_DIR, fields = fields)
+            greb_model!(RunSpec(ctrl = 1, scnr = 0), preset(:full_model; corrections = SpinUp(1));
+                        jld2_dir = DATA_DIR, fields = fields)
         end
         flux_ref = [
             (Ts = 277.28638, Ta = 279.7823, q = 0.0063898247),

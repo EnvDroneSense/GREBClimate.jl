@@ -21,8 +21,8 @@ function _require_data(jld2_dir::AbstractString)
     return false
 end
 
-"Time a 1-year `:full_model` control run `reps` times; returns seconds per run."
-function time_1yr(jld2_dir::AbstractString; cfg=create_experiment_config(:full_model), reps::Int=3)
+"Time a 1-year `:full_model` control run (stored corrections, no spin-up) `reps` times; returns seconds per run."
+function time_1yr(jld2_dir::AbstractString; cfg=preset(:full_model; corrections=Stored()), reps::Int=3)
     _require_data(jld2_dir) || return nothing
     reps >= 1 || throw(ArgumentError("reps must be at least 1, got $reps"))
 
@@ -31,15 +31,14 @@ function time_1yr(jld2_dir::AbstractString; cfg=create_experiment_config(:full_m
 
     # Warm-up, so compilation is not timed.
     redirect_stdout(devnull) do
-        greb_model!(RunSpec(flux=0, scnr=0), deepcopy(cfg); jld2_dir=jld2_dir, fields=deepcopy(fields))
+        greb_model!(RunSpec(scnr=0), cfg; jld2_dir=jld2_dir, fields=deepcopy(fields))
     end
 
     times = Float64[]
     for r in 1:reps
         fields_r = deepcopy(fields)  # the model mutates fields
-        cfg_r = deepcopy(cfg)
         t = @elapsed redirect_stdout(devnull) do
-            greb_model!(RunSpec(flux=0, scnr=0), cfg_r; jld2_dir=jld2_dir, fields=fields_r)
+            greb_model!(RunSpec(scnr=0), cfg; jld2_dir=jld2_dir, fields=fields_r)
         end
         push!(times, t)
         println("  run $r: ", round(t, digits=3), " s")
@@ -55,11 +54,11 @@ Time a `ctrl`-year control run followed by a `scnr`-year scenario run, `reps`
 times; returns seconds per run. Unlike `time_1yr` (fixed 1-year control
 run, no scenario), this is for checking long-run cost and stability.
 
-`cfg`'s experiment: `forcing()` takes a fast path for `:full_model` that holds CO2 
-constant across the whole scenario regardless of `scnr`. For an actual multi-year 
-forced change, pass a `cfg` from an experiment with a real CO2 trajectory.
+`experiment` is a preset name. `:full_model` holds CO2 constant across the
+whole scenario regardless of `scnr`; for an actual multi-year forced change,
+pass a preset with a real CO2 trajectory.
 """
-function time_years(jld2_dir::AbstractString; cfg=create_experiment_config(:full_model),
+function time_years(jld2_dir::AbstractString; experiment::Symbol=:full_model,
         ctrl::Int=10, scnr::Int=10, reps::Int=1)
     _require_data(jld2_dir) || return nothing
     reps >= 1 || throw(ArgumentError("reps must be at least 1, got $reps"))
@@ -68,20 +67,20 @@ function time_years(jld2_dir::AbstractString; cfg=create_experiment_config(:full
     total_years = ctrl + scnr
 
     println("Threads.nthreads() = ", Threads.nthreads())
-    println("ctrl=$ctrl scnr=$scnr ($total_years simulated years/rep), experiment=$(cfg.experiment)")
+    println("ctrl=$ctrl scnr=$scnr ($total_years simulated years/rep), experiment=$experiment")
+    cfg = preset(experiment)
     fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
 
     # Warm-up with a minimal run.
     redirect_stdout(devnull) do
-        greb_model!(RunSpec(ctrl=1, scnr=0), deepcopy(cfg); jld2_dir=jld2_dir, fields=deepcopy(fields))
+        greb_model!(RunSpec(ctrl=1, scnr=0), cfg; jld2_dir=jld2_dir, fields=deepcopy(fields))
     end
 
     times = Float64[]
     for r in 1:reps
         fields_r = deepcopy(fields)  # the model mutates fields
-        cfg_r = deepcopy(cfg)
         t = @elapsed redirect_stdout(devnull) do
-            greb_model!(RunSpec(ctrl=ctrl, scnr=scnr), cfg_r; jld2_dir=jld2_dir, fields=fields_r)
+            greb_model!(RunSpec(ctrl=ctrl, scnr=scnr), cfg; jld2_dir=jld2_dir, fields=fields_r)
         end
         push!(times, t)
         println("  run $r: ", round(t, digits=3), " s  (",
@@ -248,7 +247,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
         ctrl = haskey(flags, "ctrl") ? parse_nonneg_int("ctrl", flags["ctrl"]) : 10
         scnr = haskey(flags, "scnr") ? parse_nonneg_int("scnr", flags["scnr"]) : 10
         experiment = Symbol(get(flags, "experiment", "full_model"))
-        time_years(jld2_dir; cfg=create_experiment_config(experiment),
+        time_years(jld2_dir; experiment,
             ctrl=ctrl, scnr=scnr, reps=something(reps, 1))
     end
 end

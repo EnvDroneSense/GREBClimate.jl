@@ -4,7 +4,7 @@
 #
 # Mirrors the notebook's non-interactive path:
 #   1. load JLD2 input data        (notebook data-loading cell)
-#   2. build a PhysicsConfig       (replaces `current_physics_config()` widgets)
+#   2. build a Config              (replaces `current_physics_config()` widgets)
 #   3. run the model               (replaces the `run_toggle` execute cell)
 #   4. print a summary             (the notebook's diagnostics cell)
 #   5. plot global-mean Ts          (the notebook's plotting cell)
@@ -45,11 +45,11 @@ function run_greb(jld2_dir::AbstractString;
     fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
 
     # ── 2. configure the experiment (replaces the interactive widgets) ──────
-    cfg = create_experiment_config(:full_model)
+    cfg = preset(:full_model; corrections=SpinUp(time_flux))
 
     # ── 3. run the model ────────────────────────────────────────────────────
-    println("Running GREB (flux=$time_flux, ctrl=$time_ctrl, scnr=$time_scnr years)...")
-    run = RunSpec(flux=time_flux, ctrl=time_ctrl, scnr=time_scnr)
+    println("Running GREB (spin-up=$time_flux, ctrl=$time_ctrl, scnr=$time_scnr years)...")
+    run = RunSpec(ctrl=time_ctrl, scnr=time_scnr)
     result = greb_model!(run, cfg; jld2_dir=jld2_dir, fields=fields)
     println("Run complete. control months: ", length(result.ctrl),
             ", scenario months: ", length(result.scnr))
