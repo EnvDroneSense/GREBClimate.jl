@@ -5,6 +5,24 @@ Notable changes to GREBClimate.jl, following
 
 ## [Unreleased]
 
+### Added
+
+- A new configuration API: `Config` with a `Scenario` (CO2 path and mask,
+  sunlight, surface forcing, control CO2, start year, output form), a
+  `Processes` set (one option per process, each with an explicit meaning when
+  off, replacing the overlapping mean-climate and 2xCO2 switch sets), a
+  `Hydrology` scheme (named options instead of integer codes; `mscm_hydrology()`
+  for the original GREB scheme) and `Corrections` (`SpinUp(years)`, `Stored()`,
+  `NoCorrections()`). `preset(name)` builds every experiment; run it with
+  `greb_model!(run, config)`, where the spin-up length comes from `SpinUp`.
+  Results are identical to the `PhysicsConfig` path. Not yet available: free
+  combinations of scenario parts that match no preset, and corrections that do
+  not follow the topography (observed topography always spins up; flat
+  topography uses the stored or no corrections). Preset names that changed:
+  `:rcp85` is `:rcp85_boundary`, `:co2_step` is `:co2_abrupt_reverse`,
+  `:a1b_scenario` is `:a1b`; `:constant_topo` has no preset (use
+  `preset(:decon_2xco2; processes = Processes(topography = :flat))`).
+
 ### Changes to model results
 
 - A failed run no longer looks like a frozen planet: the 40 K floor on `Ts`

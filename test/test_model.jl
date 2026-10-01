@@ -468,3 +468,22 @@ end
         @test getfield(f, n) == before[n]
     end
 end
+
+@testset "greb_model! with a Config runs the legacy config it translates to" begin
+    # Data-free runs are not physical, but both paths must produce the same values
+    run_legacy(cfg, run) = quiet() do
+        greb_model!(run, cfg; jld2_dir = "", allow_uninitialized = true)
+    end
+    run_config(cfg, run) = quiet() do
+        greb_model!(run, cfg; jld2_dir = "", allow_uninitialized = true)
+    end
+    a = run_config(preset(:co2_double; corrections = SpinUp(1)), RunSpec(flux = 7, ctrl = 1, scnr = 1))
+    b = run_legacy(create_experiment_config(:co2_double), RunSpec(flux = 1, ctrl = 1, scnr = 1))
+    @test isequal(a.ctrl, b.ctrl) && isequal(a.scnr, b.scnr)    # SpinUp decides; run.flux is ignored
+    # The spin-up length really comes from SpinUp: compare the first (finite) month
+    first_ts(years) = quiet() do
+        greb_model!(RunSpec(flux = 1, ctrl = 1, scnr = 0), preset(:full_model; corrections = SpinUp(years));
+                    jld2_dir = "", fields = synthetic_fields(), allow_uninitialized = true)
+    end.ctrl[1].Ts
+    @test all(isfinite, first_ts(0)) && first_ts(0) != first_ts(1) && first_ts(1) == first_ts(1)
+end

@@ -24,15 +24,13 @@ const DATA_DIR = something(greb_data_dir(; allow_download=false),
                            joinpath(@__DIR__, "..", "..", "greb_input_data"))
 isdir(DATA_DIR) || error("dataset not found at $DATA_DIR")
 
-# flux = 1 so the flux-correction spin-up loop is exercised, not only the run loop.
-const RUN = RunSpec(flux=1, ctrl=1, scnr=1)
+# One spin-up year, so the flux-correction loop is exercised, then a control
+# and a scenario year. Case names are the pre-2.0 experiment names, so a
+# snapshot taken before the configuration refactor still compares.
+const RUN = RunSpec(ctrl=1, scnr=1)
+const RENAMED = Dict("rcp85" => :rcp85_boundary, "co2_step" => :co2_abrupt_reverse, "a1b_scenario" => :a1b)
 
-function _decon_cfg()
-    cfg = create_experiment_config(:full_model)
-    cfg.log_crcl_dmc = false   # the humidity-circulation selection in time_loop!
-    cfg.log_hydro_dmc = false
-    return cfg
-end
+case(name; kw...) = preset(name; corrections=SpinUp(1), kw...)
 
 # A fixed two-year CO2 path for the :custom_co2 preset
 function _custom_co2_file()
@@ -41,18 +39,18 @@ function _custom_co2_file()
     return path
 end
 
-# name => config constructor: every preset, then the switch case
+# name => config constructor: every preset, then two switch cases
 function _cases()
-    presets = sort!(collect(keys(GREBClimate._EXPERIMENT_OVERRIDES)))
-    append!(presets, (:decon_mean_climate, :decon_2xco2))
     cases = Pair{String,Function}[]
-    for p in presets
-        mk = p === :custom_co2 ? () -> create_experiment_config(p; co2_path=_custom_co2_file()) :
-                                 () -> create_experiment_config(p)
-        push!(cases, string(p) => mk)
+    for p in preset_names()
+        name = something(findfirst(==(p), RENAMED), string(p))
+        mk = p === :custom_co2 ? () -> case(p; path=_custom_co2_file()) : () -> case(p)
+        push!(cases, name => mk)
     end
-    push!(cases, "decon_crcl_hydro_off" => _decon_cfg)
-    return cases
+    # flat topography runs on the stored corrections (the former :constant_topo)
+    push!(cases, "constant_topo" => () -> preset(:co2_double; processes=Processes(topography=:flat)))
+    push!(cases, "decon_crcl_hydro_off" => () -> case(:full_model; processes=Processes(transport=false, hydrology=:none)))
+    return sort!(cases; by=first)
 end
 
 function run_cases()

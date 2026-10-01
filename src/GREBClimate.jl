@@ -19,6 +19,12 @@ using LoopVectorization   # @turbo SIMD
 using JLD2
 using DataDeps: DataDeps, DataDep, register, unpack, @datadep_str
 
+export Config, preset, preset_names, Scenario, Processes, Hydrology, mscm_hydrology
+export Corrections, SpinUp, Stored, NoCorrections
+export CO2Path, ConstantCO2, CO2Table, CO2File, A1BRamp, CO2SineWave, CO2Step, SeasonalCO2
+export CO2Mask, UniformMask, LatitudeMask, SurfaceMask
+export Solar, ModernSolar, SolarConstant, SolarCycle, SolarTable, EarthSunDistance
+export SurfaceForcing, NoSurfaceForcing, BoundaryAnomaly, SSTOffset
 export PhysicsConfig, RunSpec, CirculationWorkspace, MonthlyAccumulator, TimeState, MonthlyRecord
 export ClimateFields, ModelState, SurfaceState
 export greb_data_dir
@@ -34,6 +40,9 @@ export xdim, ydim, nstep_yr
 
 include("core/constants.jl")
 include("core/config.jl")
+include("core/processes.jl")
+include("core/scenario.jl")
+include("core/presets.jl")
 include("data.jl")
 include("core/state.jl")
 include("io.jl")
@@ -45,6 +54,7 @@ include("core/tendencies.jl")
 include("core/output.jl")
 include("core/postprocess.jl")
 include("core/model.jl")
+include("core/lower.jl")   # needs greb_model! from model.jl
 
 function __init__()
     # Registration only: nothing is downloaded until `greb_data_dir()` has to
