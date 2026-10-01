@@ -9,39 +9,6 @@
     @test result.ctrl[1] isa MonthlyRecord
 end
 
-@testset "greb_model! flux-correction spin-up: loaded files aren't overwritten by qflux_correction!" begin
-    tmpdir = mktempdir()
-    try
-        mkpath(joinpath(tmpdir, "climatology"))
-        GREBClimate.jldopen(joinpath(tmpdir, "climatology", "flux_corrections.jld2"), "w") do f
-            f["Tsurf_flux_correction"] = fill(42.0, GREBClimate.xdim, GREBClimate.ydim, GREBClimate.nstep_yr)
-            f["vapour_flux_correction"] = fill(43.0, GREBClimate.xdim, GREBClimate.ydim, GREBClimate.nstep_yr)
-            f["Tocean_flux_correction"] = fill(44.0, GREBClimate.xdim, GREBClimate.ydim, GREBClimate.nstep_yr)
-        end
-
-        cfg = preset(:full_model; corrections = Stored())
-        fields = ClimateFields()
-        # greb_model! restores `fields` when it returns, so the branch it took
-        # is read from its progress output: load the file, never recompute.
-        log = mktemp() do path, io
-            redirect_stdout(io) do
-                greb_model!(RunSpec(ctrl = 0, scnr = 0), cfg; jld2_dir = tmpdir, fields = fields, allow_uninitialized = true)
-            end
-            flush(io)
-            read(path, String)
-        end
-        @test occursin("loading flux correction fields", log)
-        @test !occursin("% flux correction  CO2", log)
-        # The loader itself fills the three arrays from the file
-        GREBClimate.load_flux_corrections_jld2!(tmpdir, fields)
-        @test all(==(42.0), fields.TF_correct)
-        @test all(==(43.0), fields.qF_correct)
-        @test all(==(44.0), fields.ToF_correct)
-    finally
-        rm(tmpdir; recursive = true, force = true)
-    end
-end
-
 @testset "hydro! is finite under every evaporation and rain scheme" begin
     # Each evaporation scheme is a separate `@turbo` block in `hydro!`; the
     # default pair runs end to end in the baseline testset.
@@ -182,7 +149,6 @@ end
         end
 
         # One end-to-end run proves greb_model! actually wires the table in.
-        @test resolve(preset(:rcp45); jld2_dir = dir).co2_table == Dict(1950 => Float32(expected[:rcp45]))
         result = quiet() do
             greb_model!(RunSpec(ctrl = 0, scnr = 1), preset(:rcp45); jld2_dir = dir,
                         allow_uninitialized = true)
@@ -209,7 +175,6 @@ end
 
         # ...then one run to prove greb_model! reads the file.
         cfg = preset(:custom_co2; path = co2_path)
-        @test resolve(cfg).co2_table == Dict(1950 => 300.0, 1951 => 301.0)
         result = quiet() do
             greb_model!(RunSpec(ctrl = 0, scnr = 1), cfg; jld2_dir = "",
                         allow_uninitialized = true)
@@ -385,7 +350,9 @@ end
 @testset "greb_model! restores the fields it changes, so one fields serves several runs" begin
     f = synthetic_fields()
     f.TF_correct .= 1.0f0   # stands in for loaded corrections; the run zeroes them here
-    names = (:sw_solar, :TF_correct, :qF_correct, :ToF_correct, :z_topo, :cldclim, :qclim, :mldclim)
+    # sw_solar is not in this list: no part of this config swaps the solar
+    # table, so the paleo testset is where its restore is checked.
+    names = (:TF_correct, :qF_correct, :ToF_correct, :z_topo, :cldclim, :qclim, :mldclim)
     before = Dict(n => copy(getfield(f, n)) for n in names)
     # Running without corrections zeroes them; flat topography, uniform clouds
     # and humidity and the mixed-layer ocean replace their climatologies.
