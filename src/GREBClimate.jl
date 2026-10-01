@@ -10,9 +10,10 @@ module GREBClimate
 # lives in `notebooks/GREB_explorer.jl`; see the package docs or README for
 # usage.
 #
-# Files below are included in dependency order: constants -> config -> data
-# -> state -> io -> physics/{radiation,hydrology,ocean} -> circulation ->
-# tendencies -> output -> postprocess -> model.
+# Files below are included in dependency order: constants -> config ->
+# config/{processes,scenario,presets} -> data -> state -> io ->
+# physics/{radiation,hydrology,ocean,circulation} -> tendencies -> forcing ->
+# output -> postprocess -> model.
 # =============================================================================
 
 using LoopVectorization   # @turbo SIMD
@@ -40,17 +41,18 @@ export xdim, ydim, nstep_yr
 
 include("core/constants.jl")
 include("core/config.jl")
-include("core/processes.jl")
-include("core/scenario.jl")
-include("core/presets.jl")
+include("config/processes.jl")
+include("config/scenario.jl")
+include("config/presets.jl")
 include("data.jl")
 include("core/state.jl")
 include("io.jl")
 include("physics/radiation.jl")
 include("physics/hydrology.jl")
 include("physics/ocean.jl")
-include("circulation.jl")
+include("physics/circulation.jl")
 include("core/tendencies.jl")
+include("forcing/forcing.jl")
 include("core/output.jl")
 include("core/postprocess.jl")
 include("core/model.jl")

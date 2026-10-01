@@ -22,12 +22,13 @@ GREBClimate.jl/
 │   │   ├── constants.jl        # grid/physical constants
 │   │   ├── config.jl           # PhysicsConfig, RunSpec, experiment presets
 │   │   ├── state.jl            # ClimateFields, ModelState, workspaces
-│   │   ├── tendencies.jl       # per-timestep physics pipeline, forcing()
+│   │   ├── tendencies.jl       # per-timestep physics pipeline
 │   │   ├── output.jl           # diagnostics!/output!/time_loop!
 │   │   ├── postprocess.jl      # monthly climatology/anomalies
 │   │   └── model.jl            # init_model!/qflux_correction!/greb_model!
-│   ├── physics/                # radiation.jl, hydrology.jl, ocean.jl
-│   ├── circulation.jl          # diffusion/advection/convergence
+│   ├── config/                 # Config parts: processes.jl, scenario.jl, presets.jl
+│   ├── forcing/                # forcing(): CO2 and sunlight per timestep
+│   ├── physics/                # radiation.jl, hydrology.jl, ocean.jl, circulation.jl
 │   ├── data.jl                 # greb_data_dir(): dataset location + DataDep
 │   └── io.jl                   # JLD2 loaders
 ├── test/                       # one file per subject; runtests.jl lists them
