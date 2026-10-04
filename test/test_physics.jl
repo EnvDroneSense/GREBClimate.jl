@@ -207,6 +207,13 @@ end
     off = run(Processes(ice_albedo = false))
     @test all(a -> isapprox(a, ramp[3]; rtol = 1e-5), off.albedo)
     @test off.ice_cover == sw.ice_cover
+
+    # Exactly on a threshold: full ice at the lower one, none at the upper one
+    for (T1, T2, inv) in ((G.To_ice1, G.To_ice2, G.inv_To_ice_range), (G.Tl_ice1, G.Tl_ice2, G.inv_Tl_ice_range))
+        @test GREBClimate.@ice_ramp(T1, T1, T2, inv) === 1.0f0
+        @test GREBClimate.@ice_ramp(T2, T1, T2, inv) === 0.0f0
+        @test GREBClimate.@ice_ramp(prevfloat(T2), T1, T2, inv) > 0
+    end
 end
 
 @testset "LWradiation!: emissivity and the longwave fluxes" begin

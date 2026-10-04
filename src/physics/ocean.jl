@@ -24,9 +24,7 @@ function seaice!(Ts0, fields::ClimateFields, timestate, p::Processes)
             cap_open = cap_ocean * mld_val
 
             # Ice fraction (0 = no ice, 1 = full ice)
-            ice_frac = ifelse(T <= To_ice1, 1.0f0,
-                ifelse(T >= To_ice2, 0.0f0,
-                    1.0f0 - (T - To_ice1) * inv_To_ice_range))
+            ice_frac = @ice_ramp(T, To_ice1, To_ice2, inv_To_ice_range)
 
             # Blend between land (ice) and open ocean capacities
             cap_with_ice = cap_land * ice_frac + cap_open * (1.0f0 - ice_frac)

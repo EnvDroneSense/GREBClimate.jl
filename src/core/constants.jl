@@ -74,6 +74,12 @@ const To_ice2 = 273.15f0 - 1.7f0             # ocean: no ice albedo
 const inv_To_ice_range = 1.0f0 / (To_ice2 - To_ice1)
 const inv_Tl_ice_range = 1.0f0 / (Tl_ice2 - Tl_ice1)
 
+# Ice fraction at temperature `T`: 1 at or below `T1`, 0 at or above `T2`,
+# linear in between. A macro so that the `@turbo` loops see the expression.
+macro ice_ramp(T, T1, T2, inv_range)
+    return esc(:(ifelse($T <= $T1, 1.0f0, ifelse($T >= $T2, 0.0f0, 1.0f0 - ($T - $T1) * $inv_range))))
+end
+
 # ── Deep ocean ──────────────────────────────────────────────────
 const co_turb = 5.0f0                        # turbulent mixing coefficient [W/K/m²]
 const c_effmix = 0.5f0                       # mixing efficiency

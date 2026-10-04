@@ -18,15 +18,9 @@ function SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, p
     # 1. Ice cover fraction
     @turbo for i in 1:xdim, j in 1:ydim
         T = Ts[i, j]
-        land_expr = ifelse(T <= Tl_ice1, 1.0f0,
-            ifelse(T < Tl_ice2,
-                1.0f0 - (T - Tl_ice1) * inv_Tl_ice_range,
-                0.0f0))
-        ocean_expr = ifelse(T <= To_ice1, 1.0f0,
-            ifelse(T < To_ice2,
-                1.0f0 - (T - To_ice1) * inv_To_ice_range,
-                0.0f0))
-        ice_cover[i, j] = ifelse(@is_land(z_topo[i, j]), land_expr, ocean_expr)
+        land_ice = @ice_ramp(T, Tl_ice1, Tl_ice2, inv_Tl_ice_range)
+        ocean_ice = @ice_ramp(T, To_ice1, To_ice2, inv_To_ice_range)
+        ice_cover[i, j] = ifelse(@is_land(z_topo[i, j]), land_ice, ocean_ice)
     end
 
     # 2. Atmospheric albedo
@@ -37,14 +31,9 @@ function SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, p
     if p.ice_albedo
         @turbo for i in 1:xdim, j in 1:ydim
             T = Ts[i, j]
-            # Land albedo expression
-            land_alb = ifelse(T <= Tl_ice1, a_no_ice + da_ice,
-                ifelse(T >= Tl_ice2, a_no_ice,
-                    a_no_ice + da_ice * (1.0f0 - (T - Tl_ice1) * inv_Tl_ice_range)))
-            # Ocean albedo expression
-            ocean_alb = ifelse(T <= To_ice1, a_no_ice + da_ice,
-                ifelse(T >= To_ice2, a_no_ice,
-                    a_no_ice + da_ice * (1.0f0 - (T - To_ice1) * inv_To_ice_range)))
+            # Ice-free albedo plus the ice increment times the ice fraction
+            land_alb = a_no_ice + da_ice * @ice_ramp(T, Tl_ice1, Tl_ice2, inv_Tl_ice_range)
+            ocean_alb = a_no_ice + da_ice * @ice_ramp(T, To_ice1, To_ice2, inv_To_ice_range)
             # Choose based on topography
             a_surf[i, j] = ifelse(@is_land(z_topo[i, j]), land_alb, ocean_alb)
             # Glacier override: if glacier mask > 0.5, set to ice albedo
