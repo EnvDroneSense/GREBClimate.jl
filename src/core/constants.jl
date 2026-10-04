@@ -149,8 +149,8 @@ const calendar_lookup = [(
     step=mod(it - 1, nstep_yr) + 1
 ) for it in 1:max_timesteps]
 
-const polar_treshold = 2.5f5  # 250 km in meters
-const IS_POLAR = [dxlat_grid[k] <= polar_treshold for k in 1:ydim]
+const polar_threshold = 2.5f5  # 250 km in meters
+const IS_POLAR = [dxlat_grid[k] <= polar_threshold for k in 1:ydim]
 
 # ── Polar sub-stepping constants (diffusion!/advection!) ──────────────
 function _polar_diff_step(k)

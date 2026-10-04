@@ -356,7 +356,7 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
         if s.surface isa SSTOffset
             CO2 = CO2_ctrl
             ityr_now = mod(it - 1, nstep_yr) + 1
-            @. Ts = ifelse(!is_land(fields.z_topo), fields.Tclim[:, :, ityr_now] + s.surface.K, Ts)
+            @views @. Ts = ifelse(!is_land(fields.z_topo), fields.Tclim[:, :, ityr_now] + s.surface.K, Ts)
         end
 
         (mon, irec) = time_loop!(it, year, CO2, mon, irec,

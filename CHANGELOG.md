@@ -7,6 +7,8 @@ Notable changes to GREBClimate.jl, following
 
 ### Changed
 
+- A scenario with an `SSTOffset` (`:sst_plus1`) no longer allocates a copy of
+  the temperature climatology at every step. Results are unchanged.
 - The `observer` keyword of `greb_model!` and `GREBClimate.BudgetCheck` are no
   longer marked experimental. The contents of the observer's `view` are part
   of the interface from here on.
