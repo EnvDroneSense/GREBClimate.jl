@@ -10,7 +10,6 @@ function SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, p
     ice_cover = ws.ice_cover_buf # output: ice fraction
     a_surf = ws.a_surf_buf       # surface albedo
     albedo = ws.albedo_buf       # output: combined albedo (surface + atmosphere)
-    a_atmos = ws.a_atmos_buf     # atmospheric albedo
     sw = ws.sw_buf               # output: net shortwave flux
 
     z_topo = fields.z_topo
@@ -62,7 +61,6 @@ function SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, p
         sf = sw_solar[j, ityr] * multiplier
         for i in 1:xdim
             aa = cld[i, j, ityr] * a_cloud
-            a_atmos[i, j] = aa
             alb = a_surf[i, j] + aa - a_surf[i, j] * aa
             albedo[i, j] = alb
             sw[i, j] = sf * (1.0f0 - alb)

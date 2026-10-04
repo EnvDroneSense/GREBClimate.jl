@@ -18,7 +18,6 @@ Base.@kwdef mutable struct CirculationWorkspace
     dX_conv::Matrix{Float32} = zeros(Float32, xdim, ydim)  # convection output
 
     # Tendency buffers
-    temp_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # general workspace (humidity-update scratch)
     Q_sens_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Sensible heat flux buffer
 
     # State buffers
@@ -35,17 +34,11 @@ Base.@kwdef mutable struct CirculationWorkspace
     LW_down_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Downwelling longwave
     LW_up_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Upwelling longwave
 
-    # Hydrology buffers
-    qs::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Saturation humidity buffer
-    Tskin::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Skin temperature buffer
-    rq::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Relative humidity buffer
-    ws_base::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Base wind speed buffer
     # Hydrology
     Q_lat_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
     Q_lat_air_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
     dq_eva_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
     dq_rain_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
-    cE_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface exchange coefficient buffer
 
     # Deep_ocean
     dT_ocean_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
@@ -59,7 +52,6 @@ Base.@kwdef mutable struct CirculationWorkspace
     ice_cover_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # ice fraction
     a_surf_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # surface albedo
     albedo_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # combined albedo (surface + atmosphere)
-    a_atmos_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # atmospheric albedo
     sw_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # net shortwave flux
 
     # time_loop

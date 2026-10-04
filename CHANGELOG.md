@@ -11,6 +11,12 @@ Notable changes to GREBClimate.jl, following
   longer marked experimental. The contents of the observer's `view` are part
   of the interface from here on.
 
+### Removed
+
+- Seven fields of `CirculationWorkspace` that were written every step and read
+  by nothing: `qs`, `rq`, `Tskin`, `ws_base`, `cE_buf`, `temp_buf` and
+  `a_atmos_buf`. Results are bit-identical.
+
 ### Fixed
 
 - `:regional_co2_nh`, `:regional_co2_sh`, `:regional_co2_tropics` and

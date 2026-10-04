@@ -36,7 +36,6 @@ function hydro!(Ts, q, fields::ClimateFields, timestate, p::Processes, h::Resolv
 
     z_topo = fields.z_topo
     wz_air = fields.wz_air
-    wz_vapor = fields.wz_vapor
     u = @view fields.uclim[:, :, timestate.ityr]
     v = @view fields.vclim[:, :, timestate.ityr]
     swet = @view fields.swetclim[:, :, timestate.ityr]
@@ -66,9 +65,7 @@ function hydro!(Ts, q, fields::ClimateFields, timestate, p::Processes, h::Resolv
             for i in 1:xdim
                 T = Ts[i, j] - 273.15f0
                 qs = max(const_factor1 * exp(const_factor2 * T / (T + const_factor3)) * wz_air[i, j], 1f-8)
-                ws.qs[i, j] = qs
                 rq = q[i, j] / qs
-                ws.rq[i, j] = rq
 
                 u_val = u[i, j]; v_val = v[i, j]
                 wind = sqrt(u_val*u_val + v_val*v_val)
@@ -91,23 +88,18 @@ function hydro!(Ts, q, fields::ClimateFields, timestate, p::Processes, h::Resolv
             for i in 1:xdim
                 T0 = Ts[i, j] - 273.15f0
                 qs0 = max(const_factor1 * exp(const_factor2 * T0 / (T0 + const_factor3)) * wz_air[i, j], 1f-8)
-                ws.qs[i, j] = qs0
                 rq = q[i, j] / qs0
-                ws.rq[i, j] = rq
 
                 Tskin = ifelse(@is_land(z_topo[i, j]), Ts[i, j] + 5.0f0, Ts[i, j] + 1.0f0)
                 Tskin = ifelse(Tskin < 200.0f0, 200.0f0, Tskin)
-                ws.Tskin[i, j] = Tskin
                 T = Tskin - 273.15f0
                 qs_val = const_factor1 * exp(const_factor2 * T / (T + const_factor3)) * wz_air[i, j]
 
                 ws_base = ws_view[i, j]
-                ws.ws_base[i, j] = ws_base
                 gust = ifelse(@is_land(z_topo[i, j]), 132.25f0, 29.16f0)
                 wind = sqrt(ws_base*ws_base + gust)
 
                 cE = ifelse(@is_land(z_topo[i, j]), cE_land, cE_ocean)
-                ws.cE_buf[i, j] = cE
                 qlat = cE * wind * ρ_air * cq_latent * (q[i, j] - qs_val) * swet[i, j]
                 Q_lat[i, j] = qlat
 
@@ -127,9 +119,7 @@ function hydro!(Ts, q, fields::ClimateFields, timestate, p::Processes, h::Resolv
             for i in 1:xdim
                 T = Ts[i, j] - 273.15f0
                 qs = max(const_factor1 * exp(const_factor2 * T / (T + const_factor3)) * wz_air[i, j], 1f-8)
-                ws.qs[i, j] = qs
                 rq = q[i, j] / qs
-                ws.rq[i, j] = rq
 
                 u_val = u[i, j]; v_val = v[i, j]
                 wind = sqrt(u_val*u_val + v_val*v_val)
@@ -155,9 +145,7 @@ function hydro!(Ts, q, fields::ClimateFields, timestate, p::Processes, h::Resolv
             for i in 1:xdim
                 T = Ts[i, j] - 273.15f0
                 qs = max(const_factor1 * exp(const_factor2 * T / (T + const_factor3)) * wz_air[i, j], 1f-8)
-                ws.qs[i, j] = qs
                 rq = q[i, j] / qs
-                ws.rq[i, j] = rq
 
                 wind = ws_view[i, j]
                 wind = sqrt(wind*wind + ifelse(@is_land(z_topo[i, j]), gust_land_2, gust_ocean_2))
