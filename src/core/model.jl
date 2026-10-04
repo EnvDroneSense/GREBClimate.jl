@@ -223,6 +223,8 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     config = r.config
     s = config.scenario
     time_ctrl, time_scnr = run.ctrl, run.scnr
+    time_ctrl == 0 && time_scnr > 0 && s.co2_mask isa SurfaceMask &&
+        throw(ArgumentError("a SurfaceMask is built from the control run's ice cover: use ctrl >= 1"))
     is_forced_boundary = s.surface isa BoundaryAnomaly
     # The run overwrites these in place; restore them so a reused `fields`
     # does not carry one run's changes into the next

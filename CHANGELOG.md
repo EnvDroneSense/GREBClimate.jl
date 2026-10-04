@@ -29,6 +29,9 @@ Notable changes to GREBClimate.jl, following
 - `load_greb_jld2!` with an unknown `dataset` (for example `:era5`) raises an
   `ArgumentError` naming the valid ones. Before, it loaded the NCEP files and
   printed the name it was given.
+- A scenario with a `SurfaceMask` (`:regional_co2_ocean`,
+  `:regional_co2_land_ice`) run with `RunSpec(ctrl = 0)` raises an
+  `ArgumentError`. Before, the mask was built from an ice cover of zero.
 - Docstrings corrected: `CO2Table` lists the `:rcp85` key; `Hydrology`
   describes `:skin_gust` as it is computed (no skin temperature);
   `ClimateFields` no longer says one instance per run, and states that

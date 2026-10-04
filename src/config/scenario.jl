@@ -117,7 +117,8 @@ end
     SurfaceMask(surface)
 
 The scenario CO2 applies over `:ocean` or over `:land_ice`, as the control
-run's annual-mean ice cover defines them.
+run's annual-mean ice cover defines them. A scenario with this mask needs a
+control run: `RunSpec(ctrl = 0)` is an `ArgumentError`.
 """
 struct SurfaceMask <: CO2Mask
     surface::Symbol

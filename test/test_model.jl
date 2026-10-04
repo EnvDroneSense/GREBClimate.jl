@@ -248,6 +248,10 @@ end
     land_ice = run_mask(:regional_co2_land_ice)
     @test land_ice.got == land_ice.expected
     @test all(isone, land_ice.got[1:(X - 48), :])    # land kept whatever the ice
+
+    # Without a control run there is no ice cover to build the mask from
+    @test_throws ArgumentError greb_model!(RunSpec(ctrl = 0, scnr = 1),
+        preset(:regional_co2_ocean; corrections = NoCorrections()); jld2_dir = "", allow_uninitialized = true)
 end
 
 @testset "boundary anomalies: the files load and are added to the climatology, in the scenario only" begin
