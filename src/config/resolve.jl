@@ -17,15 +17,16 @@ struct ResolvedHydrology
     c_omegastd::Float32
 end
 
-# (c_q, c_rq, c_omega, c_omegastd) per rain scheme; :fitted is the ERA-Interim fit
+# (c_q, c_rq, c_omega, c_omegastd) per (rain, rain_fit); only :fitted has an
+# :ncep fit, the constructor of Hydrology rejects it for the others
 const _RAIN_COEFFICIENTS = Dict(
-    :original => (1.0f0, 0.0f0, 0.0f0, 0.0f0),
-    :rh => (-1.391649f0, 3.018774f0, 0.0f0, 0.0f0),
-    :omega => (0.862162f0, 0.0f0, -29.02096f0, 0.0f0),
-    :rh_omega => (-0.2685845f0, 1.4591853f0, -26.9858807f0, 0.0f0),
-    :fitted => (-1.88f0, 2.25f0, -17.69f0, 59.07f0),
+    (:original, :era) => (1.0f0, 0.0f0, 0.0f0, 0.0f0),
+    (:rh, :era) => (-1.391649f0, 3.018774f0, 0.0f0, 0.0f0),
+    (:omega, :era) => (0.862162f0, 0.0f0, -29.02096f0, 0.0f0),
+    (:rh_omega, :era) => (-0.2685845f0, 1.4591853f0, -26.9858807f0, 0.0f0),
+    (:fitted, :era) => (-1.88f0, 2.25f0, -17.69f0, 59.07f0),
+    (:fitted, :ncep) => (-1.27f0, 1.99f0, -16.54f0, 21.15f0),
 )
-const _RAIN_FIT_NCEP = (-1.27f0, 1.99f0, -16.54f0, 21.15f0)
 
 """
     ResolvedConfig
@@ -63,8 +64,7 @@ function resolve(config::Config; jld2_dir::AbstractString="")
 end
 
 function resolve(h::Hydrology)
-    c = h.rain === :fitted && h.rain_fit === :ncep ? _RAIN_FIT_NCEP : _RAIN_COEFFICIENTS[h.rain]
-    return ResolvedHydrology(h.rain, h.evaporation, c...)
+    return ResolvedHydrology(h.rain, h.evaporation, _RAIN_COEFFICIENTS[(h.rain, h.rain_fit)]...)
 end
 
 _co2_table(::CO2Path, jld2_dir) = Dict{Int,Float32}()
