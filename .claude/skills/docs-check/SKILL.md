@@ -53,7 +53,7 @@ measured 2026-09-29 for v1.0.1 and unchanged since. The earlier default (stored
 flux corrections, no spin-up) gave `1970  14.43 ...` and 276.64 K: the control
 ran on corrections that do not fit this configuration and drifted warm. A healthy line above 14 °C now means the spin-up did not run.
 
-The degenerate column was re-measured 2026-10-07: a run on all-zero fields
+The degenerate column was re-measured 2026-10-04: a run on all-zero fields
 (`allow_uninitialized=true`) returns NaN everywhere, because a zero mixed-layer
 depth makes the surface heat capacity zero. Earlier versions of this table
 said it pinned at the 40 K floor; the healthy column was confirmed the same day.

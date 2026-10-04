@@ -13,6 +13,14 @@ Notable changes to GREBClimate.jl, following
 
 ### Fixed
 
+- `:regional_co2_nh`, `:regional_co2_sh`, `:regional_co2_tropics` and
+  `:regional_co2_extratropics` (any scenario with a `LatitudeMask`): the mask
+  was already active in the spin-up and the control, which therefore ran on
+  half the control CO2 outside the band, and the scenario then doubled the CO2
+  everywhere relative to that control. The mask now applies from the start of
+  the scenario only, as in the original GREB code (`subroutine forcing`). **The
+  results of these four presets change**: the response outside the band is
+  much smaller than before. `SurfaceMask` presets are unaffected.
 - Docstrings corrected: `CO2Table` lists the `:rcp85` key; `Hydrology`
   describes `:skin_gust` as it is computed (no skin temperature);
   `ClimateFields` no longer says one instance per run, and states that

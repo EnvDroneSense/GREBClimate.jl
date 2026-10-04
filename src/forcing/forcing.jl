@@ -6,8 +6,8 @@
 
 The scenario's CO2 (ppm) and solar multiplier at scenario step `it` in
 calendar `year`, from its [`CO2Path`](@ref) and [`Solar`](@ref) parts. CO2 is
-0 with `Processes(co2 = false)`. Pure: where the CO2 applies is set once per
-run by `apply_co2_mask!` and `apply_dynamic_co2_mask!`.
+0 with `Processes(co2 = false)`. Pure: where the CO2 applies is set once, at
+the start of the scenario, by `apply_co2_mask!` and `apply_dynamic_co2_mask!`.
 """
 function forcing(it, year, r::ResolvedConfig)
     s = r.config.scenario
@@ -58,9 +58,10 @@ _solar_factor(s::EarthSunDistance, year) = (1.0f0 / (1.0f0 + 0.01f0 * s.pct))^2
     apply_co2_mask!(mask::CO2Mask, fields::ClimateFields)
 
 Sets `fields.co2_part`, the fraction of the scenario CO2 each cell gets: 1
-everywhere, then 0.5 outside a [`LatitudeMask`](@ref) band. A
-[`SurfaceMask`](@ref) needs the control run's ice cover and is set later by
-`apply_dynamic_co2_mask!`.
+everywhere, then 0.5 outside a [`LatitudeMask`](@ref) band. `greb_model!`
+calls it at the start of the scenario; the spin-up and the control run on the
+full CO2 everywhere. A [`SurfaceMask`](@ref) needs the control run's ice cover
+and is set by `apply_dynamic_co2_mask!`.
 """
 function apply_co2_mask!(mask::CO2Mask, fields::ClimateFields)
     fields.co2_part .= 1.0f0

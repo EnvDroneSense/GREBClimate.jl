@@ -1,7 +1,7 @@
 """
     init_model!(r::ResolvedConfig, fields::ClimateFields)
 
-One-time per-run setup: sets the CO2 mask, applies the climatologies the
+One-time per-run setup: resets the CO2 mask to full CO2, applies the climatologies the
 [`Processes`](@ref) options replace (flat topography, cloud cover, humidity,
 mixed layer) and zeroes the flux corrections for `NoCorrections()`, derives
 the fields that follow from them ([`derive_fields!`](@ref)), then computes the
@@ -11,9 +11,10 @@ control-run initial state. Returns
 function init_model!(r::ResolvedConfig, fields::ClimateFields)
     p = r.config.processes
 
-    # Reset in case `fields` is reused: a regional run earlier against the
-    # same fields would otherwise leak its mask into this one
-    apply_co2_mask!(r.config.scenario.co2_mask, fields)
+    # The spin-up and the control run on the full CO2 everywhere; a regional
+    # mask is set at the start of the scenario. The reset also clears what an
+    # earlier regional run left in a reused `fields`
+    fields.co2_part .= 1.0f0
 
     Tclim = fields.Tclim
     z_topo = fields.z_topo
@@ -301,6 +302,9 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     # ── Build ice climatology from control output ───────────────
     ice_forcing = compute_annual_ice_climatology(ctrl_output)
 
+    # Regional CO2 masks belong to the scenario: the spin-up and the control
+    # above ran on the full CO2 everywhere
+    apply_co2_mask!(s.co2_mask, fields)
     apply_dynamic_co2_mask!(s.co2_mask, fields, ice_forcing)
 
     # ── 4. Scenario run ─────────────────────────────────────────

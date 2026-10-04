@@ -91,7 +91,16 @@ end
     end
 end
 
-@testset "CO2 masks: latitude bands at once, surface masks from the annual-mean ice cover" begin
+@testset "a latitude CO2 mask applies in the scenario only" begin
+    cfg = preset(:regional_co2_nh; corrections = NoCorrections())
+    part(phase, run) = at_first_step(v -> copy(v.fields.co2_part), run, cfg; phase, jld2_dir = "")
+    # The control runs on the full CO2 everywhere, as in the original code
+    @test all(isone, part(:ctrl, RunSpec(ctrl = 1, scnr = 0)))
+    scnr = part(:scnr, RunSpec(ctrl = 0, scnr = 1))
+    @test all(==(0.5f0), scnr[:, 1:24]) && all(isone, scnr[:, 25:48])
+end
+
+@testset "CO2 masks: latitude bands, surface masks from the annual-mean ice cover" begin
     f = ClimateFields()
     GREBClimate.apply_co2_mask!(LatitudeMask(:nh), f)
     @test all(==(0.5f0), f.co2_part[:, 1:24]) && all(isone, f.co2_part[:, 25:48])

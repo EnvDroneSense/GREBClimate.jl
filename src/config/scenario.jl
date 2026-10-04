@@ -88,7 +88,8 @@ end
 
 Where the scenario CO2 applies; elsewhere the cell gets half of it (the
 regional 2×CO2 experiments): [`UniformMask`](@ref), [`LatitudeMask`](@ref),
-[`SurfaceMask`](@ref).
+[`SurfaceMask`](@ref). A mask acts on the scenario only; the spin-up and the
+control run on the control CO2 everywhere.
 """
 abstract type CO2Mask end
 
