@@ -5,6 +5,8 @@ Notable changes to GREBClimate.jl, following
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-10-04
+
 ### Changed
 
 - A scenario with an `SSTOffset` (`:sst_plus1`) no longer allocates a copy of
@@ -13,13 +15,7 @@ Notable changes to GREBClimate.jl, following
   longer marked experimental. The contents of the observer's `view` are part
   of the interface from here on.
 
-### Removed
-
-- Seven fields of `CirculationWorkspace` that were written every step and read
-  by nothing: `qs`, `rq`, `Tskin`, `ws_base`, `cE_buf`, `temp_buf` and
-  `a_atmos_buf`. Results are bit-identical.
-
-### Fixed
+### Changes to model results
 
 - `:regional_co2_nh`, `:regional_co2_sh`, `:regional_co2_tropics` and
   `:regional_co2_extratropics` (any scenario with a `LatitudeMask`): the mask
@@ -29,6 +25,15 @@ Notable changes to GREBClimate.jl, following
   the scenario only, as in the original GREB code (`subroutine forcing`). **The
   results of these four presets change**: the response outside the band is
   much smaller than before. `SurfaceMask` presets are unaffected.
+
+### Removed
+
+- Seven fields of `CirculationWorkspace` that were written every step and read
+  by nothing: `qs`, `rq`, `Tskin`, `ws_base`, `cE_buf`, `temp_buf` and
+  `a_atmos_buf`. Results are bit-identical.
+
+### Fixed
+
 - `corrections = Stored()` without `jld2_dir` no longer zeroes the flux
   corrections that `load_greb_jld2!` put in `fields`: it runs on them. Before,
   such a run (for example `greb_model!(run, preset(:decon_mean_climate);
