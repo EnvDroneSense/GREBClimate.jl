@@ -71,9 +71,9 @@ end
 
 _latitude_mask!(co2_part, ::CO2Mask) = co2_part
 
-# The tropics band runs from 33.75 S to 30 N, as in the original code, which
-# also keeps the full CO2 at every fourth longitude of the outermost rows it
-# halves.
+# The tropics band runs from 33.75 S to 30 N, as in the original code. In the
+# two rows at the band edge that are halved, every fourth longitude keeps the
+# full CO2.
 const _TROPICS_SOUTH = -33.75f0
 const _TROPICS_NORTH = 30.0f0
 

@@ -114,6 +114,12 @@ end
     @test full(:sh) == lat[lat .< 0]
     @test full(:tropics) == lat[-33.75 .< lat .< 30]
     @test full(:extratropics) == lat[(lat .< -33.75) .| (lat .> 30)]
+    # Every fourth longitude of the two halved rows at the band edge keeps
+    # the full CO2
+    GREBClimate.apply_co2_mask!(LatitudeMask(:tropics), f)
+    @test findall(isone, f.co2_part[:, 15]) == 4:4:X && findall(isone, f.co2_part[:, 33]) == 4:4:X
+    GREBClimate.apply_co2_mask!(LatitudeMask(:extratropics), f)
+    @test findall(isone, f.co2_part[:, 16]) == 4:4:X && findall(isone, f.co2_part[:, 32]) == 4:4:X
 
     fields = ClimateFields()  # z_topo defaults to 0 everywhere -> land branch never fires
     icmn_ctrl = zeros(Float64, X, Y, 12)
