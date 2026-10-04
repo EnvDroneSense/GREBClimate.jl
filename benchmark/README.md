@@ -35,22 +35,31 @@ same-process comparison above.
 ## Profiling
 
 ```bash
-julia --project=. -t 1 benchmark/profile.jl step [jld2_dir] [--years=N] [--out=DIR]
+julia --project=. -t 1 benchmark/profile.jl step [jld2_dir] [--years=N] [--samples=N] [--out=DIR]
 ```
 
-`step` samples a control run of `:full_model` on the stored flux corrections
-(50 years by default, about 20 s and 10 000 samples) and writes three files to
+`step` samples control runs of `:full_model` on the stored flux corrections
+(`--years`, default 50), repeated until `--samples` samples are collected
+(default 10000, at most 8 runs), and writes five files to
 `benchmark/profiles/<date>-<commit>-step/`, which is gitignored:
 
-| File | Content |
-|:-----|:--------|
-| `header.txt` | Commit, Julia version, threads, years, elapsed time, sample count and interval |
-| `flat.txt` | Self time per frame, largest last |
-| `tree.txt` | The call tree from `greb_model!` down, rows below 0.1 percent left out |
+| File | Content | Read it for |
+|:-----|:--------|:------------|
+| `header.txt` | Commit, Julia version, threads, years, elapsed time, sample count and interval | Whether the run is usable |
+| `category.txt` | Samples per kind of cost, judged by the innermost frame: vectorized kernel, Base array access, package code, allocation and GC, copies, dispatch, compilation, waiting, I/O | What kind of time there is |
+| `owned.txt` | Samples per package function and per package line; a sample belongs to its innermost frame in `src/`, so library time is charged to the line that called it | Which line of the model owns the time |
+| `flat.txt` | Self time per frame, libraries included, largest last | The single hottest frames |
+| `tree.txt` | The call tree from `greb_model!` down, rows below 0.1 percent left out | The call path behind a row |
 
-Run it at `-t 1`: on Windows the sampler records the first thread only, so at
-`-t 2,0` one of the two `circulation!` calls is missing from the profile. A
-profile shows where the time goes; it does not show that a change is faster.
+| Rule | Why |
+|:-----|:----|
+| Run it at `-t 1` | On Windows the sampler records the first thread only, so at `-t 2,0` one of the two `circulation!` calls is missing |
+| Read the `+/-` column | It is one standard error. A row smaller than three of them, or a difference between two runs smaller than that, is noise |
+| A `@turbo` loop is one row | The whole loop is charged to its `@turbo for` line; lines inside it are not resolved |
+| A share is not a speed | A profile shows where the time goes. That a change is faster needs the same-process comparison above |
+
+The sampler's rate varies on this machine (2 to 13 ms per sample has been
+seen), which is why the run is repeated up to a sample target.
 
 ## Files
 
