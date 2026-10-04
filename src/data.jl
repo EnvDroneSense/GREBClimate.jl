@@ -23,15 +23,9 @@ const DATA_URL = "https://github.com/EnvDroneSense/GREBClimate.jl/releases/downl
                  "$DATA_RELEASE_TAG/$DATA_ARCHIVE_NAME"
 
 """
-SHA256 of `DATA_ARCHIVE_NAME`, 370563584 bytes.
-
-Reproducible: `tools/dataset/package_dataset.jl` builds the archive with sorted entries,
-zeroed owner/group, **pinned entry timestamps** and `gzip -n`, so the archive
-depends only on the dataset's contents. Regenerating the `.jld2` tree from the
-raw `.bin` files and repackaging reproduces this exact hash.
-
-(The timestamp pin matters: without it tar stored each file's mtime, so a
-regenerated-but-byte-identical dataset produced a different archive.)
+SHA256 of `DATA_ARCHIVE_NAME`, 370563584 bytes. `tools/dataset/package_dataset.jl`
+builds the archive reproducibly, so repackaging the same dataset gives this
+hash.
 """
 const DATA_SHA256 = "a9799ecb2e50d6f01517c69e2a7c6a8f646887123271d83eb3538990597f65c5"
 
@@ -40,8 +34,7 @@ The GREB input dataset (~353 MB download, ~439 MB unpacked).
 
 Derived from the input files of the original GREB model by Dietmar Dommenget
 and colleagues (Monash University), converted to JLD2. It combines fields from
-several upstream sources, each with its own terms of use and acknowledgement
-requirements:
+several upstream sources:
 
   NCEP/NCAR reanalysis      surface temperature, winds, humidity, soil moisture
   ERA-Interim (ECMWF)       surface temperature, winds, humidity, omega
@@ -64,8 +57,7 @@ Return the directory holding the JLD2 input dataset, resolving in this order:
 5. The `$DATA_DEP_NAME` DataDep - downloading it on first use, after asking.
 
 Pass `allow_download = false` to stop after step 4 and return `nothing` when no
-dataset is available locally. Test suites and benchmarks use this so that running
-them can never pull 353 MB over the network as a side effect.
+dataset is available locally.
 
 The result is a plain path, suitable for [`load_greb_jld2!`](@ref) and
 `greb_model!`'s `jld2_dir`:
@@ -92,8 +84,8 @@ function greb_data_dir(path::Union{Nothing,AbstractString} = nothing;
     local_dir = normpath(joinpath(@__DIR__, "..", "greb_input_data"))
     isdir(local_dir) && return local_dir
 
-    # An already-unpacked DataDep is just a directory on disk - usable even when
-    # downloading is forbidden.
+    # A dataset downloaded earlier is used even with `allow_download = false`:
+    # reading it needs no network.
     cached = _cached_datadep_path()
     cached === nothing || return cached
 
@@ -107,14 +99,10 @@ end
 """
     _cached_datadep_path() -> String or nothing
 
-Path to the already-downloaded dataset cache, or `nothing` if it is absent.
-
-DataDeps offers no public "is this already here?" query - `datadep"..."` and
-`resolve` both *fetch* when the data is missing, which is the opposite of what is
-wanted here. `try_determine_load_path` is the internal function that answers it
-without touching the network. It is wrapped in a `try` so that if a future
-DataDeps release renames or removes it, this degrades to "not cached" (and the
-normal download path still works) rather than erroring.
+Path of the already-downloaded dataset, or `nothing` if it is absent. Looks
+only, never downloads: the public DataDeps calls fetch missing data, so this
+uses the internal `DataDeps.try_determine_load_path`, and treats any error
+from it as "not cached".
 """
 function _cached_datadep_path()
     try

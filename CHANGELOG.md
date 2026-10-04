@@ -5,6 +5,20 @@ Notable changes to GREBClimate.jl, following
 
 ## [Unreleased]
 
+### Changed
+
+- The `observer` keyword of `greb_model!` and `GREBClimate.BudgetCheck` are no
+  longer marked experimental. The contents of the observer's `view` are part
+  of the interface from here on.
+
+### Fixed
+
+- Docstrings corrected: `CO2Table` lists the `:rcp85` key; `Hydrology`
+  describes `:skin_gust` as it is computed (no skin temperature);
+  `ClimateFields` no longer says one instance per run, and states that
+  all-zero fields give NaN output, not a 40 K world; `tendencies!` and
+  `mscm_hydrology` had a cut-off sentence and a missing separator.
+
 ## [2.0.0] - 2026-10-01
 
 ### Added

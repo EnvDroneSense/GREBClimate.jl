@@ -1,13 +1,7 @@
-# The net heat flux into the surface and into the atmosphere (W/m2): the sums
-# both the flux-correction spin-up and the run integrate, defined once so a new
-# term enters both.
-#
-# They are macros, not functions: a macro pastes the sum into each `@turbo`
-# loop, where a function call changes how the loop contracts `em * LW_surf`
-# into a fused multiply-add and so changes `Ta` in the last digit. The macros
-# read the flux arrays by name from the calling scope: `SW`, `LW_surf`,
-# `LW_down`, `Q_lat`, `Q_sens` for the surface; `LW_up`, `LW_down`, `em`,
-# `LW_surf`, `Q_lat_air`, `Q_sens` for the atmosphere.
+# The net heat flux into the surface and into the atmosphere (W/m2), defined
+# once for the flux-correction spin-up and the run. Macros, not functions: a
+# function call changes how `@turbo` contracts `em * LW_surf` and so changes
+# `Ta` in the last digit. They read the flux arrays by name from the caller.
 
 macro surface_flux(i, j)
     return esc(:(SW[$i, $j] + LW_surf[$i, $j] - LW_down[$i, $j] + Q_lat[$i, $j] + Q_sens[$i, $j]))
@@ -53,7 +47,7 @@ After the run it holds, over all steps and cells:
 | `humidity_low`, `humidity_high` | cells where the humidity change was limited |
 | `rain_limit` | cells where rain was set to the rain limit (`rain = :rh` only) |
 
-Experimental and not exported, like the `observer` keyword itself.
+Not exported: create it with `GREBClimate.BudgetCheck()`.
 """
 Base.@kwdef mutable struct BudgetCheck
     Ts::Matrix{Float32} = zeros(Float32, xdim, ydim)

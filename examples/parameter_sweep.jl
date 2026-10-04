@@ -1,9 +1,9 @@
 # =============================================================================
 # parameter_sweep.jl - CO2-concentration sensitivity sweep.
 #
-# Control held at the model's 340 ppm baseline; scenario phase run at each
-# level in co2_grid via :custom_co2. Records scenario-minus-control anomalies
-# in global-mean Ts, ice extent and precipitation.
+# Control at 280 ppm (the control CO2 of :custom_co2); scenario phase run at
+# each level in co2_grid. Records scenario-minus-control anomalies of Ts, ice
+# extent and precipitation as plain means over grid cells (not area-weighted).
 #
 # Run as script:  julia --project=. examples/parameter_sweep.jl [data_dir]
 # Or from REPL:   include("examples/parameter_sweep.jl"); parameter_sweep("data_dir")
@@ -18,7 +18,7 @@ using Statistics
     parameter_sweep(jld2_dir; co2_grid=default_co2_grid(), spinup=3, ctrl=5, scnr=100)
 
 Run the :custom_co2 experiment at each CO2 level (ppm) in `co2_grid`, with the
-control held at the model's 340 ppm baseline. Each grid point gets its own
+control at that preset's 280 ppm. Each grid point gets its own
 config/fields instance and CO2 table. Returns a Vector of
 (co2, Ts_anom, ice_anom, precip_anom) NamedTuples and writes
 examples/parameter_sweep_results.csv.
@@ -50,8 +50,8 @@ function parameter_sweep(jld2_dir::AbstractString;
     results = NamedTuple{(:co2, :Ts_anom, :ice_anom, :precip_anom),
                           Tuple{Float64,Float64,Float64,Float64}}[]
 
-    # :custom_co2's scenario clock starts at 1950 (src/core/model.jl:426) and
-    # advances 1 year per step, so the table needs an entry per scenario year.
+    # :custom_co2's scenario clock starts at 1950 and advances one year per
+    # simulated year, so the table needs an entry per scenario year.
     years = 1950:(1950 + scnr - 1)
 
     mktempdir() do tmpdir

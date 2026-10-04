@@ -45,18 +45,18 @@ on a `:full_model` control run against the real dataset:
 
 | | healthy | ran on a zero climatology |
 |---|---|---|
-| the model's own printed line | `1970  13.82  26.79  4.85` | `1970  -233.15  -233.15  -233.15` |
-| `mean(result.ctrl[1].Ts)` | 276.94 K | 40.0 K |
+| the model's own printed line | `1970  13.82  26.79  4.85` | `1970  NaN  NaN  NaN` |
+| `mean(result.ctrl[1].Ts)` | 276.94 K | NaN |
 
 These are the numbers of `preset(:full_model)` with its default `SpinUp(3)`,
 measured 2026-09-29 for v1.0.1 and unchanged since. The earlier default (stored
 flux corrections, no spin-up) gave `1970  14.43 ...` and 276.64 K: the control
 ran on corrections that do not fit this configuration and drifted warm. A healthy line above 14 °C now means the spin-up did not run.
 
-The degenerate column dates from 2026-08-22 (`dfc9797`), when `min_T_K` went
-from 233.15 K (−40 °C, a physical floor that was silently clamping real
-Antarctic/Siberian winter cells) to 40 K, a pure numerical-stability floor:
-the degenerate world pins at 40 K, not 233.15 K.
+The degenerate column was re-measured 2026-10-07: a run on all-zero fields
+(`allow_uninitialized=true`) returns NaN everywhere, because a zero mixed-layer
+depth makes the surface heat capacity zero. Earlier versions of this table
+said it pinned at the 40 K floor; the healthy column was confirmed the same day.
 
 (The printed 13.82 °C and the 276.94 K array mean are different quantities —
 the printout is the model's own global/land/ocean summary, the other is an

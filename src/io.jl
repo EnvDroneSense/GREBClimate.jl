@@ -218,7 +218,7 @@ function load_greb_jld2!(jld2_dir::String; dataset::Symbol=:ncep)
         )
     )
 
-    # Use mixed dataset as fallback
+    # An unknown `dataset` falls back to the NCEP files
     files = get(file_map, dataset, file_map[:ncep])
 
     println("📂 Loading 3D climatology ($dataset dataset)...")

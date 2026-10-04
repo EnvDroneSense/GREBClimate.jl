@@ -1,9 +1,7 @@
 # Physics kernels: tendencies!, hydro!, SWradiation!, diffusion/advection/circulation.
 
 @testset "tendencies! Q_sens honors the atmosphere switch" begin
-    # Q_sens = ct_sens * (Ta - Ts) is checkable directly against a
-    # hand-computed value without reimplementing the rest of the
-    # physics pipeline.
+    # Q_sens = ct_sens * (Ta - Ts), checked against a hand-computed value.
     fields = ClimateFields()
     state = ModelState()
     ws = CirculationWorkspace()

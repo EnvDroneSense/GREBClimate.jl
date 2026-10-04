@@ -4,9 +4,9 @@
 """
     forcing(it, year, r::ResolvedConfig) -> (CO2, sw_solar_forcing)
 
-The scenario's CO₂ (ppm) and solar multiplier at scenario step `it` in
-calendar `year`, from its [`CO2Path`](@ref) and [`Solar`](@ref) parts. CO₂ is
-0 with `Processes(co2 = false)`. Pure: where the CO₂ applies is set once per
+The scenario's CO2 (ppm) and solar multiplier at scenario step `it` in
+calendar `year`, from its [`CO2Path`](@ref) and [`Solar`](@ref) parts. CO2 is
+0 with `Processes(co2 = false)`. Pure: where the CO2 applies is set once per
 run by `apply_co2_mask!` and `apply_dynamic_co2_mask!`.
 """
 function forcing(it, year, r::ResolvedConfig)
@@ -57,7 +57,7 @@ _solar_factor(s::EarthSunDistance, year) = (1.0f0 / (1.0f0 + 0.01f0 * s.pct))^2
 """
     apply_co2_mask!(mask::CO2Mask, fields::ClimateFields)
 
-Sets `fields.co2_part`, the fraction of the scenario CO₂ each cell gets: 1
+Sets `fields.co2_part`, the fraction of the scenario CO2 each cell gets: 1
 everywhere, then 0.5 outside a [`LatitudeMask`](@ref) band. A
 [`SurfaceMask`](@ref) needs the control run's ice cover and is set later by
 `apply_dynamic_co2_mask!`.
@@ -97,7 +97,7 @@ end
     apply_dynamic_co2_mask!(mask::CO2Mask, fields::ClimateFields, icmn_ctrl)
 
 Sets `fields.co2_part` for a [`SurfaceMask`](@ref) from the control run's
-annual-mean ice cover `icmn_ctrl`: `:ocean` halves CO₂ over land and over ice,
+annual-mean ice cover `icmn_ctrl`: `:ocean` halves CO2 over land and over ice,
 `:land_ice` halves it over ice-free ocean. A no-op for every other mask.
 """
 apply_dynamic_co2_mask!(::CO2Mask, fields::ClimateFields, icmn_ctrl) = nothing
@@ -111,7 +111,7 @@ function apply_dynamic_co2_mask!(mask::SurfaceMask, fields::ClimateFields, icmn_
     icmn_ctrl1 = dropdims(sum(icmn_ctrl, dims=3), dims=3) ./ size(icmn_ctrl, 3)
 
     if mask.surface === :ocean
-        # 2×CO₂ ocean only: halve CO₂ over land, and over annual-mean ice.
+        # 2×CO2 ocean only: halve CO2 over land, and over annual-mean ice.
         for j in 1:ydim, i in 1:xdim
             if is_land(z_topo[i, j])
                 co2_part[i, j] = 0.5f0
@@ -123,7 +123,7 @@ function apply_dynamic_co2_mask!(mask::SurfaceMask, fields::ClimateFields, icmn_
             end
         end
     else
-        # 2×CO₂ land/ice only: halve CO₂ over ocean, then exempt annual-mean ice.
+        # 2×CO2 land/ice only: halve CO2 over ocean, then exempt annual-mean ice.
         for j in 1:ydim, i in 1:xdim
             if !is_land(z_topo[i, j])
                 co2_part[i, j] = 0.5f0

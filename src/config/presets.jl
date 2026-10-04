@@ -91,11 +91,9 @@ The names [`preset`](@ref) accepts, sorted.
 """
 preset_names() = sort!(collect(keys(_PRESET_SCENARIOS)))
 
-# Presets whose physics differs from the default Config. The deconstruction
-# switches were designed for the MSCM physics; with the fitted rain scheme and
-# moisture convergence a switched-off process can make the run diverge.
-# Mean-climate deconstruction also runs on the stored corrections, so a
-# switched-off process changes the climate instead of being corrected away.
+# Presets whose physics differs from the default Config (see `preset`). With
+# the fitted rain scheme and moisture convergence a switched-off process can
+# make a deconstruction run diverge.
 const _PRESET_PHYSICS = Dict{Symbol,NamedTuple}(
     :decon_mean_climate => (processes=Processes(moisture_convergence=false),
                             hydrology=mscm_hydrology(), corrections=Stored()),
@@ -112,14 +110,14 @@ The [`Config`](@ref) of a named experiment ([`preset_names`](@ref) lists them).
 [`Hydrology`](@ref) replaces them. `index` selects the table row of
 `:obliquity`/`:eccentricity` (default: the row nearest today, see
 [`SolarTable`](@ref)), `pct` the distance change of `:earth_sun_distance`,
-`path` the CO₂ file of `:custom_co2`.
+`path` the CO2 file of `:custom_co2`.
 
 Every preset runs the default physics with a 3-year [`SpinUp`](@ref), except
 the two deconstructions, which run the MSCM physics ([`mscm_hydrology`](@ref),
 `moisture_convergence = false`) their switches were designed for.
 `:decon_mean_climate` (mean-climate deconstruction; run it with
 `RunSpec(scnr = 0)`) also takes the [`Stored`](@ref) corrections, so a
-switched-off process changes the climate. `:decon_2xco2` is the 2×CO₂-response
+switched-off process changes the climate. `:decon_2xco2` is the 2×CO2-response
 deconstruction.
 
 ```jldoctest

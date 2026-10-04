@@ -36,7 +36,7 @@ function time_1yr(jld2_dir::AbstractString; cfg=preset(:full_model; corrections=
 
     times = Float64[]
     for r in 1:reps
-        fields_r = deepcopy(fields)  # the model mutates fields
+        fields_r = deepcopy(fields)  # a fresh copy per repetition
         t = @elapsed redirect_stdout(devnull) do
             greb_model!(RunSpec(scnr=0), cfg; jld2_dir=jld2_dir, fields=fields_r)
         end
@@ -78,7 +78,7 @@ function time_years(jld2_dir::AbstractString; experiment::Symbol=:full_model,
 
     times = Float64[]
     for r in 1:reps
-        fields_r = deepcopy(fields)  # the model mutates fields
+        fields_r = deepcopy(fields)  # a fresh copy per repetition
         t = @elapsed redirect_stdout(devnull) do
             greb_model!(RunSpec(ctrl=ctrl, scnr=scnr), cfg; jld2_dir=jld2_dir, fields=fields_r)
         end

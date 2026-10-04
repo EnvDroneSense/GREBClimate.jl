@@ -14,7 +14,9 @@ Computes latent heat flux and evaporation/rain tendencies. `h.evaporation`
 selects the evaporation scheme; `h.rain` and its coefficients
 (`c_q`/`c_rq`/`c_omega`/`c_omegastd`) the rain regression. Returns zeros
 without an atmosphere or with `p.hydrology` other than `:full`.
-Returns `(Q_lat, Q_lat_air, dq_eva, dq_rain)`.
+Returns `(Q_lat, Q_lat_air, dq_eva, dq_rain)`. The saturation formula is not
+finite for `Ts` at or below 38.975 K; a run stays above it through the 40 K
+floor.
 """
 function hydro!(Ts, q, fields::ClimateFields, timestate, p::Processes, h::ResolvedHydrology, ws::CirculationWorkspace)
     c_q = h.c_q

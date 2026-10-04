@@ -1,7 +1,7 @@
 """
     init_model!(r::ResolvedConfig, fields::ClimateFields)
 
-One-time per-run setup: sets the CO₂ mask, applies the climatologies the
+One-time per-run setup: sets the CO2 mask, applies the climatologies the
 [`Processes`](@ref) options replace (flat topography, cloud cover, humidity,
 mixed layer) and zeroes the flux corrections for `NoCorrections()`, derives
 the fields that follow from them ([`derive_fields!`](@ref)), then computes the
@@ -58,14 +58,14 @@ function init_model!(r::ResolvedConfig, fields::ClimateFields)
     To_ini = fields.Toclim[:, :, nstep_yr] |> copy  # deep ocean temperature
     q_ini = fields.qclim[:, :, nstep_yr] |> copy    # atmospheric water vapor
 
-    # ── Control CO₂ level ───────────────────────────────────────
+    # ── Control CO2 level ───────────────────────────────────────
     CO2_ctrl = p.co2 ? r.config.scenario.control_co2 : 0.0f0
 
     return (Ts_ini=Ts_ini, Ta_ini=Ta_ini, To_ini=To_ini,
         q_ini=q_ini, CO2_ctrl=CO2_ctrl)
 end
 
-# Boundary climatologies that a BoundaryAnomaly perturbs at scenario start
+"The climatologies a [`BoundaryAnomaly`](@ref) adds its anomalies to at scenario start."
 const _BOUNDARY_FIELDS = (:Tclim, :uclim, :vclim, :omegaclim, :wsclim)
 
 _apply_boundary_anomalies!(::SurfaceForcing, fields::ClimateFields) = fields
@@ -84,11 +84,15 @@ function _apply_boundary_anomalies!(b::BoundaryAnomaly, fields::ClimateFields)
     return fields
 end
 
-# Arrays of `fields` a run overwrites in place, restored by `greb_model!`: the
-# solar table (orbital swaps), the flux corrections (spin-up, file load or
-# zeroing), the boundary climatologies (scenario anomalies) and the
-# climatologies the Processes options replace in `init_model!`. Everything
-# else `init_model!` writes is derived from these.
+"""
+    _mutated_fields(c::Config) -> Vector{Symbol}
+
+The arrays of `fields` a run of `c` overwrites and [`greb_model!`](@ref)
+restores: the solar table, the flux corrections, the boundary climatologies
+(for a [`BoundaryAnomaly`](@ref)) and the climatologies the
+[`Processes`](@ref) options replace. Everything else `init_model!` writes is
+derived from these.
+"""
 function _mutated_fields(c::Config)
     p = c.processes
     names = [:sw_solar, :TF_correct, :qF_correct, :ToF_correct]
@@ -106,7 +110,7 @@ end
 Runs `years` years of `tendencies!` to derive the ocean/atmosphere flux
 corrections (`fields.TF_correct`/`qF_correct`/`ToF_correct`) that make the
 control climate match observed climatology. Mutates `Ts`/`Ta`/`q`/`To` in
-place as it integrates. `ws_a`/`ws_q` are forwarded to [`tendencies!`](@ref)
+place as it integrates. `ws_a`/`ws_q` are forwarded to [`tendencies!`](@ref).
 """
 function qflux_correction!(CO2_ctrl, Ts, Ta, q, To, fields::ClimateFields, state::ModelState, timestate, r::ResolvedConfig, ws::CirculationWorkspace, years;
     ws_a::CirculationWorkspace=ws, ws_q::CirculationWorkspace=ws)
@@ -118,7 +122,6 @@ function qflux_correction!(CO2_ctrl, Ts, Ta, q, To, fields::ClimateFields, state
 
         tend = tendencies!(CO2_ctrl, Ts, Ta, To, q, fields, state, ws, timestate, r; ws_a=ws_a, ws_q=ws_q)
 
-        # Views into climatology & correction fields
         Tc = @view fields.Tclim[:, :, ityr]
         Toc = @view fields.Toclim[:, :, ityr]
         qc = @view fields.qclim[:, :, ityr]
@@ -160,7 +163,6 @@ function qflux_correction!(CO2_ctrl, Ts, Ta, q, To, fields::ClimateFields, state
         # Sea ice (updates cap_surf in place)
         seaice!(ws.Ts0_buf, fields, timestate, r.config.processes)
 
-        # Diagnostics
         surf = SurfaceState(ws.Ts0_buf, ws.Ta0_buf, ws.To0_buf, ws.q0_buf)
         diagnostics!(it, 0.0, CO2_ctrl, surf, tend, fields, state, timestate)
 
@@ -178,30 +180,26 @@ end
                 allow_uninitialized=false, observer=nothing)
     greb_model!(run::RunSpec, r::ResolvedConfig; ...)
 
-Run `config`: the flux corrections its `corrections` ask for (a
-[`SpinUp`](@ref) of its own length, the [`Stored`](@ref) ones, or none), a
-control run of `run.ctrl` years and a scenario run of `run.scnr` years.
-Returns `(ctrl, scnr)`, vectors of [`MonthlyRecord`](@ref); `scnr` is the
-anomaly against the control's final year when the scenario's `output` is
-`:anomaly`. A `Config` is [`resolve`](@ref)d first, reading its tables from
-`jld2_dir`.
+Run `config`: its flux corrections (a [`SpinUp`](@ref), the [`Stored`](@ref)
+ones, or none), a control run of `run.ctrl` years and a scenario run of
+`run.scnr` years. Returns `(ctrl, scnr)`, vectors of [`MonthlyRecord`](@ref);
+`scnr` is the anomaly against the control's final year when the scenario's
+`output` is `:anomaly`.
 
-`fields` holds the loaded climatology/grid/flux-correction state (see
-[`ClimateFields`](@ref), built by [`load_greb_jld2!`](@ref)). The run changes
-`fields` while it runs (flux corrections, scenario anomalies, the
-climatologies the [`Processes`](@ref) options replace) and restores them when
-it returns, so one loaded `fields` can be passed to several runs.
+| Keyword | Meaning |
+|:--------|:--------|
+| `jld2_dir` | The dataset directory. A `Config` is [`resolve`](@ref)d from it, and the run reads stored corrections and anomaly fields from it |
+| `fields` | The loaded [`ClimateFields`](@ref) (from [`load_greb_jld2!`](@ref)). The run restores the input fields it changes when it returns, so one instance can be passed to several runs |
+| `allow_uninitialized` | Accept all-zero `fields`; for precompilation and tests |
+| `observer` | A function `observer(point, view)`, called twice per control and scenario step |
 
-`observer` (experimental: what it is handed can change in any release) is a
-function `observer(point, view)` the control and scenario runs call twice per
-timestep: at `:after_tendencies`, when the step's flows are known and the
-state is still the old one, and at `:after_step`, when the state is updated.
+The observer is called at `:after_tendencies` (the step's flows are known,
+the state is still the old one) and at `:after_step` (the state is updated).
 `view` is a `NamedTuple` with `phase` (`:ctrl` or `:scnr`), `it`, `year`,
 `ityr`, `CO2`, the state `Ts`, `Ta`, `To`, `q`, the flows `tend` (what
 [`tendencies!`](@ref) returns), `fields` and `config`. These are the model's
-own arrays: read them, copy what must outlast the call, and do not write to
-them. The flux-correction spin-up does not call it. `GREBClimate.BudgetCheck`
-is an observer that checks the step's bookkeeping.
+own arrays: read or copy them, do not write to them. The spin-up does not
+call the observer. `GREBClimate.BudgetCheck` is one.
 """
 greb_model!(run::RunSpec, config::Config; jld2_dir::AbstractString="", kwargs...) =
     greb_model!(run, resolve(config; jld2_dir); jld2_dir, kwargs...)
@@ -256,7 +254,6 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     ws_q = CirculationWorkspace()
     acc = MonthlyAccumulator()
 
-    # Initialize time state
     timestate = TimeState(1, 1)
 
     # ── 2. Flux-correction spin-up ──────────────────────────────
@@ -290,7 +287,7 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
 
     ctrl_output = MonthlyRecord[]
     sizehint!(ctrl_output, time_ctrl * 12)  # Pre-allocate for all months
-    timestate = TimeState(1, 1)  # Initialize time state
+    timestate = TimeState(1, 1)
 
     for it in 1:(time_ctrl*nstep_yr)
         (mon, irec) = time_loop!(it, year, CO2_ctrl, mon, irec,
@@ -326,7 +323,7 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     irec = 0
 
     state.sw_solar_forcing = 1.0f0
-    reset!(acc)  # Use accumulator reset
+    reset!(acc)
 
     scnr_output = MonthlyRecord[]
     if time_scnr > 0
@@ -334,7 +331,6 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     end
 
     for it in 1:(time_scnr*nstep_yr)
-        # Obtain forcing (CO2 and solar multiplier)
         forcing_result = forcing(it, year, r)
         CO2 = forcing_result.CO2
         state.sw_solar_forcing = forcing_result.sw_solar_forcing

@@ -26,7 +26,7 @@ function diagnostics!(it, year, CO2, surf::SurfaceState, tend, fields::ClimateFi
         global_mean = sum(state.Tsmn[i, j] * dxlat_grid[j] for i in 1:xdim, j in 1:ydim) /
                       (xdim * sum(dxlat_grid)) - 273.15f0
         point1 = state.Tsmn[48, 27] - 273.15f0   # Tropical Pacific
-        point2 = state.Tsmn[16, 38] - 273.15f0   # Hamburg/North Europe
+        point2 = state.Tsmn[16, 38] - 273.15f0   # 58 E, 51 N
 
         println(year, "  ", round(global_mean, digits=2),
             "  ", round(point1, digits=2),

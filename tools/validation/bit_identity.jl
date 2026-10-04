@@ -2,7 +2,7 @@
 #
 # MAINTAINER TOOL - not part of the package. Needs the local dataset.
 #
-# Runs every experiment preset, plus one case with switches off, and saves every
+# Runs every experiment preset, plus two cases with switches off, and saves every
 # monthly record field of the control and scenario runs; after a change, runs
 # them again and compares with exact equality (NaN equals NaN). A refactor that
 # claims "no change to results" must report 0 differing values here. A snapshot

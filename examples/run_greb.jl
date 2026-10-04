@@ -1,13 +1,12 @@
 # =============================================================================
-# run_greb.jl - plain-Julia driver reproducing the GREB_explorer.jl notebook flow
-# on top of the extracted `GREBClimate` package (no Pluto / no @bind widgets).
-#
-# Mirrors the notebook's non-interactive path:
-#   1. load JLD2 input data        (notebook data-loading cell)
-#   2. build a Config              (replaces `current_physics_config()` widgets)
-#   3. run the model               (replaces the `run_toggle` execute cell)
-#   4. print a summary             (the notebook's diagnostics cell)
-#   5. plot global-mean Ts          (the notebook's plotting cell)
+# run_greb.jl - a plain-Julia run of the model:
+#   1. load JLD2 input data
+#   2. build a Config
+#   3. run the model
+#   4. print a summary
+#   5. plot the mean Ts
+# The means printed and plotted here are plain means over grid cells, not
+# area-weighted, so they read colder than the model's own global mean.
 #
 # Two ways to run:
 #   * as a script:  julia --project=. examples/run_greb.jl [path/to/greb_input_data]

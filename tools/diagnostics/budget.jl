@@ -1,6 +1,6 @@
 # Energy and water bookkeeping of one run, from the per-step observer.
 #
-#   julia --project=. -t 2 tools/diagnostics/budget.jl [preset] [years]
+#   julia --project=. -t 2,0 tools/diagnostics/budget.jl [preset] [years]
 #
 # Runs `preset` (default full_model) on the stored flux corrections for
 # `years` (default 1) of control and scenario and prints, per phase:

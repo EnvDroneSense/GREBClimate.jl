@@ -21,7 +21,7 @@ climatologies.
 | `hydrology` | `:full`, `:no_evap_rain`, `:none` | No evaporation and rain; or no water cycle at all (humidity 0, not updated) |
 | `ocean` | `:full`, `:mixed_layer`, `:none` | A 50 m mixed layer without deep ocean; or land heat capacity everywhere |
 | `topography` | `:observed`, `:flat` | Topography capped at 1 m |
-| `co2` | `true`, `false` | CO₂ 0 ppm in the control and the scenario |
+| `co2` | `true`, `false` | CO2 0 ppm in the control and the scenario |
 | `ice_albedo` | `true`, `false` | No ice-albedo feedback |
 | `transport` | `true`, `false` | No atmospheric heat and moisture transport |
 | `heat_diffusion`, `heat_advection`, `vapour_diffusion`, `vapour_advection`, `moisture_convergence` | `true`, `false` | The single transport term switched off |
@@ -65,9 +65,9 @@ et al. (2019); [`mscm_hydrology`](@ref) gives the original GREB scheme.
 
 | Keyword | Values |
 |:--------|:-------|
-| `rain` | `:fitted` (Stassen et al. 2019), `:original` (proportional to humidity), `:rh` (+ relative humidity, with a rain-rate limit), `:omega` (+ vertical velocity), `:rh_omega` |
+| `rain` | `:fitted` (Stassen et al. 2019), `:original` (proportional to humidity), `:rh` (+ relative humidity, with a minimum rain rate), `:omega` (+ vertical velocity), `:rh_omega` |
 | `rain_fit` | `:era`, `:ncep`: which reanalysis the `:fitted` coefficients were fitted to; only for `rain = :fitted` |
-| `evaporation` | `:original` (climatological wind plus a fixed gust term), `:skin` (skin temperature, land/ocean exchange coefficients), `:original_gust`, `:skin_gust` (the same with modified gust terms) |
+| `evaporation` | `:original` (climatological wind plus a fixed gust term), `:skin` (skin temperature, land/ocean exchange coefficients), `:original_gust` (`:original` with larger gust terms and land/ocean coefficients), `:skin_gust` (wind-speed climatology with its own gust terms and land/ocean coefficients; no skin temperature) |
 """
 struct Hydrology
     rain::Symbol
@@ -87,7 +87,7 @@ end
 """
     mscm_hydrology()
 
-The original GREB hydrology`Hydrology(rain = :original, evaporation = :original)`. 
+The original GREB hydrology: `Hydrology(rain = :original, evaporation = :original)`.
 Reproducing MSCM also needs `Processes(moisture_convergence = false)`.
 """
 mscm_hydrology() = Hydrology(rain=:original, evaporation=:original)
@@ -111,7 +111,8 @@ abstract type Corrections end
     SpinUp(years)
 
 Compute the flux corrections in a spin-up of `years` years before the control
-run.
+run. `SpinUp(0)` runs no spin-up and uses whatever corrections `fields`
+already holds.
 """
 struct SpinUp <: Corrections
     years::Int
