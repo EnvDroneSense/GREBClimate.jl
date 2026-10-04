@@ -47,7 +47,7 @@ function load_solar_forcing_jld2(jld2_dir::String, forcing_type::Symbol, index::
         result = read_jld2(filepath)
         values = Int.(result.coords[1])
         pos = findfirst(==(index), values)
-        @assert pos !== nothing "Eccentricity index $index not found in $(values)"
+        pos === nothing && throw(ArgumentError("eccentricity index $index is not in the table; available: $(values)"))
         return result.data[pos, :, :]
 
     elseif forcing_type == :obliquity
@@ -55,7 +55,7 @@ function load_solar_forcing_jld2(jld2_dir::String, forcing_type::Symbol, index::
         result = read_jld2(filepath)
         values = Int.(result.coords[1])
         pos = findfirst(==(index), values)
-        @assert pos !== nothing "Obliquity index $index not found in $(values)"
+        pos === nothing && throw(ArgumentError("obliquity index $index is not in the table; available: $(values)"))
         return result.data[pos, :, :]
 
     else
@@ -271,7 +271,8 @@ function load_greb_jld2!(jld2_dir::String; dataset::Symbol=:ncep)
     solar_path = joinpath(jld2_dir, "solar", "solar_radiation.clim.jld2")
     if isfile(solar_path)
         solar_result = read_jld2(solar_path)
-        @assert size(solar_result.data) == (ydim, nstep_yr) "Wrong solar dimensions"
+        size(solar_result.data) == (ydim, nstep_yr) ||
+            error("$solar_path holds a $(size(solar_result.data)) table, expected ($ydim, $nstep_yr)")
         fields.sw_solar .= solar_result.data
     else
         error("Solar radiation file not found: $solar_path")

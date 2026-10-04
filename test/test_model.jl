@@ -203,6 +203,9 @@ end
             @test size(table) == (Y, N)
             @test all(==(999.0f0), table)
         end
+        # An orbital index that is not in the table
+        @test_throws ArgumentError load_solar_forcing_jld2(dir, :obliquity, 7)
+        @test_throws ArgumentError load_solar_forcing_jld2(dir, :eccentricity, 7)
 
         cfg = preset(:obliquity; index = 0, corrections = NoCorrections())
         @test all(==(999.0f0), at_first_step(v -> copy(v.fields.sw_solar), RunSpec(ctrl = 0, scnr = 1), cfg; jld2_dir = dir))

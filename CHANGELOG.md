@@ -35,6 +35,10 @@ Notable changes to GREBClimate.jl, following
 - Several `greb_model!` runs in parallel tasks no longer fail with a JLD2
   error (`InvalidDataException`, `EOFError`) when they read dataset files at
   the same time: the loaders take a lock around each file open.
+- `load_solar_forcing_jld2` with an orbital `index` that is not in the table
+  raises an `ArgumentError` listing the available ones, and `load_greb_jld2!`
+  raises an error naming the file when the solar table has the wrong shape.
+  Both were `@assert`s, which Julia may skip.
 - Docstrings corrected: `CO2Table` lists the `:rcp85` key; `Hydrology`
   describes `:skin_gust` as it is computed (no skin temperature);
   `ClimateFields` no longer says one instance per run, and states that
