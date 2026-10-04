@@ -125,24 +125,6 @@ end
     @test_throws ErrorException hydro!(Ts, q, ClimateFields(), TimeState(1, 1), Processes(), h, CirculationWorkspace())
 end
 
-@testset "hydro! :original_gust evaporation: latent heat flux over land and ocean" begin
-    r = resolve(preset(:full_model; hydrology = (evaporation = :original_gust,)))
-    Ts = fill(290.0f0, GREBClimate.xdim, GREBClimate.ydim)
-    q = fill(0.008f0, GREBClimate.xdim, GREBClimate.ydim)
-    ts = TimeState(1, 1)
-
-    for (topo, gust, coeff) in ((1.0, 4.0 + 144.0, 0.04), (-1.0, 9.0 + 50.41, 0.73))
-        fields = constant_fields(z_topo = topo)
-        init_model!(r, fields)
-        ws = CirculationWorkspace()
-        result = hydro!(Ts, q, fields, ts, Processes(), r.hydrology, ws)
-
-        qs = 3.75e-3 * exp(17.08085 * (290.0 - 273.15) / (290.0 - 273.15 + 234.175)) * fields.wz_air[1, 1]
-        expected = (q[1, 1] - qs) * sqrt(gust) * GREBClimate.cq_latent * GREBClimate.ρ_air * coeff * GREBClimate.ce * 1.0
-        @test isapprox(result.Q_lat[1, 1], expected; rtol = 1e-5)
-    end
-end
-
 @testset "hydro! fitted rain: dq_rain and Q_lat_air values, with no limit on rain" begin
     fields = constant_fields(z_topo = 1.0)
     init_model!(resolve(preset(:full_model)), fields)
@@ -161,7 +143,7 @@ end
     @test isapprox(result.Q_lat_air[1, 1], -expected_dq_rain * GREBClimate.cq_latent * GREBClimate.r_qviwv; rtol = 1e-5)
 end
 
-@testset "hydro! evaporation: latent heat flux of :original, :skin and :skin_gust over land and ocean" begin
+@testset "hydro! evaporation: latent heat flux of the four schemes over land and ocean" begin
     G = GREBClimate
     Ts = fill(290.0f0, X, Y)
     q = fill(0.008f0, X, Y)
@@ -171,11 +153,13 @@ end
         fields = constant_fields(z_topo = land ? 1.0 : -1.0, swet = 0.4, u = 3.0, v = 4.0, ws = 6.0)
         G.derive_fields!(fields, Processes())
         wz = fields.wz_air[1, 1]
-        # :original uses the wind components, the other two the wind-speed
-        # climatology; :skin takes the saturation humidity 5 K (land) or 1 K
-        # (ocean) above the surface temperature
+        # :original and :original_gust use the wind components, the other
+        # two the wind-speed climatology; :skin takes the saturation humidity
+        # 5 K (land) or 1 K (ocean) above the surface temperature
         expected = (
             original = (0.008 - qsat(290, wz)) * sqrt(25 + (land ? 4 : 9)) * bulk * 0.4,
+            original_gust = (0.008 - qsat(290, wz)) * sqrt(25 + (land ? 4 + 144 : 9 + 50.41)) *
+                            bulk * (land ? 0.04 : 0.73) * 0.4,
             skin = (0.008 - qsat(290 + (land ? 5 : 1), wz)) * sqrt(36 + (land ? 132.25 : 29.16)) *
                    bulk * (land ? 0.25 : 0.58) * 0.4,
             skin_gust = (0.008 - qsat(290, wz)) * sqrt(36 + (land ? 81 : 16)) * bulk * (land ? 0.56 : 0.79) * 0.4,
