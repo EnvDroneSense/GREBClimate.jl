@@ -5,6 +5,25 @@ Notable changes to GREBClimate.jl, following
 
 ## [Unreleased]
 
+### Added
+
+- `load_greb_jld2!(dir; corrections = false)` loads a dataset without the
+  stored flux corrections; the correction arrays stay zero.
+
+### Changed
+
+- **Breaking:** the RCP6.0 CO2 table is `CO2Table(:rcp60)`, the name of its
+  preset. `load_co2_scenario_jld2(dir, :rcp6)`, and so a `CO2Table(:rcp6)` run, raise an
+  `ArgumentError`. The `:rcp60` preset is unchanged.
+- `load_greb_jld2!` and `load_flux_corrections_jld2!` raise an `ArgumentError`
+  when `climatology/flux_corrections.jld2` or one of its three tables is
+  missing. They used to fill the corrections with zeros and warn. For a
+  dataset without the file, pass `corrections = false`.
+- A `BoundaryAnomaly` scenario (`:rcp85_boundary`, `:elnino`, `:lanina`) reads
+  its anomaly files once per `ClimateFields`: a later run on the same fields,
+  directory and source reuses the arrays. `ClimateFields` has two new fields
+  for this, `anom_cc_source` and `anom_enso_source`. Results are unchanged.
+
 ## [2.0.1] - 2026-10-04
 
 ### Changed

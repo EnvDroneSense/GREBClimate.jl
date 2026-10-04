@@ -62,7 +62,7 @@ const _PRESET_SCENARIOS = Dict{Symbol,Scenario}(
     :rcp85 => Scenario(; co2=CO2Table(:rcp85), _TABLE...),
     :rcp26 => Scenario(; co2=CO2Table(:rcp26), _TABLE...),
     :rcp45 => Scenario(; co2=CO2Table(:rcp45), _TABLE...),
-    :rcp60 => Scenario(; co2=CO2Table(:rcp6), _TABLE...),
+    :rcp60 => Scenario(; co2=CO2Table(:rcp60), _TABLE...),
     :ssp119 => Scenario(; co2=CO2Table(:ssp119), _TABLE...),
     :ssp126 => Scenario(; co2=CO2Table(:ssp126), _TABLE...),
     :ssp245 => Scenario(; co2=CO2Table(:ssp245), _TABLE...),

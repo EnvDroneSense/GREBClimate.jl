@@ -234,11 +234,13 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     state = ModelState()
 
     # ── 1. Initialisation ───────────────────────────────────────
+    # The anomaly files are read once per `fields`, directory and source
     if is_forced_boundary
-        if s.surface.source === :cmip5_rcp85
-            load_cc_anomaly_jld2!(String(jld2_dir), fields)
+        dir, source = String(jld2_dir), s.surface.source
+        if source === :cmip5_rcp85
+            fields.anom_cc_source == dir || load_cc_anomaly_jld2!(dir, fields)
         else
-            load_enso_anomaly_jld2!(String(jld2_dir), fields, s.surface.source)
+            fields.anom_enso_source == (dir, source) || load_enso_anomaly_jld2!(dir, fields, source)
         end
     end
 

@@ -219,6 +219,11 @@ Base.@kwdef mutable struct ClimateFields
     # Regional CO2 mask (1.0 = full CO2, 0.5 = half CO2)
     co2_part::Matrix{Float32} = ones(Float32, xdim, ydim)
 
+    # Where the anomaly arrays were loaded from: the directory (RCP8.5), and the
+    # directory and the event (ENSO). Set by the two anomaly loaders.
+    anom_cc_source::String = ""
+    anom_enso_source::Tuple{String,Symbol} = ("", :none)
+
     # false for a bare `ClimateFields()`; set by `load_greb_jld2!`. See the
     # docstring above and `greb_model!`'s `allow_uninitialized` keyword.
     loaded::Bool = false

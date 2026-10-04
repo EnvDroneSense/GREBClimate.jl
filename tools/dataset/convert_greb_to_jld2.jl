@@ -181,7 +181,7 @@ function convert_flux_corrections(input_path::String, output_dir::String)
                 file[name] = arr
                 println("  ✓ $name → combined")
             else
-                println("  ⚠ $name.bin not found - omitted (load_flux_corrections_jld2! will zero-fill)")
+                println("  ⚠ $name.bin not found - omitted; load_greb_jld2! needs it")
             end
         end
     end

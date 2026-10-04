@@ -156,11 +156,16 @@ end
                     :ssp119 => 300.0, :ssp126 => 301.0, :ssp245 => 302.0,
                     :ssp460 => 303.0, :ssp585 => 304.0, :historical_co2 => 280.73)
     key(p) = preset(p).scenario.co2.key
+    on_disk(p) = p === :rcp60 ? "rcp6" : string(key(p))   # the dataset's name for RCP6.0
     with_tempdir() do dir
-        write_ipcc_scenarios(dir, Dict(string(key(p)) => Dict(1950 => co2) for (p, co2) in expected))
+        write_ipcc_scenarios(dir, Dict(on_disk(p) => Dict(1950 => co2) for (p, co2) in expected))
         for (p, co2) in expected
             @test isapprox(load_co2_scenario_jld2(dir, key(p))[1950], co2; atol = 1e-3)
         end
+
+        # The table's name is :rcp60; the dataset's own key is not accepted
+        @test key(:rcp60) === :rcp60
+        @test_throws ArgumentError load_co2_scenario_jld2(dir, :rcp6)
 
         # The scenario runs on the table's value
         @test at_first_step(v -> v.CO2, RunSpec(ctrl = 0, scnr = 1),
@@ -325,6 +330,24 @@ end
             @test all(iszero, tclim(:ctrl, RunSpec(ctrl = 1, scnr = 0)))
             @test all(==(anomaly), tclim(:scnr, RunSpec(ctrl = 0, scnr = 1)))
         end
+
+        # A second run on the same fields and directory does not read the files
+        # again; another event or another directory does.
+        reused = ClimateFields()
+        first_tclim(p, dir) = at_first_step(v -> copy(v.fields.Tclim), RunSpec(ctrl = 0, scnr = 1),
+                                            preset(p; corrections = NoCorrections()); phase = :scnr,
+                                            jld2_dir = dir, fields = reused)
+        @test all(==(7.0f0), first_tclim(:lanina, tmpdir_anom))
+        @test reused.anom_enso_source == (tmpdir_anom, :lanina)
+        reused.Tclim_anom_enso .= 70.0f0                     # a mark a reload would erase
+        @test all(==(70.0f0), first_tclim(:lanina, tmpdir_anom))
+        @test all(==(7.0f0), first_tclim(:elnino, tmpdir_anom))
+        @test reused.anom_enso_source == (tmpdir_anom, :elnino)
+        @test all(==(2.0f0), first_tclim(:rcp85_boundary, tmpdir_anom))
+        reused.Tclim_anom_cc .= 20.0f0
+        @test all(==(20.0f0), first_tclim(:rcp85_boundary, tmpdir_anom))
+        @test_throws ErrorException first_tclim(:rcp85_boundary, joinpath(tmpdir_anom, "elsewhere"))
+        @test reused.anom_cc_source == ""                   # a failed load leaves no source
 
         # A missing required file must error loudly, not silently zero.
         rm(joinpath(clim_dir, "cmip5.tsurf.rcp85.ensmean.forcing.jld2"))

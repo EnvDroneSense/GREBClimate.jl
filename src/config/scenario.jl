@@ -22,7 +22,7 @@ end
 """
     CO2Table(key)
 
-CO2 per year from the dataset's IPCC table `key`: `:rcp26`, `:rcp45`, `:rcp6`,
+CO2 per year from the dataset's IPCC table `key`: `:rcp26`, `:rcp45`, `:rcp60`,
 `:rcp85`, `:ssp119`, `:ssp126`, `:ssp245`, `:ssp460`, `:ssp585` or `:hist`
 (1850-2017).
 """
