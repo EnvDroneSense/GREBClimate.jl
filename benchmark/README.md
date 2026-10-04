@@ -32,11 +32,32 @@ This harness times one variant per run. It is a quick check and a source of
 per-stage shares, not a measurement protocol: a claimed speed-up needs the
 same-process comparison above.
 
+## Profiling
+
+```bash
+julia --project=. -t 1 benchmark/profile.jl step [jld2_dir] [--years=N] [--out=DIR]
+```
+
+`step` samples a control run of `:full_model` on the stored flux corrections
+(50 years by default, about 20 s and 10 000 samples) and writes three files to
+`benchmark/profiles/<date>-<commit>-step/`, which is gitignored:
+
+| File | Content |
+|:-----|:--------|
+| `header.txt` | Commit, Julia version, threads, years, elapsed time, sample count and interval |
+| `flat.txt` | Self time per frame, largest last |
+| `tree.txt` | The call tree from `greb_model!` down, rows below 0.1 percent left out |
+
+Run it at `-t 1`: on Windows the sampler records the first thread only, so at
+`-t 2,0` one of the two `circulation!` calls is missing from the profile. A
+profile shows where the time goes; it does not show that a change is faster.
+
 ## Files
 
 | File | Role |
 |:-----|:-----|
 | `run_benchmarks.jl` | The modes above |
+| `profile.jl` | The sampling profile above |
 | `common.jl` | Argument parsing and dataset lookup shared with the Fortran comparison |
 | `Manifest.toml` | Gitignored; there is no `Project.toml` here, scripts run in the package environment (`--project=.` from the repo root) |
 | `fortran/` | Local only (excluded in `.git/info/exclude`, not in the repository). `run_fortran_comparison.jl` times and checks GREBClimate.jl against the original Fortran GREB (modes `compare`, `memory`, `verify`, `io`, `build`, `selftest`); `peak_memory.ps1` is its Windows peak-memory helper. Needs gfortran and the Fortran source (`GREB_GFORTRAN`, `GREB_FORTRAN_DIR`) |
