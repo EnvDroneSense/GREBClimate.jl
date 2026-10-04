@@ -181,9 +181,9 @@ end
 
 Load all GREB input data from JLD2 formatted files, returning a fresh
 [`ClimateFields`](@ref). `dataset` (`:ncep`/`:era`) selects which
-climatology *files* to read; this is independent of `Hydrology.rain_fit`,
-which only selects the rain-regression *coefficients* (see
-[`Hydrology`](@ref)).
+climatology *files* to read, and any other value is an `ArgumentError`; this
+is independent of `Hydrology.rain_fit`, which only selects the
+rain-regression *coefficients* (see [`Hydrology`](@ref)).
 """
 function load_greb_jld2!(jld2_dir::String; dataset::Symbol=:ncep)
     if !isdir(jld2_dir)
@@ -218,8 +218,9 @@ function load_greb_jld2!(jld2_dir::String; dataset::Symbol=:ncep)
         )
     )
 
-    # An unknown `dataset` falls back to the NCEP files
-    files = get(file_map, dataset, file_map[:ncep])
+    haskey(file_map, dataset) ||
+        throw(ArgumentError("unknown dataset :$dataset; use one of $(join(repr.(sort!(collect(keys(file_map)))), ", "))"))
+    files = file_map[dataset]
 
     println("📂 Loading 3D climatology ($dataset dataset)...")
     climatology_dir = joinpath(jld2_dir, "climatology")

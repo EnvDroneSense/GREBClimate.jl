@@ -26,6 +26,9 @@ Notable changes to GREBClimate.jl, following
   such a run (for example `greb_model!(run, preset(:decon_mean_climate);
   fields)`) logged one warning and ran without corrections. With `jld2_dir`
   given, a missing corrections file is now an `ArgumentError`.
+- `load_greb_jld2!` with an unknown `dataset` (for example `:era5`) raises an
+  `ArgumentError` naming the valid ones. Before, it loaded the NCEP files and
+  printed the name it was given.
 - Docstrings corrected: `CO2Table` lists the `:rcp85` key; `Hydrology`
   describes `:skin_gust` as it is computed (no skin temperature);
   `ClimateFields` no longer says one instance per run, and states that

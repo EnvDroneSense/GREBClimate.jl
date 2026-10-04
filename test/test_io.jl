@@ -36,6 +36,9 @@
         @test all(==(0.0), fields_nocorr.ToF_correct)
         @test all(==(3.0), fields_nocorr.Tclim)  # loader itself still worked
 
+        # A dataset name the loader does not know is an error, not NCEP
+        @test_throws ArgumentError load_greb_jld2!(tmpdir; dataset = :era5)
+
         # "files present" branch: add the combined flux-correction file and reload.
         mkpath(joinpath(tmpdir, "climatology"))
         GREBClimate.jldopen(joinpath(tmpdir, "climatology", "flux_corrections.jld2"), "w") do f
