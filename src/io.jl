@@ -1,3 +1,7 @@
+# JLD2 cannot open one file from several tasks at once: runs side by side
+# take this lock around every open.
+const _JLD2_LOCK = ReentrantLock()
+
 """
     read_jld2(filepath::String)
 
@@ -12,7 +16,7 @@ Read a `.jld2` field file written by `tools/dataset/convert_greb_to_jld2.jl`.
   - `ctl`: raw GrADS `.ctl` metadata text, or `nothing` if the file has none
 """
 function read_jld2(filepath::String)
-    jldopen(filepath, "r") do file
+    @lock _JLD2_LOCK jldopen(filepath, "r") do file
         return (
             data=file["data"],
             dim_names=file["dim_names"],
@@ -69,7 +73,7 @@ function load_co2_scenario_jld2(jld2_dir::String, scenario::Symbol)
     filepath = joinpath(jld2_dir, "scenario", "ipcc_scenarios.jld2")
     isfile(filepath) ||
         error("Scenario file not found: $filepath (run tools/dataset/convert_greb_to_jld2.jl)")
-    scenarios = jldopen(filepath, "r") do file
+    scenarios = @lock _JLD2_LOCK jldopen(filepath, "r") do file
         file["scenarios"]
     end
     key = string(scenario)
@@ -114,7 +118,7 @@ function load_flux_corrections_jld2!(jld2_dir::String, fields::ClimateFields)
 
     filepath = joinpath(jld2_dir, "climatology", "flux_corrections.jld2")
     if isfile(filepath)
-        jldopen(filepath, "r") do file
+        @lock _JLD2_LOCK jldopen(filepath, "r") do file
             for (key, array) in correction_keys
                 if haskey(file, key)
                     array .= file[key]

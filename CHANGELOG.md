@@ -32,6 +32,9 @@ Notable changes to GREBClimate.jl, following
 - A scenario with a `SurfaceMask` (`:regional_co2_ocean`,
   `:regional_co2_land_ice`) run with `RunSpec(ctrl = 0)` raises an
   `ArgumentError`. Before, the mask was built from an ice cover of zero.
+- Several `greb_model!` runs in parallel tasks no longer fail with a JLD2
+  error (`InvalidDataException`, `EOFError`) when they read dataset files at
+  the same time: the loaders take a lock around each file open.
 - Docstrings corrected: `CO2Table` lists the `:rcp85` key; `Hydrology`
   describes `:skin_gust` as it is computed (no skin temperature);
   `ClimateFields` no longer says one instance per run, and states that

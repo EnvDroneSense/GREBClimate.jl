@@ -56,6 +56,11 @@
         @test all(==(15.0), fields.TF_correct)
         @test all(==(16.0), fields.qF_correct)
         @test all(==(17.0), fields.ToF_correct)
+
+        # Tasks reading the same file at once all get its content
+        path = joinpath(tmpdir, "climatology", "Tocean.clim.jld2")
+        reads = [Threads.@spawn read_jld2(path).data for _ in 1:8]
+        @test all(t -> all(==(10.0), fetch(t)), reads)
     finally
         rm(tmpdir; recursive = true, force = true)
     end
