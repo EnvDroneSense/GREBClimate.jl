@@ -83,7 +83,7 @@ Things worth knowing before you add tests:
 - **A new test file must be added to the `SHARD` table in
   [test/runtests.jl](test/runtests.jl), or it will not run.** Nothing globs
   the directory.
-- Shared fixtures live in `test/testutils.jl`: `quiet()`, `with_tempdir()`,
+- Shared fixtures live in `test/support/testutils.jl`: `quiet()`, `with_tempdir()`,
   `synthetic_fields()`, `constant_fields()`, `uniform_record()`,
   `at_first_step()`, `DATA_DIR`, and the grid constants.
 - Any test that calls `greb_data_dir` must pass `allow_download=false`.

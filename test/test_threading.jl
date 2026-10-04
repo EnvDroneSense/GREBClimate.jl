@@ -4,7 +4,7 @@
     # `tendencies!` runs the two circulation! calls concurrently only when
     # `Threads.nthreads() > 1` and `ws_a !== ws_q`. Thread count is fixed at
     # Julia startup, so both counts are started as subprocesses.
-    utils = joinpath(@__DIR__, "testutils.jl")
+    utils = joinpath(@__DIR__, "support", "testutils.jl")
     script = """
         using GREBClimate
         using Test

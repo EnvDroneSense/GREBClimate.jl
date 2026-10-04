@@ -1,5 +1,5 @@
 # What each experiment preset is: the forcing it imposes and the physics it
-# runs, captured without the dataset. Used by test_presets.jl and by
+# runs, captured without the dataset. Used by test/test_presets.jl and by
 # tools/validation/preset_reference.jl, which writes the reference in
 # test/data/preset_reference.jl. Needs testutils.jl.
 

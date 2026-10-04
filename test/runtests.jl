@@ -1,7 +1,7 @@
 using GREBClimate
 using Test
 
-include("testutils.jl")
+include(joinpath("support", "testutils.jl"))
 
 # One file per subject; `SHARD` decides which CI job runs each. Set
 # GREB_TEST_SHARD=light|heavy to run one group; unset (or "all") runs
