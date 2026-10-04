@@ -405,11 +405,20 @@ end
             @test all(isfinite, stored)
             # Stored reads the file: the same as a run on those values without a spin-up
             @test isequal(stored, first_ts(SpinUp(0); preloaded = 0.5f0, jld2_dir = ""))
+            # Without a directory Stored keeps the corrections already in `fields`
+            @test isequal(stored, first_ts(Stored(); preloaded = 0.5f0, jld2_dir = ""))
             # NoCorrections zeroes whatever was there
             @test isequal(first_ts(NoCorrections(); preloaded = 0.5f0), first_ts(SpinUp(0); jld2_dir = ""))
             @test !isequal(stored, first_ts(NoCorrections()))
             # SpinUp computes them
             @test !isequal(stored, first_ts(SpinUp(1)))
+        end
+    end
+    # A directory without the corrections file is an error, not a run on zeros
+    with_tempdir() do empty_dir
+        @test_throws ArgumentError quiet() do
+            greb_model!(RunSpec(ctrl = 1, scnr = 0), preset(:full_model; corrections = Stored());
+                        jld2_dir = empty_dir, fields = synthetic_fields(), allow_uninitialized = true)
         end
     end
 end

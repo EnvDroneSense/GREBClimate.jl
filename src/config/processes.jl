@@ -130,6 +130,10 @@ They were computed with the MSCM physics ([`mscm_hydrology`](@ref),
 `moisture_convergence = false`) and hold that configuration at the observed
 climate. With the default hydrology the control drifts (about 5 K in 20
 years); use [`SpinUp`](@ref) there.
+
+`greb_model!` reads them from `jld2_dir` when it is given, and a missing file
+is an error there. Without `jld2_dir` it uses the corrections already in
+`fields`, which `load_greb_jld2!` loads.
 """
 struct Stored <: Corrections end
 

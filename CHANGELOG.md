@@ -21,6 +21,11 @@ Notable changes to GREBClimate.jl, following
   the scenario only, as in the original GREB code (`subroutine forcing`). **The
   results of these four presets change**: the response outside the band is
   much smaller than before. `SurfaceMask` presets are unaffected.
+- `corrections = Stored()` without `jld2_dir` no longer zeroes the flux
+  corrections that `load_greb_jld2!` put in `fields`: it runs on them. Before,
+  such a run (for example `greb_model!(run, preset(:decon_mean_climate);
+  fields)`) logged one warning and ran without corrections. With `jld2_dir`
+  given, a missing corrections file is now an `ArgumentError`.
 - Docstrings corrected: `CO2Table` lists the `:rcp85` key; `Hydrology`
   describes `:skin_gust` as it is computed (no skin temperature);
   `ClimateFields` no longer says one instance per run, and states that

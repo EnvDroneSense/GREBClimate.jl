@@ -260,8 +260,14 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     # ── 2. Flux-correction spin-up ──────────────────────────────
     corrections = config.corrections
     if corrections isa Stored
-        println("% loading flux correction fields...")
-        load_flux_corrections_jld2!(String(jld2_dir), fields)
+        # Without a directory the corrections already in `fields` are used
+        # (`load_greb_jld2!` loads them)
+        if !isempty(jld2_dir)
+            file = joinpath(jld2_dir, "climatology", "flux_corrections.jld2")
+            isfile(file) || throw(ArgumentError("Stored() found no flux corrections at $file"))
+            println("% loading flux correction fields...")
+            load_flux_corrections_jld2!(String(jld2_dir), fields)
+        end
     elseif corrections isa SpinUp
         println("% flux correction  CO2 = ", CO2_ctrl)
         qflux_correction!(CO2_ctrl, Ts_ini, Ta_ini, q_ini, To_ini, fields, state, timestate, r, ws, corrections.years;
