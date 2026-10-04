@@ -36,7 +36,7 @@ export init_model!, apply_co2_mask!, apply_dynamic_co2_mask!
 export SWradiation!, LWradiation!, hydro!, convergence!, seaice!, deep_ocean!
 export diffusion!, advection!, circulation!, tendencies!, forcing
 export diagnostics!, output!, time_loop!
-export build_monthly_climatology, apply_scenario_anomalies, compute_annual_ice_climatology
+export build_monthly_climatology, apply_scenario_anomalies, compute_annual_ice_climatology, global_mean
 export qflux_correction!, greb_model!
 export xdim, ydim, nstep_yr
 
@@ -71,13 +71,11 @@ using Logging: with_logger, NullLogger
 
 @compile_workload begin
     with_logger(NullLogger()) do
-        redirect_stdout(devnull) do
-            greb_model!(RunSpec(scnr=0), preset(:full_model; corrections=NoCorrections());
-                        jld2_dir="", allow_uninitialized=true)
-            greb_model!(RunSpec(scnr=0), preset(:full_model; hydrology=(evaporation=:skin,),
-                                                 corrections=NoCorrections());
-                        jld2_dir="", allow_uninitialized=true)
-        end
+        greb_model!(RunSpec(scnr=0), preset(:full_model; corrections=NoCorrections());
+                    jld2_dir="", allow_uninitialized=true)
+        greb_model!(RunSpec(scnr=0), preset(:full_model; hydrology=(evaporation=:skin,),
+                                             corrections=NoCorrections());
+                    jld2_dir="", allow_uninitialized=true)
     end
 end
 

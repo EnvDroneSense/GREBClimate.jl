@@ -7,10 +7,8 @@ const DATA_DIR = something(greb_data_dir(; allow_download = false),
 
 const X, Y, N = GREBClimate.xdim, GREBClimate.ydim, GREBClimate.nstep_yr
 
-"""Run `f` with stdout muted - the model prints a progress line per year."""
-quiet(f) = redirect_stdout(devnull) do
-    f()
-end
+"""Run `f` with the logger muted - the model logs a progress line per year."""
+quiet(f) = Base.CoreLogging.with_logger(f, Base.CoreLogging.NullLogger())
 
 """Run `f(dir)` in a fresh temp directory, removed afterwards even on failure."""
 function with_tempdir(f)

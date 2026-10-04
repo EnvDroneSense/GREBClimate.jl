@@ -1,10 +1,14 @@
+# The two cells of the annual summary line: label, longitude index, latitude index
+const _SAMPLE_CELLS = (("178 E 9 N", 48, 27), ("58 E 51 N", 16, 38))
+
 """
     diagnostics!(it, year, CO2, surf::SurfaceState, tend, fields, state, timestate)
 
 Accumulates the current timestep into `state`'s annual-mean buffers; at the
-last timestep of the year, averages them, prints the annual summary line
-(global mean + two sample points), and resets the accumulators for the next
-year. `tend` is the `NamedTuple` [`tendencies!`](@ref) returns.
+last timestep of the year, averages them, logs the annual summary line
+(the area-weighted global mean and two sample cells, in °C) with `@info`, and
+resets the accumulators for the next year. `tend` is the `NamedTuple`
+[`tendencies!`](@ref) returns.
 """
 function diagnostics!(it, year, CO2, surf::SurfaceState, tend, fields::ClimateFields, state::ModelState, timestate)
     # Accumulate
@@ -22,15 +26,10 @@ function diagnostics!(it, year, CO2, surf::SurfaceState, tend, fields::ClimateFi
         n = nstep_yr
         state.Tsmn ./= n
 
-        # Global mean and sample points (°C)
-        global_mean = sum(state.Tsmn[i, j] * dxlat_grid[j] for i in 1:xdim, j in 1:ydim) /
-                      (xdim * sum(dxlat_grid)) - 273.15f0
-        point1 = state.Tsmn[48, 27] - 273.15f0   # Tropical Pacific
-        point2 = state.Tsmn[16, 38] - 273.15f0   # 58 E, 51 N
-
-        println(year, "  ", round(global_mean, digits=2),
-            "  ", round(point1, digits=2),
-            "  ", round(point2, digits=2))
+        # Annual-mean surface temperature (°C): global mean and the two sample cells
+        celsius(T) = round(T - 273.15; digits=2)
+        cells = join(("$label $(celsius(state.Tsmn[i, j]))" for (label, i, j) in _SAMPLE_CELLS), "; ")
+        @info "$year: Ts global mean $(celsius(global_mean(state.Tsmn))) °C; $cells"
 
         # Reset accumulators
         fill!(state.Tsmn, 0.0f0)

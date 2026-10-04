@@ -269,22 +269,22 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
         if !isempty(jld2_dir)
             file = joinpath(jld2_dir, "climatology", "flux_corrections.jld2")
             isfile(file) || throw(ArgumentError("Stored() found no flux corrections at $file"))
-            println("% loading flux correction fields...")
+            @info "Loading the stored flux corrections"
             load_flux_corrections_jld2!(String(jld2_dir), fields)
         end
     elseif corrections isa SpinUp
-        println("% flux correction  CO2 = ", CO2_ctrl)
+        @info "Flux-correction spin-up: CO2 = $CO2_ctrl ppm, $(corrections.years) yr"
         qflux_correction!(CO2_ctrl, Ts_ini, Ta_ini, q_ini, To_ini, fields, state, timestate, r, ws, corrections.years;
             ws_a=ws_a, ws_q=ws_q)
     else
-        println("Flux correction skipped")
+        @info "No flux corrections"
     end
 
     # Reset accumulators after spin-up
     reset!(acc)
 
     # ── 3. Control run ──────────────────────────────────────────
-    println("CONTROL RUN: CO2 = ", CO2_ctrl, " time = ", time_ctrl, " yr")
+    @info "Control run: CO2 = $CO2_ctrl ppm, $time_ctrl yr"
 
     # Initialize state arrays
     Ts = copy(Ts_ini);
@@ -318,7 +318,7 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     apply_dynamic_co2_mask!(s.co2_mask, fields, ice_forcing)
 
     # ── 4. Scenario run ─────────────────────────────────────────
-    println("SCENARIO  time = ", time_scnr, " yr")
+    @info "Scenario run: $time_scnr yr"
 
     # Solar-table scenarios: swap in the alternate insolation
     r.solar_table === nothing || (fields.sw_solar .= r.solar_table)

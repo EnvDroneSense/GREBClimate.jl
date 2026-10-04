@@ -111,3 +111,69 @@ function _check_step!(b::BudgetCheck, view)
     b.steps += 1
     return b
 end
+
+"""
+    RangeCheck(; Ts=(100, 360), Ta=(100, 360), To=(250, 330), q=(0, 0.08))
+
+An observer for [`greb_model!`](@ref)'s `observer` keyword that notices a run
+which leaves the physical range without going non-finite: a cell can run away
+to 1e24 K and still look like a result. Each keyword is the allowed
+`(lowest, highest)` value of that field, in K and kg/kg; the defaults are well
+outside what any preset reaches (`Ts` 155 to 325 K, `Ta` 162 to 329 K, `To` 266
+to 313 K, `q` up to 0.039 kg/kg).
+
+After the run it holds:
+
+| Field | Meaning |
+|:------|:--------|
+| `steps` | steps checked |
+| `seen` | lowest and highest value of each field over the run |
+| `first` | `nothing`, or the first step outside the range: `(phase, it, year, field, value)` |
+
+`GREBClimate.in_range(check)` is `true` when no step left the range. A NaN
+counts as outside. Not exported: create it with `GREBClimate.RangeCheck()`.
+"""
+mutable struct RangeCheck
+    limits::NamedTuple{(:Ts, :Ta, :To, :q),NTuple{4,Tuple{Float32,Float32}}}
+    seen::NamedTuple{(:Ts, :Ta, :To, :q),NTuple{4,Tuple{Float32,Float32}}}
+    steps::Int
+    first::Union{Nothing,NamedTuple{(:phase, :it, :year, :field, :value),Tuple{Symbol,Int,Int,Symbol,Float32}}}
+end
+
+function RangeCheck(; Ts=(100, 360), Ta=(100, 360), To=(250, 330), q=(0, 0.08))
+    nothing_seen = (Inf32, -Inf32)
+    return RangeCheck(map(l -> Float32.(l), (; Ts, Ta, To, q)), map(_ -> nothing_seen, (; Ts, Ta, To, q)), 0, nothing)
+end
+
+in_range(c::RangeCheck) = c.first === nothing
+
+# Lowest and highest value of `A` and the number of cells outside
+# `lower..upper`. A NaN fails both comparisons, so it counts as outside; the
+# extremes skip it.
+function _range(A::AbstractMatrix{Float32}, lower::Float32, upper::Float32)
+    lo, hi, outside = Inf32, -Inf32, 0
+    @turbo for i in eachindex(A)
+        x = A[i]
+        lo = min(lo, x)
+        hi = max(hi, x)
+        outside += !((lower <= x) & (x <= upper))
+    end
+    return lo, hi, outside
+end
+
+function (c::RangeCheck)(point::Symbol, view)
+    point === :after_step || return nothing
+    seen = map(keys(c.limits)) do field
+        old = c.seen[field]
+        lower, upper = c.limits[field]
+        lo, hi, outside = _range(getproperty(view, field), lower, upper)
+        if c.first === nothing && outside > 0
+            value = lo < lower ? lo : hi > upper ? hi : NaN32
+            c.first = (phase=view.phase, it=Int(view.it), year=Int(view.year), field=field, value=value)
+        end
+        (min(old[1], lo), max(old[2], hi))
+    end
+    c.seen = NamedTuple{keys(c.limits)}(seen)
+    c.steps += 1
+    return nothing
+end

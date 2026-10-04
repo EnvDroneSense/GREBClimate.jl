@@ -53,7 +53,7 @@ function main(args)
         end
         ph.check(point, view)
     end
-    redirect_stdout(devnull) do
+    Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
         greb_model!(RunSpec(ctrl=years, scnr=years), preset(name; corrections=Stored());
             jld2_dir=dir, fields=fields, observer=observer)
     end

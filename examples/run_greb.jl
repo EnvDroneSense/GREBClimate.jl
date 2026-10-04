@@ -5,8 +5,7 @@
 #   3. run the model
 #   4. print a summary
 #   5. plot the mean Ts
-# The means printed and plotted here are plain means over grid cells, not
-# area-weighted, so they read colder than the model's own global mean.
+# The means printed and plotted here are area-weighted (`global_mean`).
 #
 # Two ways to run:
 #   * as a script:  julia --project=. examples/run_greb.jl [path/to/greb_input_data]
@@ -59,17 +58,17 @@ function run_greb(jld2_dir::AbstractString;
         println("\n" * "="^50)
         println("GREB MODEL OUTPUT (control month 1)")
         println("="^50)
-        println("🌡️  Ts (K):   mean=$(round(mean(rec.Ts), digits=1))  " *
+        println("🌡️  Ts (K):   mean=$(round(global_mean(rec.Ts), digits=1))  " *
                 "min=$(round(minimum(rec.Ts), digits=1))  max=$(round(maximum(rec.Ts), digits=1))")
-        println("💧  precip:   mean=$(round(mean(rec.precip), digits=2))")
-        println("☀️  SW (W/m²): mean=$(round(mean(rec.sw), digits=1))")
-        println("❄️  ice:      mean=$(round(mean(rec.ice), digits=2))")
+        println("💧  precip:   mean=$(round(global_mean(rec.precip), digits=2))")
+        println("☀️  SW (W/m²): mean=$(round(global_mean(rec.sw), digits=1))")
+        println("❄️  ice:      mean=$(round(global_mean(rec.ice), digits=2))")
         println("✅ all finite: $(all(isfinite, rec.Ts))")
     end
 
     # ── 5. plot global-mean surface temperature (optional; needs Plots) ─────
     if !isempty(result.ctrl)
-        Ts_global_mean = [mean(rec.Ts) for rec in result.ctrl]
+        Ts_global_mean = [global_mean(rec.Ts) for rec in result.ctrl]
         try
             @eval using Plots
             plt = Base.invokelatest(plot, Ts_global_mean;

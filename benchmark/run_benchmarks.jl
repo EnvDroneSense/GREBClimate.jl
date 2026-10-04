@@ -30,14 +30,14 @@ function time_1yr(jld2_dir::AbstractString; cfg=preset(:full_model; corrections=
     fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
 
     # Warm-up, so compilation is not timed.
-    redirect_stdout(devnull) do
+    Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
         greb_model!(RunSpec(scnr=0), cfg; jld2_dir=jld2_dir, fields=deepcopy(fields))
     end
 
     times = Float64[]
     for r in 1:reps
         fields_r = deepcopy(fields)  # a fresh copy per repetition
-        t = @elapsed redirect_stdout(devnull) do
+        t = @elapsed Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
             greb_model!(RunSpec(scnr=0), cfg; jld2_dir=jld2_dir, fields=fields_r)
         end
         push!(times, t)
@@ -72,14 +72,14 @@ function time_years(jld2_dir::AbstractString; experiment::Symbol=:full_model,
     fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
 
     # Warm-up with a minimal run.
-    redirect_stdout(devnull) do
+    Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
         greb_model!(RunSpec(ctrl=1, scnr=0), cfg; jld2_dir=jld2_dir, fields=deepcopy(fields))
     end
 
     times = Float64[]
     for r in 1:reps
         fields_r = deepcopy(fields)  # a fresh copy per repetition
-        t = @elapsed redirect_stdout(devnull) do
+        t = @elapsed Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
             greb_model!(RunSpec(ctrl=ctrl, scnr=scnr), cfg; jld2_dir=jld2_dir, fields=fields_r)
         end
         push!(times, t)

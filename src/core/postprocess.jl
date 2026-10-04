@@ -60,3 +60,30 @@ function compute_annual_ice_climatology(ctrl_output::Vector{MonthlyRecord})
 
     return ice_months
 end
+
+"""
+    global_mean(field::AbstractMatrix)
+
+Area-weighted global mean of a field on the model grid (`xdim` by `ydim`):
+each latitude row counts by the cosine of its latitude. A plain mean over the
+cells counts the polar rows too heavily; for the surface temperature it reads
+8 to 11 K colder.
+
+```jldoctest
+julia> global_mean(fill(288.0f0, xdim, ydim))
+288.0
+```
+"""
+function global_mean(field::AbstractMatrix)
+    size(field) == (xdim, ydim) ||
+        throw(DimensionMismatch("global_mean needs a ($xdim, $ydim) field, got $(size(field))"))
+    total = 0.0
+    for j in 1:ydim
+        row = zero(eltype(field))
+        @turbo for i in 1:xdim
+            row += field[i, j]
+        end
+        total += Float64(row) * dxlat_grid[j]
+    end
+    return total / (xdim * sum(Float64, dxlat_grid))
+end

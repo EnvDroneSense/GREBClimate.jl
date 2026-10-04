@@ -181,7 +181,7 @@ function load_flux_corrections_jld2!(jld2_dir::String, fields::ClimateFields)
         for (field, key) in pairs(_FLUX_CORRECTION_KEYS)
             haskey(file, key) || throw(ArgumentError("$key not found in $filepath"))
             getfield(fields, field) .= file[key]
-            println("✅ Loaded $key")
+            @info "Loaded $key"
         end
     end
     return nothing
@@ -255,18 +255,18 @@ function load_greb_jld2!(jld2_dir::String; dataset::Symbol=:ncep, corrections::B
     haskey(_CLIMATOLOGY_FILES, dataset) ||
         throw(ArgumentError("unknown dataset :$dataset; use one of $(join(repr.(keys(_CLIMATOLOGY_FILES)), ", "))"))
 
-    println("📂 Loading static fields...")
+    @info "Loading static fields"
     _load_fields!(fields, joinpath(jld2_dir, "static"), _STATIC_FILES)
 
-    println("📂 Loading 3D climatology ($dataset dataset)...")
+    @info "Loading the $dataset climatology"
     climatology_dir = joinpath(jld2_dir, "climatology")
     _load_fields!(fields, climatology_dir, _CLIMATOLOGY_FILES[dataset])
 
-    println("📂 Loading common climatology fields...")
+    @info "Loading the common climatology fields"
     _load_fields!(fields, climatology_dir, _COMMON_CLIMATOLOGY_FILES)
 
     # Solar radiation (special: lat × time)
-    println("📂 Loading solar radiation...")
+    @info "Loading the solar radiation table"
     solar_path = joinpath(jld2_dir, "solar", _SOLAR_FILE * ".jld2")
     if isfile(solar_path)
         solar_result = read_jld2(solar_path)
@@ -278,13 +278,13 @@ function load_greb_jld2!(jld2_dir::String; dataset::Symbol=:ncep, corrections::B
     end
 
     if corrections
-        println("📂 Loading flux corrections...")
+        @info "Loading the flux corrections"
         load_flux_corrections_jld2!(jld2_dir, fields)
     end
 
     split_winds!(fields)
 
     fields.loaded = true
-    println("✅ All GREB data loaded successfully from JLD2")
+    @info "Dataset loaded from $jld2_dir"
     return fields
 end

@@ -3,7 +3,7 @@
 #
 # Control at 280 ppm (the control CO2 of :custom_co2); scenario phase run at
 # each level in co2_grid. Records scenario-minus-control anomalies of Ts, ice
-# extent and precipitation as plain means over grid cells (not area-weighted).
+# extent and precipitation as area-weighted global means.
 #
 # Run as script:  julia --project=. examples/parameter_sweep.jl [data_dir]
 # Or from REPL:   include("examples/parameter_sweep.jl"); parameter_sweep("data_dir")
@@ -73,9 +73,9 @@ function parameter_sweep(jld2_dir::AbstractString;
                 result = greb_model!(run, cfg; jld2_dir=jld2_dir, fields=fields)
 
                 scnr_final_year = @view result.scnr[end-11:end]  # last 12 monthly records
-                Ts_anom = mean(mean(rec.Ts) for rec in scnr_final_year)
-                ice_anom = mean(mean(rec.ice) for rec in scnr_final_year)
-                precip_anom = mean(mean(rec.precip) for rec in scnr_final_year)
+                Ts_anom = mean(global_mean(rec.Ts) for rec in scnr_final_year)
+                ice_anom = mean(global_mean(rec.ice) for rec in scnr_final_year)
+                precip_anom = mean(global_mean(rec.precip) for rec in scnr_final_year)
 
                 push!(results, (co2=co2, Ts_anom=Ts_anom,
                                  ice_anom=ice_anom, precip_anom=precip_anom))

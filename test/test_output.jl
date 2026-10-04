@@ -74,14 +74,10 @@ end
     @test all(==(280.0), state.Tsmn)   # accumulated once, no averaging/reset yet
 
     ts.ityr = GREBClimate.nstep_yr
-    captured = mktemp() do path, io
-        redirect_stdout(io) do
-            diagnostics!(GREBClimate.nstep_yr, 1970, 340.0, surf, tend, fields, state, ts)
-        end
-        flush(io)
-        read(path, String)
-    end
-    @test occursin("1970", captured)   # prints the annual summary line
+    # Logs the annual summary line. Two steps of 280 K over a year of 730: 0.77 K,
+    # the same in the global mean and in the two cells
+    @test_logs (:info, "1970: Ts global mean -272.38 °C; 178 E 9 N -272.38; 58 E 51 N -272.38") diagnostics!(
+        GREBClimate.nstep_yr, 1970, 340.0, surf, tend, fields, state, ts)
     @test all(iszero, state.Tsmn)      # reset after year end
 end
 
@@ -170,4 +166,22 @@ end
 
     @test isnan(Ts[5, 5])
     @test isnan(Ta[40, 30])
+end
+
+@testset "global_mean weights each row by the cosine of its latitude" begin
+    X, Y = GREBClimate.xdim, GREBClimate.ydim
+    @test global_mean(fill(3.5f0, X, Y)) ≈ 3.5
+    # A field equal to the latitude weight: mean of cos^2 over mean of cos
+    w = cosd.(GREBClimate.lat_grid)
+    field = repeat(w', X, 1)
+    @test global_mean(field) ≈ sum(abs2, w) / sum(w) rtol = 1e-6
+    # The poles count less than in a plain mean
+    polar = zeros(Float32, X, Y); polar[:, 1] .= 1; polar[:, Y] .= 1
+    @test global_mean(polar) < sum(polar) / length(polar) / 10
+    @test_throws DimensionMismatch global_mean(zeros(Y, X))
+    # The sample cells of the annual line are where their labels say
+    for (label, i, j) in GREBClimate._SAMPLE_CELLS
+        lon, lat = (i - 0.5) * GREBClimate.dlon, GREBClimate.lat_grid[j]
+        @test label == "$(round(Int, lon)) E $(round(Int, lat)) N"
+    end
 end

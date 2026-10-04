@@ -7,11 +7,22 @@ Notable changes to GREBClimate.jl, following
 
 ### Added
 
+- `global_mean(field)`: the area-weighted global mean of a field on the model
+  grid. The examples use it; their plain means read 8 to 11 K too cold.
+- `GREBClimate.RangeCheck()`: an observer that records the first step at which
+  `Ts`, `Ta`, `To` or `q` leaves a physical range, for a run that diverges
+  without going non-finite.
 - `load_greb_jld2!(dir; corrections = false)` loads a dataset without the
   stored flux corrections; the correction arrays stay zero.
 
 ### Changed
 
+- What a run and the loaders report goes through the logger (`@info`) and no
+  longer through `println`: the lines carry an `[ Info:` prefix, go to
+  standard error, and are silenced with
+  `with_logger(NullLogger())` instead of `redirect_stdout(devnull)`.
+- The yearly line names what it shows:
+  `1970: Ts global mean 13.82 °C; 178 E 9 N 26.79; 58 E 51 N 4.85`.
 - **Breaking:** the RCP6.0 CO2 table is `CO2Table(:rcp60)`, the name of its
   preset. `load_co2_scenario_jld2(dir, :rcp6)`, and so a `CO2Table(:rcp6)` run, raise an
   `ArgumentError`. The `:rcp60` preset is unchanged.

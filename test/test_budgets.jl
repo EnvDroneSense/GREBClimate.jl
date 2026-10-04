@@ -88,3 +88,43 @@ end
         setup! = (Ts, Ta, q, To, fields) -> (fields.rain_limit .= -1.0f0))
     @test limited.rain_limit == X * Y
 end
+
+@testset "RangeCheck: the first step outside the physical range is recorded" begin
+    G = GREBClimate
+    field(v) = fill(Float32(v), X, Y)
+    view(it; Ts = 280, Ta = 270, To = 285, q = 0.005) =
+        (; phase = :ctrl, it, year = 1950, Ts = field(Ts), Ta = field(Ta), To = field(To), q = field(q))
+
+    check = G.RangeCheck()
+    check(:after_tendencies, view(1; Ts = 1e24))     # only the state after the step is checked
+    @test check.steps == 0 && G.in_range(check)
+    check(:after_step, view(1))
+    check(:after_step, view(2; Ta = 265))
+    @test check.steps == 2 && G.in_range(check)
+    @test check.seen.Ta == (265.0f0, 270.0f0) && check.seen.Ts == (280.0f0, 280.0f0)
+
+    # A cell that ran away, then a later one: the first is kept
+    runaway = view(3)
+    runaway.Ts[5, 7] = 1.0f24
+    check(:after_step, runaway)
+    check(:after_step, view(4; q = -1))
+    @test !G.in_range(check)
+    @test check.first == (phase = :ctrl, it = 3, year = 1950, field = :Ts, value = 1.0f24)
+    @test check.seen.q[1] == -1.0f0
+
+    # A NaN is outside; limits can be set
+    nan = G.RangeCheck()
+    nan(:after_step, view(1; To = NaN))
+    @test !G.in_range(nan) && nan.first.field === :To
+    narrow = G.RangeCheck(Ts = (285, 300))
+    narrow(:after_step, view(1))
+    @test narrow.first.field === :Ts && narrow.first.value == 280.0f0
+
+    # In a run it sees every step of the control and the scenario
+    seen = G.RangeCheck(Ts = (-Inf, Inf), Ta = (-Inf, Inf), To = (-Inf, Inf), q = (-Inf, Inf))
+    quiet() do
+        greb_model!(RunSpec(ctrl = 1, scnr = 1), preset(:full_model; corrections = NoCorrections());
+                    fields = synthetic_fields(), allow_uninitialized = true, observer = seen)
+    end
+    @test seen.steps == 2N
+end

@@ -54,7 +54,7 @@ function run_cases()
     fields = load_greb_jld2!(DATA_DIR; dataset=:ncep)
     snap = Dict{String,Array{Float32,3}}()
     for (name, mkcfg) in _cases()
-        result = redirect_stdout(devnull) do
+        result = Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
             greb_model!(RUN, mkcfg(); jld2_dir=DATA_DIR, fields=deepcopy(fields))
         end
         for phase in (:ctrl, :scnr), var in fieldnames(MonthlyRecord)

@@ -45,7 +45,7 @@ on a `:full_model` control run against the real dataset:
 
 | | healthy | ran on a zero climatology |
 |---|---|---|
-| the model's own printed line | `1970  13.82  26.79  4.85` | `1970  NaN  NaN  NaN` |
+| the model's own logged line | `[ Info: 1970: Ts global mean 13.82 °C; 178 E 9 N 26.79; 58 E 51 N 4.85` | `[ Info: 1970: Ts global mean NaN °C; 178 E 9 N NaN; 58 E 51 N NaN` |
 | `mean(result.ctrl[1].Ts)` | 276.94 K | NaN |
 
 These are the numbers of `preset(:full_model)` with its default `SpinUp(3)`,
@@ -58,10 +58,11 @@ The degenerate column was re-measured 2026-10-04: a run on all-zero fields
 depth makes the surface heat capacity zero. Earlier versions of this table
 said it pinned at the 40 K floor; the healthy column was confirmed the same day.
 
-(The printed 13.82 °C and the 276.94 K array mean are different quantities —
-the printout is the model's own global/land/ocean summary, the other is an
-unweighted mean over grid cells. Don't try to reconcile them; just compare each
-against its own column.)
+(The logged 13.82 °C and the 276.94 K array mean are different quantities —
+the logged line is the area-weighted annual mean and two sample cells, the other
+is an unweighted mean over grid cells of one month. `global_mean` gives the
+weighted one. Don't try to reconcile them; just compare each against its own
+column.)
 
 Both cases exit 0, print `✅ All GREB data loaded successfully`, and satisfy
 `all(isfinite, Ts)`.
