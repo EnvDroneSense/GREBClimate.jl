@@ -46,6 +46,8 @@ function capture_preset(p::Symbol)
     ini = quiet() do
         init_model!(r, fields)
     end
+    # The two mask steps of the scenario start
+    GREBClimate.apply_co2_mask!(s.co2_mask, fields)
     static_mask = copy(fields.co2_part)
     ice = zeros(Float32, X, Y, 12)
     ice[:, abs.(GREBClimate.lat_grid) .> 60, :] .= 1.0f0

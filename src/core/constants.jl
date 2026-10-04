@@ -87,7 +87,7 @@ const cq_latent = 2.257f6              # latent heat of evaporation [J/kg]
 const cq_rain = -0.1f0 / 24.0f0 / 3600.0f0   # rain-related vapor decrease [1/s]
 
 # ── Scaling heights [m] ─────────────────────────────────────────
-const z_air = 8400.0f0                 # heat & CO₂ scaling height
+const z_air = 8400.0f0                 # heat & CO2 scaling height
 const z_vapor = 5000.0f0               # water vapor scaling height
 const const_factor = Δt_crcl / z_vapor * 2.5f0 / (ρ_air * grav)
 
@@ -125,18 +125,10 @@ the other:
     row    1 … 3  │  4 … 99         │  100 … 102
     holds  94…96  │  1 … 96 (real)  │  1 … 3
 
-So `A[j-1, k]` is just `P[j+2, k]`. The `lon_jm1`..`lon_jp3` index arrays this
-replaced cost ~12 gather instructions per inner loop.
+So `A[j-1, k]` is just `P[j+2, k]`.
 
 `nghost` is the zonal stencils' reach, so it is 3 and they spell their offsets
 out literally (`j` … `j+6`); widening the stencil means widening both.
-
-Also called *halo cells* (the usual term in climate models) or *guard cells*.
-The literature covers the distributed-memory use, where ghosts cache a
-neighbouring MPI rank and are refreshed by a "halo exchange" - Kjolstad & Snir,
-"The Ghost Cell Pattern" (ParaPLoP 2010). Here there is one process and the
-neighbour is the opposite edge of the same array, so ghost cells buy
-vectorisable addressing, not avoided communication.
 """
 const nghost = 3
 "Row count of a ghosted circulation buffer (`xdim + 2nghost`)."
@@ -157,8 +149,8 @@ const calendar_lookup = [(
     step=mod(it - 1, nstep_yr) + 1
 ) for it in 1:max_timesteps]
 
-const polar_treshold = 2.5f5  # 250 km in meters
-const IS_POLAR = [dxlat_grid[k] <= polar_treshold for k in 1:ydim]
+const polar_threshold = 2.5f5  # 250 km in meters
+const IS_POLAR = [dxlat_grid[k] <= polar_threshold for k in 1:ydim]
 
 # ── Polar sub-stepping constants (diffusion!/advection!) ──────────────
 function _polar_diff_step(k)

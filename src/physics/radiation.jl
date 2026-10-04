@@ -10,7 +10,6 @@ function SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, p
     ice_cover = ws.ice_cover_buf # output: ice fraction
     a_surf = ws.a_surf_buf       # surface albedo
     albedo = ws.albedo_buf       # output: combined albedo (surface + atmosphere)
-    a_atmos = ws.a_atmos_buf     # atmospheric albedo
     sw = ws.sw_buf               # output: net shortwave flux
 
     z_topo = fields.z_topo
@@ -62,7 +61,6 @@ function SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, p
         sf = sw_solar[j, ityr] * multiplier
         for i in 1:xdim
             aa = cld[i, j, ityr] * a_cloud
-            a_atmos[i, j] = aa
             alb = a_surf[i, j] + aa - a_surf[i, j] * aa
             albedo[i, j] = alb
             sw[i, j] = sf * (1.0f0 - alb)
@@ -75,7 +73,7 @@ end
 """
     LWradiation!(Ts, Ta, q, CO2, fields::ClimateFields, timestate, p::Processes, ws::CirculationWorkspace)
 
-Computes atmospheric emissivity from CO₂/water-vapor/cloud columns, then
+Computes atmospheric emissivity from CO2/water-vapor/cloud columns, then
 surface/upward/downward longwave flux. Without an atmosphere (`p.atmosphere = false`) only
 `LW_down` is zeroed - `LW_up` is snapshotted beforehand and keeps its full
 value (decouples surface from atmospheric downwelling feedback without
@@ -84,7 +82,7 @@ touching the atmosphere's own emission term). Returns
 """
 function LWradiation!(Ts, Ta, q, CO2, fields::ClimateFields, timestate, p::Processes, ws::CirculationWorkspace)
     # Extract workspace buffers
-    e_co2 = ws.e_co2_buf      # CO₂ [ppm scaled by pressure]
+    e_co2 = ws.e_co2_buf      # CO2 [ppm scaled by pressure]
     e_vapor = ws.e_vapor_buf  # water vapour [kg/m²]
     em = ws.em_buf            # emissivity ε_atmos
     LW_surf = ws.LW_surf_buf  # surface long-wave flux [W/m²]

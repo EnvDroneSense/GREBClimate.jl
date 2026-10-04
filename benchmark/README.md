@@ -6,7 +6,7 @@ red suite is a regression. It needs the local dataset and never downloads it
 (`GREB_DATA` or a path argument overrides the location).
 
 ```bash
-julia --project=. -t 2 benchmark/run_benchmarks.jl [mode] [jld2_dir] [reps]
+julia --project=. -t 2,0 benchmark/run_benchmarks.jl [mode] [jld2_dir] [reps]
 ```
 
 | Mode | Measures | Default reps | Notes |
@@ -17,13 +17,13 @@ julia --project=. -t 2 benchmark/run_benchmarks.jl [mode] [jld2_dir] [reps]
 | `alloc` | Bytes allocated by one `tendencies!` call | none | Compared with the 256-byte budget in `test/test_invariants.jl`; the two numbers are kept in sync by hand |
 | `years` | `--ctrl=N` control years plus `--scnr=N` scenario years of `--experiment=<preset>` | 1 | Defaults 10, 10, `full_model`. Stored corrections, no spin-up. Prints seconds per simulated year |
 
-Example: `julia --project=. -t 2 benchmark/run_benchmarks.jl years --ctrl=10 --scnr=100 --experiment=co2_double`.
+Example: `julia --project=. -t 2,0 benchmark/run_benchmarks.jl years --ctrl=10 --scnr=100 --experiment=co2_double`.
 
 ## Reading the numbers
 
 | Rule | Why |
 |:-----|:----|
-| Use `-t 2` for `year`, `years` and `stages` | Best thread count on this machine, but only 1.01-1.26x over `-t 1`; `-t 3` and `-t 4` do not help. CI also uses 2 |
+| Use `-t 2,0` for `year`, `years` and `stages` | Two compute threads and no interactive thread. Measured 2026-10-01 at 0.259 s per year against 0.303 s for plain `-t 2` and 0.407 s for `-t 1`; `-t 3` and `-t 4` do not help. CI uses the same |
 | Do not compare timings between sessions | An untouched kernel has measured 0.45 us in one session and 1.28 us in another |
 | Compare variants in one process | Compile both, interleave the trials, shuffle the order each trial, and time a second copy of the baseline as a control. If the control is not about 1.00x, discard the run |
 | Do not record test-suite timings as benchmark results | Assertion counts are stable; wall-clock times are not |

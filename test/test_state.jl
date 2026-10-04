@@ -2,15 +2,17 @@
 
 @testset "init_model! clears the CO2 mask an earlier run left in the same fields" begin
     fields = ClimateFields()
-    quiet() do
-        init_model!(resolve(preset(:regional_co2_nh)), fields)
-    end
-    @test any(!=(1.0f0), fields.co2_part)  # regional run actually changed the mask
+    GREBClimate.apply_co2_mask!(LatitudeMask(:nh), fields)
+    @test any(!=(1.0f0), fields.co2_part)  # what a regional scenario leaves behind
 
-    quiet() do
-        init_model!(resolve(preset(:full_model)), fields)
+    # Full CO2 again, also for a regional preset: its mask is for the scenario
+    for p in (:full_model, :regional_co2_nh)
+        fields.co2_part[1, 1] = 0.5f0
+        quiet() do
+            init_model!(resolve(preset(p)), fields)
+        end
+        @test all(==(1.0f0), fields.co2_part)
     end
-    @test all(==(1.0f0), fields.co2_part)  # init_model! resets it back to full CO2
 end
 
 @testset "reset! zeroes every accumulator field" begin

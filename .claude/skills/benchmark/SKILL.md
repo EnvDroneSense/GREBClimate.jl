@@ -9,17 +9,17 @@ description: Run GREBClimate.jl's timing/allocation benchmarks (benchmark/run_be
 
 | Mode | Answers | Command |
 |---|---|---|
-| `year` (default) | How fast is a 1-year `:full_model` control run; before vs after a change | `julia --project=. -t 2 benchmark/run_benchmarks.jl year` |
+| `year` (default) | How fast is a 1-year `:full_model` control run; before vs after a change | `julia --project=. -t 2,0 benchmark/run_benchmarks.jl year` |
 | `stages` | Where the time goes: each `tendencies!` stage and its share | `julia --project=. -t 1 benchmark/run_benchmarks.jl stages` |
 | `threads` | Speedup of `-t 1..4`, each in its own subprocess | `julia --project=. -t 1 benchmark/run_benchmarks.jl threads` |
 | `alloc` | Bytes allocated by one `tendencies!` call; budget 256 bytes (`TENDENCIES_ALLOC_BUDGET`, same value in `test/test_invariants.jl`) | `julia --project=. -t 1 benchmark/run_benchmarks.jl alloc` |
-| `years` | Cost and stability over many years: `--ctrl=N --scnr=N [--experiment=NAME]` (default 10/10, `full_model`, which holds CO2 flat; use `a1b_scenario` for a trend) | `julia --project=. -t 2 benchmark/run_benchmarks.jl years --ctrl=10 --scnr=100` |
+| `years` | Cost and stability over many years: `--ctrl=N --scnr=N [--experiment=NAME]` (default 10/10, `full_model`, which holds CO2 flat; use `a1b` for a trend) | `julia --project=. -t 2,0 benchmark/run_benchmarks.jl years --ctrl=10 --scnr=100` |
 
 The data directory is the next positional argument (default `../greb_input_data`, or `GREB_DATA`); `[jld2_dir] [reps]` are positional in every mode. The legacy form `run_benchmarks.jl <dir>` runs `year`.
 
 ## Reference numbers (this machine)
 
-| Regime | `year` at `-t 2` | Recorded |
+| Regime | `year` at plain `-t 2` (`-t 2,0` measured about 15% faster on 2026-10-01) | Recorded |
 |---|---|---|
 | Normal background load | ~0.6-0.75 s per simulated year | 2026-08-21, mean 0.63 s |
 | Background processes closed | ~0.27-0.43 s per simulated year | 2026-09-22, mean 0.31 s |
@@ -35,7 +35,7 @@ Check which regime the machine is in (`tasklist`) before judging a `year` readin
 
 ## Steps
 
-1. Pick the mode that answers the question (table above). Default to `-t 2`.
+1. Pick the mode that answers the question (table above). Default to `-t 2,0` (no interactive thread; the `threads` mode launches `-t N,0` too).
 2. Before trusting a slow or surprising `year`/`threads` reading, rule out noise:
 
    | Cause | Check |

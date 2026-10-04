@@ -5,6 +5,59 @@ Notable changes to GREBClimate.jl, following
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-10-04
+
+### Changed
+
+- A scenario with an `SSTOffset` (`:sst_plus1`) no longer allocates a copy of
+  the temperature climatology at every step. Results are unchanged.
+- The `observer` keyword of `greb_model!` and `GREBClimate.BudgetCheck` are no
+  longer marked experimental. The contents of the observer's `view` are part
+  of the interface from here on.
+
+### Changes to model results
+
+- `:regional_co2_nh`, `:regional_co2_sh`, `:regional_co2_tropics` and
+  `:regional_co2_extratropics` (any scenario with a `LatitudeMask`): the mask
+  was already active in the spin-up and the control, which therefore ran on
+  half the control CO2 outside the band, and the scenario then doubled the CO2
+  everywhere relative to that control. The mask now applies from the start of
+  the scenario only, as in the original GREB code (`subroutine forcing`). **The
+  results of these four presets change**: the response outside the band is
+  much smaller than before. `SurfaceMask` presets are unaffected.
+
+### Removed
+
+- Seven fields of `CirculationWorkspace` that were written every step and read
+  by nothing: `qs`, `rq`, `Tskin`, `ws_base`, `cE_buf`, `temp_buf` and
+  `a_atmos_buf`. Results are bit-identical.
+
+### Fixed
+
+- `corrections = Stored()` without `jld2_dir` no longer zeroes the flux
+  corrections that `load_greb_jld2!` put in `fields`: it runs on them. Before,
+  such a run (for example `greb_model!(run, preset(:decon_mean_climate);
+  fields)`) logged one warning and ran without corrections. With `jld2_dir`
+  given, a missing corrections file is now an `ArgumentError`.
+- `load_greb_jld2!` with an unknown `dataset` (for example `:era5`) raises an
+  `ArgumentError` naming the valid ones. Before, it loaded the NCEP files and
+  printed the name it was given.
+- A scenario with a `SurfaceMask` (`:regional_co2_ocean`,
+  `:regional_co2_land_ice`) run with `RunSpec(ctrl = 0)` raises an
+  `ArgumentError`. Before, the mask was built from an ice cover of zero.
+- Several `greb_model!` runs in parallel tasks no longer fail with a JLD2
+  error (`InvalidDataException`, `EOFError`) when they read dataset files at
+  the same time: the loaders take a lock around each file open.
+- `load_solar_forcing_jld2` with an orbital `index` that is not in the table
+  raises an `ArgumentError` listing the available ones, and `load_greb_jld2!`
+  raises an error naming the file when the solar table has the wrong shape.
+  Both were `@assert`s, which Julia may skip.
+- Docstrings corrected: `CO2Table` lists the `:rcp85` key; `Hydrology`
+  describes `:skin_gust` as it is computed (no skin temperature);
+  `ClimateFields` no longer says one instance per run, and states that
+  all-zero fields give NaN output, not a 40 K world; `tendencies!` and
+  `mscm_hydrology` had a cut-off sentence and a missing separator.
+
 ## [2.0.0] - 2026-10-01
 
 ### Added

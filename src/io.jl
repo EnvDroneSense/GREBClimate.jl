@@ -1,3 +1,7 @@
+# JLD2 cannot open one file from several tasks at once: runs side by side
+# take this lock around every open.
+const _JLD2_LOCK = ReentrantLock()
+
 """
     read_jld2(filepath::String)
 
@@ -12,7 +16,7 @@ Read a `.jld2` field file written by `tools/dataset/convert_greb_to_jld2.jl`.
   - `ctl`: raw GrADS `.ctl` metadata text, or `nothing` if the file has none
 """
 function read_jld2(filepath::String)
-    jldopen(filepath, "r") do file
+    @lock _JLD2_LOCK jldopen(filepath, "r") do file
         return (
             data=file["data"],
             dim_names=file["dim_names"],
@@ -43,7 +47,7 @@ function load_solar_forcing_jld2(jld2_dir::String, forcing_type::Symbol, index::
         result = read_jld2(filepath)
         values = Int.(result.coords[1])
         pos = findfirst(==(index), values)
-        @assert pos !== nothing "Eccentricity index $index not found in $(values)"
+        pos === nothing && throw(ArgumentError("eccentricity index $index is not in the table; available: $(values)"))
         return result.data[pos, :, :]
 
     elseif forcing_type == :obliquity
@@ -51,7 +55,7 @@ function load_solar_forcing_jld2(jld2_dir::String, forcing_type::Symbol, index::
         result = read_jld2(filepath)
         values = Int.(result.coords[1])
         pos = findfirst(==(index), values)
-        @assert pos !== nothing "Obliquity index $index not found in $(values)"
+        pos === nothing && throw(ArgumentError("obliquity index $index is not in the table; available: $(values)"))
         return result.data[pos, :, :]
 
     else
@@ -69,7 +73,7 @@ function load_co2_scenario_jld2(jld2_dir::String, scenario::Symbol)
     filepath = joinpath(jld2_dir, "scenario", "ipcc_scenarios.jld2")
     isfile(filepath) ||
         error("Scenario file not found: $filepath (run tools/dataset/convert_greb_to_jld2.jl)")
-    scenarios = jldopen(filepath, "r") do file
+    scenarios = @lock _JLD2_LOCK jldopen(filepath, "r") do file
         file["scenarios"]
     end
     key = string(scenario)
@@ -114,7 +118,7 @@ function load_flux_corrections_jld2!(jld2_dir::String, fields::ClimateFields)
 
     filepath = joinpath(jld2_dir, "climatology", "flux_corrections.jld2")
     if isfile(filepath)
-        jldopen(filepath, "r") do file
+        @lock _JLD2_LOCK jldopen(filepath, "r") do file
             for (key, array) in correction_keys
                 if haskey(file, key)
                     array .= file[key]
@@ -181,9 +185,9 @@ end
 
 Load all GREB input data from JLD2 formatted files, returning a fresh
 [`ClimateFields`](@ref). `dataset` (`:ncep`/`:era`) selects which
-climatology *files* to read; this is independent of `Hydrology.rain_fit`,
-which only selects the rain-regression *coefficients* (see
-[`Hydrology`](@ref)).
+climatology *files* to read, and any other value is an `ArgumentError`; this
+is independent of `Hydrology.rain_fit`, which only selects the
+rain-regression *coefficients* (see [`Hydrology`](@ref)).
 """
 function load_greb_jld2!(jld2_dir::String; dataset::Symbol=:ncep)
     if !isdir(jld2_dir)
@@ -218,8 +222,9 @@ function load_greb_jld2!(jld2_dir::String; dataset::Symbol=:ncep)
         )
     )
 
-    # Use mixed dataset as fallback
-    files = get(file_map, dataset, file_map[:ncep])
+    haskey(file_map, dataset) ||
+        throw(ArgumentError("unknown dataset :$dataset; use one of $(join(repr.(sort!(collect(keys(file_map)))), ", "))"))
+    files = file_map[dataset]
 
     println("📂 Loading 3D climatology ($dataset dataset)...")
     climatology_dir = joinpath(jld2_dir, "climatology")
@@ -266,7 +271,8 @@ function load_greb_jld2!(jld2_dir::String; dataset::Symbol=:ncep)
     solar_path = joinpath(jld2_dir, "solar", "solar_radiation.clim.jld2")
     if isfile(solar_path)
         solar_result = read_jld2(solar_path)
-        @assert size(solar_result.data) == (ydim, nstep_yr) "Wrong solar dimensions"
+        size(solar_result.data) == (ydim, nstep_yr) ||
+            error("$solar_path holds a $(size(solar_result.data)) table, expected ($ydim, $nstep_yr)")
         fields.sw_solar .= solar_result.data
     else
         error("Solar radiation file not found: $solar_path")

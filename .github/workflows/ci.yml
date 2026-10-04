@@ -36,7 +36,7 @@ jobs:
           # when nthreads() > 1 (src/core/tendencies.jl). Thread count is fixed at
           # startup, so a 1-thread test process never reaches that branch.
           # Pkg.test's subprocess inherits this.
-          JULIA_NUM_THREADS: '2'
+          JULIA_NUM_THREADS: '2,0'
           # The dataset is not available in CI, and the tests resolve it with
           # allow_download=false, so data-dependent testsets skip. This is a
           # belt-and-braces guard: if something ever does reach the DataDep,

@@ -1,16 +1,11 @@
 # The two properties the physics kernels rest on: allocations are a bounded
-# constant regardless of grid size, and the return type is concrete. Both
-# tables below are hand-written, so the first testset asserts they cover every
-# kernel defined in the physics/circulation/tendencies files - add an eleventh
-# kernel and that assertion fails rather than the kernel going unguarded.
-#
-# Scope is the physics kernels only. The other per-timestep functions -
-# `output!`, `time_loop!`, `accumulate!`, `diagnostics!`, `forcing` - are not
-# covered here. Package-level hygiene lives in test_aqua.jl.
+# constant regardless of grid size, and the return type is concrete. The first
+# testset asserts that the hand-written tables cover every kernel in the
+# physics, circulation and tendencies files. `output!`, `time_loop!`,
+# `accumulate!`, `diagnostics!` and `forcing` are not covered here.
 
-# One fixture for both testsets. `fields` is an unloaded (all-zero) climatology
-# on purpose - these tests measure allocations and inferred types, not physics,
-# and an unloaded ClimateFields costs nothing to build.
+# One fixture for both testsets: an unloaded (all-zero) climatology, since
+# these tests measure allocations and inferred types, not physics.
 function _kernel_fixture()
     X, Y = GREBClimate.xdim, GREBClimate.ydim
     fields = ClimateFields()
@@ -35,17 +30,15 @@ function _kernel_fixture()
     )
 end
 
-# Kernels write into pre-allocated `CirculationWorkspace` buffers and return a
-# NamedTuple referencing them, so the only allocation is the tuple box - bytes,
-# not scaling with xdim*ydim. A regression that allocates per grid cell
-# overshoots by ~4 orders of magnitude, so scale matters, not exact counts.
+# Kernels write into pre-allocated workspace buffers and return a NamedTuple
+# of references, so the only allocation is the tuple. A regression that
+# allocates per grid cell overshoots by ~4 orders of magnitude.
 @testset "physics kernels allocate a bounded constant" begin
     f = _kernel_fixture()
 
-    # (name, thunk, byte budget). Budgets are the measured cost rounded up to
-    # the next power of two. tendencies! is larger only because it returns a
-    # 16-field tuple: with ws_a === ws_q === ws its two circulation! calls run
-    # serially, so nothing here pays for @spawn.
+    # (name, thunk, byte budget): the measured cost rounded up to a power of
+    # two. tendencies! is larger because it returns a 16-field tuple; its two
+    # circulation! calls run serially here, so nothing pays for @spawn.
     kernels = [
         ("SWradiation!", () -> SWradiation!(f.Ts, f.fields, f.state, f.ts, f.p, f.ws), 64),
         ("LWradiation!", () -> LWradiation!(f.Ts, f.Ta, f.q, 340.0f0, f.fields, f.ts, f.p, f.ws), 64),

@@ -32,7 +32,7 @@ const _RAIN_FIT_NCEP = (-1.27f0, 1.99f0, -16.54f0, 21.15f0)
 
 A [`Config`](@ref) with the data its names refer to: `config`, `hydrology`
 (a [`ResolvedHydrology`](@ref)), `co2_table` (year => ppm, empty unless the
-scenario's CO₂ comes from a [`CO2Table`](@ref) or [`CO2File`](@ref)) and
+scenario's CO2 comes from a [`CO2Table`](@ref) or [`CO2File`](@ref)) and
 `solar_table` (the [`SolarTable`](@ref) insolation, or `nothing`). Build it
 with [`resolve`](@ref); [`greb_model!`](@ref) does so itself.
 """
@@ -48,8 +48,8 @@ end
     resolve(hydrology::Hydrology) -> ResolvedHydrology
 
 Replace the names in `config` with what they refer to: the rain coefficients
-of its hydrology scheme, and the CO₂ or solar table its scenario reads from
-the dataset in `jld2_dir` (or from the user's CO₂ file).
+of its hydrology scheme, and the CO2 or solar table its scenario reads from
+the dataset in `jld2_dir` (or from the user's CO2 file).
 
 ```jldoctest
 julia> resolve(mscm_hydrology()).c_q

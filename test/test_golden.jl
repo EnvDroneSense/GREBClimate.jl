@@ -1,16 +1,12 @@
 # Golden regression against a saved snapshot of a real-dataset run.
 
 @testset "golden regression: real dataset control+scenario run matches snapshot" begin
-    # Tripwire for any refactor touching the physics kernels: a real 1yr
-    # control + 1yr scenario run against the actual NCEP dataset,
-    # snapshotted as monthly global-mean Ts/Ta/q, plus a control year
-    # after a one-year spin-up so the flux-correction spin-up is exercised too. The tolerances
-    # (1e-3 K, 1e-6 kg/kg) are about 30 times the drift measured between runs;
-    # they catch behaviour changes, not bit-level drift. Exact equality is
-    # checked by tools/validation/bit_identity.jl.
-    # Set RUN_GOLDEN=0 to skip this locally. CI skips it too - it has no
-    # dataset, so the !isdir(DATA_DIR) branch below always fires there. This
-    # guards nothing in CI: a golden break is local-red and CI-green.
+    # A 1-year control and 1-year scenario on the NCEP dataset, stored as
+    # monthly global-mean Ts/Ta/q, plus a control year after a one-year spin-up.
+    # The tolerances (1e-3 K, 1e-6 kg/kg) are about 30 times the drift measured
+    # between runs; exact equality is checked by tools/validation/bit_identity.jl.
+    # RUN_GOLDEN=0 skips it locally. CI has no dataset and always skips it, so
+    # a golden break is local-red and CI-green.
     if !isdir(DATA_DIR)
         @test_skip "greb_input_data/ not present"
     elseif get(ENV, "RUN_GOLDEN", "1") == "0"

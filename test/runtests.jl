@@ -3,15 +3,10 @@ using Test
 
 include("testutils.jl")
 
-# One file per subject area; `SHARD` decides which CI job runs each. Set
-# GREB_TEST_SHARD=light|heavy to run one group, or leave it unset (or "all")
-# so plain `Pkg.test()`/`]test` runs everything - sharding is opt-in, CI-only.
-#
-# Shards are grouped by measured runtime rather than file count, and only
-# roughly balanced: the heavy job is the greb_model! integration suite, the
-# golden regression and Aqua; the light job is everything else plus the
-# threading subprocesses. CI runs them in parallel, so wall-clock is set by
-# the heavy one.
+# One file per subject; `SHARD` decides which CI job runs each. Set
+# GREB_TEST_SHARD=light|heavy to run one group; unset (or "all") runs
+# everything. Shards are grouped by measured runtime: heavy is the greb_model!
+# integration suite, the golden regression and Aqua; light is the rest.
 const SHARD = [
     ("test_config.jl",     "light"),
     ("test_presets.jl",    "light"),

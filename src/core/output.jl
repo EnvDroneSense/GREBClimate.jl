@@ -26,7 +26,7 @@ function diagnostics!(it, year, CO2, surf::SurfaceState, tend, fields::ClimateFi
         global_mean = sum(state.Tsmn[i, j] * dxlat_grid[j] for i in 1:xdim, j in 1:ydim) /
                       (xdim * sum(dxlat_grid)) - 273.15f0
         point1 = state.Tsmn[48, 27] - 273.15f0   # Tropical Pacific
-        point2 = state.Tsmn[16, 38] - 273.15f0   # Hamburg/North Europe
+        point2 = state.Tsmn[16, 38] - 273.15f0   # 58 E, 51 N
 
         println(year, "  ", round(global_mean, digits=2),
             "  ", round(point1, digits=2),
@@ -131,7 +131,7 @@ function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
     Q_lat = tend.Q_lat; Q_sens = tend.Q_sens; dTa_crcl = tend.dTa_crcl
     LW_up = tend.LW_up; em = tend.em; Q_lat_air = tend.Q_lat_air
     dTo = tend.dTo; dT_ocean = tend.dT_ocean
-    temp_buf = ws.temp_buf; precip_out = ws.precip_out
+    precip_out = ws.precip_out
     evap_out = ws.evap_out; qcrcl_out = ws.qcrcl_out
 
     # Surface/air temperature, deep ocean, and humidity update
@@ -149,7 +149,6 @@ function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
             tb = ifelse(tb <= -q[i, j], -min_humidity_change * q[i, j], tb)
             tb = ifelse(tb > max_humidity_change, max_humidity_change, tb)
             tb = hydro_on * tb
-            temp_buf[i, j] = tb
             q[i, j] = q[i, j] + tb
 
             precip_out[i, j] = (-dq_rain_use[i, j]) * wz_vapor[i, j] * conv_factor

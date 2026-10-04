@@ -36,6 +36,9 @@
         @test all(==(0.0), fields_nocorr.ToF_correct)
         @test all(==(3.0), fields_nocorr.Tclim)  # loader itself still worked
 
+        # A dataset name the loader does not know is an error, not NCEP
+        @test_throws ArgumentError load_greb_jld2!(tmpdir; dataset = :era5)
+
         # "files present" branch: add the combined flux-correction file and reload.
         mkpath(joinpath(tmpdir, "climatology"))
         GREBClimate.jldopen(joinpath(tmpdir, "climatology", "flux_corrections.jld2"), "w") do f
@@ -53,6 +56,17 @@
         @test all(==(15.0), fields.TF_correct)
         @test all(==(16.0), fields.qF_correct)
         @test all(==(17.0), fields.ToF_correct)
+
+        # Tasks reading the same file at once all get its content
+        path = joinpath(tmpdir, "climatology", "Tocean.clim.jld2")
+        reads = [Threads.@spawn read_jld2(path).data for _ in 1:8]
+        @test all(t -> all(==(10.0), fetch(t)), reads)
+
+        # A solar table of the wrong shape is reported, with the file's name
+        GREBClimate.jldopen(joinpath(tmpdir, "solar", "solar_radiation.clim.jld2"), "w") do f
+            f["data"] = zeros(GREBClimate.ydim, 2); f["dim_names"] = ["lat", "time"]
+        end
+        @test_throws "solar_radiation.clim.jld2" load_greb_jld2!(tmpdir; dataset = :ncep)
     finally
         rm(tmpdir; recursive = true, force = true)
     end

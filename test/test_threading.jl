@@ -1,11 +1,9 @@
 # Threaded-vs-serial equivalence (spawns its own subprocesses).
 
 @testset "threaded circulation matches serial (subprocess -t 1 vs -t 2)" begin
-    # `tendencies!` runs circulation!(Ta) and circulation!(q) concurrently only
-    # when `Threads.nthreads() > 1` AND `ws_a !== ws_q` (see src/core/tendencies.jl).
-    # Thread count is fixed at Julia startup, so a single-threaded `Pkg.test()`
-    # can never reach that branch. Spawning both counts explicitly covers it
-    # however the suite is invoked.
+    # `tendencies!` runs the two circulation! calls concurrently only when
+    # `Threads.nthreads() > 1` and `ws_a !== ws_q`. Thread count is fixed at
+    # Julia startup, so both counts are started as subprocesses.
     utils = joinpath(@__DIR__, "testutils.jl")
     script = """
         using GREBClimate
@@ -47,7 +45,7 @@
 end
 
 @testset "threaded run matches serial on the real dataset (subprocess -t 1 vs -t 2)" begin
-    # The synthetic run above goes non-finite after about two months, so it
+    # The synthetic run above uses made-up fields with no sunlight, so it
     # compares little real physics. This one runs a flux-correction spin-up
     # and a control year on the dataset and compares every record field.
     if !isdir(DATA_DIR)

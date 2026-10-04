@@ -1,10 +1,7 @@
 # Package hygiene: stale deps, missing compat entries, method ambiguities,
-# type piracy, unbound type parameters. In the heavy shard because Aqua costs
-# ~24s (ambiguities 14s, stale_deps 8s, the rest under 1s).
-#
-# persistent_tasks is skipped: it re-precompiles the package in a subprocess to
-# find tasks or timers left running, and __init__ only registers a DataDep - it
-# starts nothing. Not worth 21s.
+# type piracy, unbound type parameters. In the heavy shard: Aqua costs ~24 s.
+# persistent_tasks is skipped: __init__ only registers a DataDep and starts
+# nothing, and the check costs 21 s.
 
 using Aqua
 

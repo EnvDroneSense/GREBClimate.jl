@@ -91,7 +91,16 @@ end
     end
 end
 
-@testset "CO2 masks: latitude bands at once, surface masks from the annual-mean ice cover" begin
+@testset "a latitude CO2 mask applies in the scenario only" begin
+    cfg = preset(:regional_co2_nh; corrections = NoCorrections())
+    part(phase, run) = at_first_step(v -> copy(v.fields.co2_part), run, cfg; phase, jld2_dir = "")
+    # The control runs on the full CO2 everywhere, as in the original code
+    @test all(isone, part(:ctrl, RunSpec(ctrl = 1, scnr = 0)))
+    scnr = part(:scnr, RunSpec(ctrl = 0, scnr = 1))
+    @test all(==(0.5f0), scnr[:, 1:24]) && all(isone, scnr[:, 25:48])
+end
+
+@testset "CO2 masks: latitude bands, surface masks from the annual-mean ice cover" begin
     f = ClimateFields()
     GREBClimate.apply_co2_mask!(LatitudeMask(:nh), f)
     @test all(==(0.5f0), f.co2_part[:, 1:24]) && all(isone, f.co2_part[:, 25:48])
@@ -105,6 +114,12 @@ end
     @test full(:sh) == lat[lat .< 0]
     @test full(:tropics) == lat[-33.75 .< lat .< 30]
     @test full(:extratropics) == lat[(lat .< -33.75) .| (lat .> 30)]
+    # Every fourth longitude of the two halved rows at the band edge keeps
+    # the full CO2
+    GREBClimate.apply_co2_mask!(LatitudeMask(:tropics), f)
+    @test findall(isone, f.co2_part[:, 15]) == 4:4:X && findall(isone, f.co2_part[:, 33]) == 4:4:X
+    GREBClimate.apply_co2_mask!(LatitudeMask(:extratropics), f)
+    @test findall(isone, f.co2_part[:, 16]) == 4:4:X && findall(isone, f.co2_part[:, 32]) == 4:4:X
 
     fields = ClimateFields()  # z_topo defaults to 0 everywhere -> land branch never fires
     icmn_ctrl = zeros(Float64, X, Y, 12)
@@ -188,6 +203,9 @@ end
             @test size(table) == (Y, N)
             @test all(==(999.0f0), table)
         end
+        # An orbital index that is not in the table
+        @test_throws ArgumentError load_solar_forcing_jld2(dir, :obliquity, 7)
+        @test_throws ArgumentError load_solar_forcing_jld2(dir, :eccentricity, 7)
 
         cfg = preset(:obliquity; index = 0, corrections = NoCorrections())
         @test all(==(999.0f0), at_first_step(v -> copy(v.fields.sw_solar), RunSpec(ctrl = 0, scnr = 1), cfg; jld2_dir = dir))
@@ -233,6 +251,10 @@ end
     land_ice = run_mask(:regional_co2_land_ice)
     @test land_ice.got == land_ice.expected
     @test all(isone, land_ice.got[1:(X - 48), :])    # land kept whatever the ice
+
+    # Without a control run there is no ice cover to build the mask from
+    @test_throws ArgumentError greb_model!(RunSpec(ctrl = 0, scnr = 1),
+        preset(:regional_co2_ocean; corrections = NoCorrections()); jld2_dir = "", allow_uninitialized = true)
 end
 
 @testset "boundary anomalies: the files load and are added to the climatology, in the scenario only" begin
@@ -390,11 +412,20 @@ end
             @test all(isfinite, stored)
             # Stored reads the file: the same as a run on those values without a spin-up
             @test isequal(stored, first_ts(SpinUp(0); preloaded = 0.5f0, jld2_dir = ""))
+            # Without a directory Stored keeps the corrections already in `fields`
+            @test isequal(stored, first_ts(Stored(); preloaded = 0.5f0, jld2_dir = ""))
             # NoCorrections zeroes whatever was there
             @test isequal(first_ts(NoCorrections(); preloaded = 0.5f0), first_ts(SpinUp(0); jld2_dir = ""))
             @test !isequal(stored, first_ts(NoCorrections()))
             # SpinUp computes them
             @test !isequal(stored, first_ts(SpinUp(1)))
+        end
+    end
+    # A directory without the corrections file is an error, not a run on zeros
+    with_tempdir() do empty_dir
+        @test_throws ArgumentError quiet() do
+            greb_model!(RunSpec(ctrl = 1, scnr = 0), preset(:full_model; corrections = Stored());
+                        jld2_dir = empty_dir, fields = synthetic_fields(), allow_uninitialized = true)
         end
     end
 end

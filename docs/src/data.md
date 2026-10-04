@@ -47,8 +47,7 @@ can hold several independent instances in one session, e.g. for parameter
 sweeps.
 
 A bare `ClimateFields()` is all zeros. Stepping the model on it runs to
-completion but produces a meaningless world pinned at the 40 K stability floor
-(−233 °C), so `greb_model!` refuses it. Runs that legitimately need no data
+completion but returns NaN in every field, so `greb_model!` refuses it. Runs that legitimately need no data
 opt in explicitly; see [Data-free runs](@ref).
 
 ## Directory structure

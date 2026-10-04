@@ -15,27 +15,27 @@ function seaice!(Ts0, fields::ClimateFields, timestate, p::Processes)
         return nothing   # No ice feedback: skip sea ice calculation
     end
 
-    # Compute ice‑dependent heat capacity for ocean points
-    @turbo for i in 1:xdim, j in 1:ydim
-        is_ocean = !@is_land(z_topo[i, j])
-        T = Ts0[i, j]
-        mld_val = mld[i, j]
-        cap_open = cap_ocean * mld_val
+    if p.ice_albedo
+        # Compute ice‑dependent heat capacity for ocean points
+        @turbo for i in 1:xdim, j in 1:ydim
+            is_ocean = !@is_land(z_topo[i, j])
+            T = Ts0[i, j]
+            mld_val = mld[i, j]
+            cap_open = cap_ocean * mld_val
 
-        # Ice fraction (0 = no ice, 1 = full ice)
-        ice_frac = ifelse(T <= To_ice1, 1.0f0,
-            ifelse(T >= To_ice2, 0.0f0,
-                1.0f0 - (T - To_ice1) * inv_To_ice_range))
+            # Ice fraction (0 = no ice, 1 = full ice)
+            ice_frac = ifelse(T <= To_ice1, 1.0f0,
+                ifelse(T >= To_ice2, 0.0f0,
+                    1.0f0 - (T - To_ice1) * inv_To_ice_range))
 
-        # Blend between land (ice) and open ocean capacities
-        cap_with_ice = cap_land * ice_frac + cap_open * (1.0f0 - ice_frac)
+            # Blend between land (ice) and open ocean capacities
+            cap_with_ice = cap_land * ice_frac + cap_open * (1.0f0 - ice_frac)
 
-        # Apply only to ocean points; keep land points unchanged
-        cap_surf[i, j] = ifelse(is_ocean, cap_with_ice, cap_surf[i, j])
-    end
-
-    # Override for experiments without ice‑albedo feedback
-    if !p.ice_albedo
+            # Apply only to ocean points; keep land points unchanged
+            cap_surf[i, j] = ifelse(is_ocean, cap_with_ice, cap_surf[i, j])
+        end
+    else
+        # Without the ice-albedo feedback the ocean keeps its open-water capacity
         @turbo for i in 1:xdim, j in 1:ydim
             cap_surf[i, j] = ifelse(@is_land(z_topo[i, j]), cap_land, cap_ocean * mld[i, j])
         end

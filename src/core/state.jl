@@ -18,7 +18,6 @@ Base.@kwdef mutable struct CirculationWorkspace
     dX_conv::Matrix{Float32} = zeros(Float32, xdim, ydim)  # convection output
 
     # Tendency buffers
-    temp_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # general workspace (humidity-update scratch)
     Q_sens_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Sensible heat flux buffer
 
     # State buffers
@@ -28,24 +27,18 @@ Base.@kwdef mutable struct CirculationWorkspace
     q0_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Humidity output
 
     # LW radiation buffers
-    e_co2_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial CO₂ buffer
+    e_co2_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial CO2 buffer
     e_vapor_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial water vapor buffer
     em_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial emissivity buffer
     LW_surf_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface longwave
     LW_down_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Downwelling longwave
     LW_up_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Upwelling longwave
 
-    # Hydrology buffers
-    qs::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Saturation humidity buffer
-    Tskin::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Skin temperature buffer
-    rq::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Relative humidity buffer
-    ws_base::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Base wind speed buffer
     # Hydrology
     Q_lat_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
     Q_lat_air_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
     dq_eva_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
     dq_rain_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
-    cE_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface exchange coefficient buffer
 
     # Deep_ocean
     dT_ocean_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
@@ -59,7 +52,6 @@ Base.@kwdef mutable struct CirculationWorkspace
     ice_cover_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # ice fraction
     a_surf_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # surface albedo
     albedo_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # combined albedo (surface + atmosphere)
-    a_atmos_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # atmospheric albedo
     sw_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # net shortwave flux
 
     # time_loop
@@ -89,8 +81,10 @@ end
 """
     MonthlyAccumulator
 
-Accumulates fields over a month for monthly-mean output.
-Reset after each month via `reset!`.
+Accumulates fields over a month for monthly-mean output. Reset after each
+month via `reset!`. `olrmm` and `lwdownmm` are summed with the signs of
+[`MonthlyRecord`](@ref) (`olr` positive upward, `lwdown` positive into the
+surface).
 """
 Base.@kwdef mutable struct MonthlyAccumulator
     Tmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface temperature accumulator
@@ -160,18 +154,17 @@ end
 """
     ClimateFields
 
-Loaded climatology, derived grid fields, flux corrections, and the
-regional-CO2 mask/solar table - everything `load_greb_jld2!` fills in and
-every physics function reads. One instance per `greb_model!` run; never
-shared as global state.
+Loaded climatology, derived grid fields, flux corrections, the CO2 mask and
+the insolation table: what `load_greb_jld2!` fills in and every physics
+function reads. It is passed as an argument, never held as global state. One
+loaded instance can serve several runs one after another: [`greb_model!`](@ref)
+restores the input fields it changes and derives the others again at the
+start of each run.
 
-`ClimateFields()` builds an all-zero instance and leaves `loaded = false`;
-`load_greb_jld2!` sets `loaded = true` once real climatology is in place.
-[`greb_model!`](@ref) refuses to run unloaded fields unless explicitly
-told to via `allow_uninitialized=true` - an all-zero climatology produces
-a physically meaningless world pinned at the 40 K floor (~-233 °C) rather
-than an error, so the
-flag exists to keep that path opt-in.
+`ClimateFields()` builds an all-zero instance with `loaded = false`;
+`load_greb_jld2!` sets `loaded = true`. [`greb_model!`](@ref) refuses unloaded
+fields unless `allow_uninitialized=true`: an all-zero climatology raises no
+error, it runs and returns NaN in every output field.
 """
 Base.@kwdef mutable struct ClimateFields
     # 2D fields (xdim, ydim)
@@ -223,7 +216,7 @@ Base.@kwdef mutable struct ClimateFields
     qF_correct::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
     ToF_correct::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
 
-    # Regional CO₂ mask (1.0 = full CO₂, 0.5 = half CO₂)
+    # Regional CO2 mask (1.0 = full CO2, 0.5 = half CO2)
     co2_part::Matrix{Float32} = ones(Float32, xdim, ydim)
 
     # false for a bare `ClimateFields()`; set by `load_greb_jld2!`. See the

@@ -1,9 +1,9 @@
 """
     tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, timestate, r::ResolvedConfig; ws_a=ws, ws_q=ws)
 
-Runs one timestep's physics pipeline - [`SWradiation!`](@ref) →
+Runs one timestep's physics pipeline: [`SWradiation!`](@ref) →
 [`LWradiation!`](@ref) → sensible heat → [`hydro!`](@ref) →
-[`circulation!`](@ref) (temperature, then humidity) → [`deep_ocean!`](@ref) -
+[`circulation!`](@ref) (temperature, then humidity) → [`deep_ocean!`](@ref)
 and returns a named tuple of every intermediate flux/tendency needed by
 [`diagnostics!`](@ref) and the caller's own state update.
 
@@ -11,7 +11,8 @@ The two `circulation!` calls are independent of each other and of every
 other stage (each reads only pre-timestep state and writes disjoint
 buffers), so when the caller supplies distinct `ws_a`/`ws_q` workspaces
 *and* `Threads.nthreads() > 1`, they run concurrently via `Threads.@spawn`
-while the remaining stages run on `ws`. With the default `ws_a=ws_q=ws`
+while the remaining stages run on `ws`. With the default `ws_a=ws_q=ws` they
+run one after the other.
 """
 function tendencies!(CO2, Ts, Ta, To, q, fields::ClimateFields, state::ModelState, ws::CirculationWorkspace,
     timestate, r::ResolvedConfig; ws_a::CirculationWorkspace=ws, ws_q::CirculationWorkspace=ws)
@@ -28,10 +29,10 @@ function tendencies!(CO2, Ts, Ta, To, q, fields::ClimateFields, state::ModelStat
         circulation!(q, z_vapor, ws_q.dq_crcl, fields, ws_q, timestate, p)
     end
 
-    # Short-wave radiation → albedo, SW flux
+    # Short-wave radiation -> albedo, SW flux
     sw_out = SWradiation!(Ts, fields, state, timestate, p, ws)
 
-    # Long-wave radiation → LW_surf, LW_up, LW_down, emissivity
+    # Long-wave radiation -> LW_surf, LW_up, LW_down, emissivity
     lw_out = LWradiation!(Ts, Ta, q, CO2, fields, timestate, p, ws)
 
     # Sensible heat flux
@@ -42,7 +43,7 @@ function tendencies!(CO2, Ts, Ta, To, q, fields::ClimateFields, state::ModelStat
         fill!(Q_sens, 0.0f0)
     end
 
-    # Hydrological cycle → latent heat + evaporation/rain tendencies
+    # Hydrological cycle -> latent heat + evaporation/rain tendencies
     hy_out = hydro!(Ts, q, fields, timestate, p, r.hydrology, ws)
 
     # Deep ocean coupling
