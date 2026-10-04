@@ -330,7 +330,6 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     q .= q_ini;
     To .= To_ini
     year = s.start_year
-    CO2 = 340.0f0;
     mon = 1;
     irec = 0
 
