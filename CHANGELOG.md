@@ -5,6 +5,8 @@ Notable changes to GREBClimate.jl, following
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-05
+
 ### Added
 
 - Calendar functions `step_of_year`, `day_of_year`, `month_of_step` and
