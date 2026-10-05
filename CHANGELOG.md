@@ -31,7 +31,9 @@ Notable changes to GREBClimate.jl, following
 - The precompile workload runs a scenario year as well as a control year, so
   the first scenario run of a session compiles less.
 - The yearly line names what it shows:
-  `1970: Ts global mean 13.82 °C; 178 E 9 N 26.79; 58 E 51 N 4.85`.
+  `1970: Ts global mean 13.82 °C; 178 E 9 N 26.79; 58 E 51 N 4.85`. A spin-up
+  year reads `spin-up year 1: ...`, and a run without a scenario no longer
+  reports a scenario of 0 years.
 - **Breaking:** the RCP6.0 CO2 table is `CO2Table(:rcp60)`, the name of its
   preset. `load_co2_scenario_jld2(dir, :rcp6)`, and so a `CO2Table(:rcp6)` run, raise an
   `ArgumentError`. The `:rcp60` preset is unchanged.

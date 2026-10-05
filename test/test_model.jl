@@ -149,6 +149,17 @@ end
     end
 end
 
+@testset "what a run logs: spin-up years are labelled, an empty scenario is not announced" begin
+    cfg = preset(:full_model; corrections = SpinUp(1))
+    logs(run) = Test.collect_test_logs() do
+        greb_model!(run, cfg; fields = synthetic_fields(), allow_uninitialized = true)
+    end[1]
+    messages = [l.message for l in logs(RunSpec(ctrl = 1, scnr = 0))]
+    @test count(startswith("spin-up year 1: Ts global mean"), messages) == 1
+    @test count(startswith("1970: Ts global mean"), messages) == 1
+    @test any(startswith("Control run"), messages) && !any(startswith("Scenario run"), messages)
+end
+
 @testset "IPCC scenario CO2 tables load under the right on-disk key" begin
     # The resolve step loads each table once. Assert the loader against every
     # preset's key instead of paying a simulated year each.

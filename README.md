@@ -34,6 +34,7 @@ GREB is a conceptual climate model that simulates the global energy balance on a
 - **40+ experiments**: CO₂ scaling, IPCC RCP and SSP scenarios, a historical CO₂ hindcast, your own CO₂ trajectory, solar, orbital and paleoclimate forcing, and ENSO and regional-CO₂ runs ([experiment list](https://EnvDroneSense.github.io/GREBClimate.jl/dev/configuration/#Presets))
 - **Deconstruction experiments**: switch individual feedback processes off to isolate their role in the mean climate or the 2×CO₂ response ([switches](https://EnvDroneSense.github.io/GREBClimate.jl/dev/configuration/))
 - **Two climatologies**: NCEP and ERA-Interim
+- **Ensembles**: run many configurations side by side with `run_ensemble`, each member identical to its own single run
 - **Fast**: SIMD-vectorised physics, and the temperature and humidity transport run concurrently with `julia -t 2,0`
 - **Plots and notebook**: maps, time series, seasonal cycles, Hovmöller diagrams and animations ([guide](https://EnvDroneSense.github.io/GREBClimate.jl/dev/viz/))
 
@@ -95,7 +96,7 @@ A run has three phases, in years:
 | `ctrl` (`RunSpec`) | Control run at 340 ppm CO₂ (280 ppm for the IPCC CO₂-table scenarios; `:rcp85_boundary` uses 340) |
 | `scnr` (`RunSpec`) | Scenario run under the experiment's forcing |
 
-`result.ctrl` and `result.scnr` are vectors of monthly means, each a `NamedTuple` of 96×48 fields (`Ts, Ta, To, q, albedo, ice, precip, evap, qcrcl, sw, lw, qlat, qsens, olr, lwdown`). `result.scnr` is an **anomaly** against the control's final year, except for the orbital experiments and runs with `ctrl=0`. The [Tutorial](https://EnvDroneSense.github.io/GREBClimate.jl/dev/tutorial/) covers configuration switches, experiment keywords and reading the results; [`examples/run_greb.jl`](examples/run_greb.jl) is a runnable script.
+`result.ctrl` and `result.scnr` are vectors of monthly means, each a `NamedTuple` of 96×48 fields (`Ts, Ta, To, q, albedo, ice, precip, evap, qcrcl, sw, lw, qlat, qsens, olr, lwdown`). `result.scnr` is an **anomaly** against the control's final year, except for the orbital experiments and runs with `ctrl=0`. `global_mean(rec.Ts)` gives an area-weighted global mean, and `run_ensemble` runs a list of configurations side by side. The [Tutorial](https://EnvDroneSense.github.io/GREBClimate.jl/dev/tutorial/) covers configuration switches, experiment keywords, reading the results, ensembles and run checks; [`examples/run_greb.jl`](examples/run_greb.jl) is a runnable script.
 
 ## 🔬 Model Components
 

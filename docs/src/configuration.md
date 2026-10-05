@@ -89,6 +89,9 @@ A scenario that reads a table ([`CO2Table`](@ref), [`CO2File`](@ref),
 [`SolarTable`](@ref)) loads it when the configuration is resolved:
 [`greb_model!`](@ref) does this itself, from its `jld2_dir`.
 
+To compare several configurations, pass them as a list to
+[`run_ensemble`](@ref); the [Tutorial](@ref) shows how.
+
 ## Configuration types
 
 ```@autodocs

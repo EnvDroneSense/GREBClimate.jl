@@ -165,7 +165,7 @@ function qflux_correction!(CO2_ctrl, Ts, Ta, q, To, fields::ClimateFields, state
         seaice!(ws.Ts0_buf, fields, timestate, r.config.processes)
 
         surf = SurfaceState(ws.Ts0_buf, ws.Ta0_buf, ws.To0_buf, ws.q0_buf)
-        diagnostics!(it, 0.0, CO2_ctrl, surf, tend, fields, state, timestate)
+        diagnostics!(it, _SpinUpYear((it - 1) ÷ nstep_yr + 1), CO2_ctrl, surf, tend, fields, state, timestate)
 
         # Advance state
         @. Ts = ws.Ts0_buf
@@ -318,7 +318,7 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     apply_dynamic_co2_mask!(s.co2_mask, fields, ice_forcing)
 
     # ── 4. Scenario run ─────────────────────────────────────────
-    @info "Scenario run: $time_scnr yr"
+    time_scnr > 0 && @info "Scenario run: $time_scnr yr"
 
     # Solar-table scenarios: swap in the alternate insolation
     r.solar_table === nothing || (fields.sw_solar .= r.solar_table)

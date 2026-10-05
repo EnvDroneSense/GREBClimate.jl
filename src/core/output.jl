@@ -1,3 +1,9 @@
+# What the annual summary line of a spin-up year shows in place of a calendar year
+struct _SpinUpYear
+    n::Int
+end
+Base.show(io::IO, y::_SpinUpYear) = print(io, "spin-up year ", y.n)
+
 # The two cells of the annual summary line: label, longitude index, latitude index
 const _SAMPLE_CELLS = (("178 E 9 N", 48, 27), ("58 E 51 N", 16, 38))
 
