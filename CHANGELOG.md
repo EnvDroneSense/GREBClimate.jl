@@ -7,6 +7,10 @@ Notable changes to GREBClimate.jl, following
 
 ### Added
 
+- `run_ensemble([reduce,] run, configs; fields, jld2_dir, ntasks, logger)`: runs
+  many configurations side by side as tasks, each on its own copy of the
+  fields, and returns one entry per member. Every member gives exactly the
+  result of running it alone.
 - `global_mean(field)`: the area-weighted global mean of a field on the model
   grid. The examples use it; their plain means read 8 to 11 K too cold.
 - `GREBClimate.RangeCheck()`: an observer that records the first step at which

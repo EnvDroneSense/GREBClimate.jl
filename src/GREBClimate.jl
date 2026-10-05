@@ -13,11 +13,12 @@ module GREBClimate
 # Files below are included in dependency order: constants ->
 # config/{processes,scenario,presets} -> data -> state -> io -> config/resolve
 # -> physics/{radiation,hydrology,ocean,circulation} -> tendencies -> budgets
-# -> forcing -> output -> postprocess -> model.
+# -> forcing -> output -> postprocess -> model -> ensemble.
 # =============================================================================
 
 using LoopVectorization   # @turbo SIMD
 using JLD2
+using Logging: with_logger, NullLogger
 using DataDeps: DataDeps, DataDep, register, unpack, @datadep_str
 
 export Config, preset, preset_names, Scenario, Processes, Hydrology, mscm_hydrology
@@ -37,7 +38,7 @@ export SWradiation!, LWradiation!, hydro!, convergence!, seaice!, deep_ocean!
 export diffusion!, advection!, circulation!, tendencies!, forcing
 export diagnostics!, output!, time_loop!
 export build_monthly_climatology, apply_scenario_anomalies, compute_annual_ice_climatology, global_mean
-export qflux_correction!, greb_model!
+export qflux_correction!, greb_model!, run_ensemble
 export xdim, ydim, nstep_yr
 
 include("core/constants.jl")
@@ -58,6 +59,7 @@ include("forcing/forcing.jl")
 include("core/output.jl")
 include("core/postprocess.jl")
 include("core/model.jl")
+include("core/ensemble.jl")
 
 function __init__()
     # Registration only: nothing is downloaded until `greb_data_dir()` has to
@@ -67,7 +69,6 @@ function __init__()
 end
 
 using PrecompileTools: @compile_workload
-using Logging: with_logger, NullLogger
 
 @compile_workload begin
     with_logger(NullLogger()) do

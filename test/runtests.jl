@@ -20,6 +20,7 @@ const SHARD = [
     ("test_invariants.jl", "light"),
     ("test_threading.jl",  "light"),
     ("test_model.jl",      "heavy"),
+    ("test_ensemble.jl",   "heavy"),
     ("test_golden.jl",     "heavy"),
     ("test_aqua.jl",       "heavy"),
 ]
