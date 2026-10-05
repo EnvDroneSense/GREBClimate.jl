@@ -6,28 +6,10 @@ const ydim = 48
 const dlon = 360.0f0 / xdim                     # longitude spacing [degrees]
 const dlat = 180.0f0 / ydim                     # latitude spacing  [degrees]
 
-# ── Time stepping ─────────────────────────────────────────────────
-const ndays_yr = 365                            # days per year (no leap years)
+# ── Time stepping (the calendar is in calendar.jl) ────────────────
 const Δt = 12.0f0 * 3600.0f0                    # main time step [s] (12 hours)
 const Δt_crcl = 1800.0f0                        # circulation sub-time step [s] (30 min)
-const ndt_days = Int(round(24 * 3600 / Δt))     # time steps per day
-"""
-    nstep_yr
-
-Time steps per year (`ndays_yr * ndt_days` = 730). Together with [`xdim`](@ref)
-and [`ydim`](@ref) this fixes the shape of every field the model steps.
-
-```jldoctest
-julia> (xdim, ydim, nstep_yr)
-(96, 48, 730)
-```
-"""
-const nstep_yr = Int(ndays_yr * ndt_days)
 const ntime = max(1, Int(round(Δt / Δt_crcl)))  # Number of sub-steps within one main time step
-
-# ── Calendar ──────────────────────────────────────────────────────
-const cjday_mon = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-const jday_mon_cumsum = cumsum(cjday_mon)
 
 # ── Numerical limits ──────────────────────────────────────────────
 const min_T_K = 40.0f0              # numerical-stability floor [K]
@@ -147,13 +129,6 @@ const xghost = xdim + 2 * nghost
 
 # More ghost cells than grid points would wrap past the opposite edge.
 @assert nghost <= xdim
-
-# ── Calendar lookup ───────────────────────────────────────────────
-const max_timesteps = 200 * nstep_yr  # covers runs of up to 200 years
-const calendar_lookup = [(
-    day=mod((it - 1) ÷ ndt_days, ndays_yr) + 1,
-    step=mod(it - 1, nstep_yr) + 1
-) for it in 1:max_timesteps]
 
 # ── Polar rows: sub-stepping of diffusion! and advection! ─────────
 const polar_threshold = 2.5f5  # 250 km in meters

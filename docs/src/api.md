@@ -21,7 +21,7 @@ Pages = ["src/data.jl", "src/io.jl"]
 
 ```@autodocs
 Modules = [GREBClimate]
-Pages = ["core/state.jl", "core/constants.jl"]
+Pages = ["core/state.jl", "core/constants.jl", "core/calendar.jl"]
 ```
 
 ## Physics and forcing

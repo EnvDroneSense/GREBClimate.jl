@@ -9,6 +9,7 @@ include(joinpath("support", "testutils.jl"))
 # integration suite, the golden regression and Aqua; light is the rest.
 const SHARD = [
     ("test_config.jl",     "light"),
+    ("test_calendar.jl",   "light"),
     ("test_presets.jl",    "light"),
     ("test_processes.jl",  "light"),
     ("test_scenario.jl",   "light"),

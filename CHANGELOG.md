@@ -7,6 +7,9 @@ Notable changes to GREBClimate.jl, following
 
 ### Added
 
+- Calendar functions `step_of_year`, `day_of_year`, `month_of_step` and
+  `decimal_year`. The calendar is computed in one place and the 200-year
+  lookup table is gone (2.3 MB less memory); results are unchanged.
 - `run_ensemble([reduce,] run, configs; fields, jld2_dir, ntasks, logger)`: runs
   many configurations side by side as tasks, each on its own copy of the
   fields, and returns one entry per member. Every member gives exactly the

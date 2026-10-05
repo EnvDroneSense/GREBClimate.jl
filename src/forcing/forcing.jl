@@ -43,14 +43,14 @@ _co2_at(::CO2SineWave, it, year, r) = 510.0f0 + 170.0f0 * cos(2f0*Float32(π) * 
 
 _co2_at(c::CO2Step, it, year, r) = year >= c.year ? c.after : c.before
 
-# Boreal winter is October to March: up to the last step of March and from
-# the first step of October
-const _MARCH_END_STEP = 181
-const _OCTOBER_START_STEP = 547
+# Boreal winter is half the year: from the first step of 1 October through the
+# first step of 1 April, as in the original code
+const _WINTER_FIRST_STEP = first_step_of(10, 1)
+const _WINTER_LAST_STEP = first_step_of(4, 1)
 
 function _co2_at(c::SeasonalCO2, it, year, r)
-    step = mod(it - 1, nstep_yr) + 1
-    winter = step <= _MARCH_END_STEP || step >= _OCTOBER_START_STEP
+    step = step_of_year(it)
+    winter = step <= _WINTER_LAST_STEP || step >= _WINTER_FIRST_STEP
     return winter == (c.season === :boreal_winter) ? c.inside : c.outside
 end
 

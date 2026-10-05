@@ -49,15 +49,15 @@ circulation output.
 """
 function output!(it, irec, mon, surf::SurfaceState, tend, ws::CirculationWorkspace,
     output_buf::Vector{MonthlyRecord}, acc::MonthlyAccumulator, timestate)
-    mon = clamp(mon, 1, 12)
+    mon = clamp(mon, 1, MONTHS_PER_YEAR)
 
     accumulate!(acc, surf.Ts, surf.Ta, surf.To, surf.q, tend.albedo, tend.ice_cover,
         ws.precip_out, ws.evap_out, ws.qcrcl_out, tend.SW, tend.LW_surf, tend.Q_lat, tend.Q_sens,
         tend.LW_up, tend.LW_down, tend.em)
 
     # ----- Check end of month -----
-    if timestate.jday == jday_mon_cumsum[mon] && (it % ndt_days == 0)
-        ndm = cjday_mon[mon] * ndt_days
+    if timestate.jday == jday_mon_cumsum[mon] && is_day_end(it)
+        ndm = steps_in_month(mon)
         irec += 1
         push!(output_buf, (
             Ts=acc.Tmm ./ ndm,
@@ -77,7 +77,7 @@ function output!(it, irec, mon, surf::SurfaceState, tend, ws::CirculationWorkspa
             lwdown=acc.lwdownmm ./ ndm
         ))
         reset!(acc)
-        mon = mon == 12 ? 1 : mon + 1
+        mon = mod(mon, MONTHS_PER_YEAR) + 1
     end
     return (mon=mon, irec=irec)
 end
@@ -98,13 +98,8 @@ function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
     fields::ClimateFields, state::ModelState, ws::CirculationWorkspace, acc::MonthlyAccumulator,
     timestate, r::ResolvedConfig; ws_a::CirculationWorkspace=ws, ws_q::CirculationWorkspace=ws,
     observer=nothing, phase::Symbol=:ctrl)
-    # Calendar lookup
-    cal = it <= max_timesteps ? calendar_lookup[it] : (
-        day=mod((it - 1) ÷ ndt_days, ndays_yr) + 1,
-        step=mod(it - 1, nstep_yr) + 1
-    )
-    timestate.jday = cal.day
-    timestate.ityr = cal.step
+    timestate.jday = day_of_year(it)
+    timestate.ityr = step_of_year(it)
     ityr = timestate.ityr
 
     # Compute tendencies

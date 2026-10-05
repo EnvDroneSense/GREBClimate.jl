@@ -10,7 +10,7 @@ module GREBClimate
 # lives in `notebooks/GREB_explorer.jl`; see the package docs or README for
 # usage.
 #
-# Files below are included in dependency order: constants ->
+# Files below are included in dependency order: constants -> calendar ->
 # config/{processes,scenario,presets} -> data -> state -> io -> config/resolve
 # -> physics/{radiation,hydrology,ocean,circulation} -> tendencies -> budgets
 # -> forcing -> output -> postprocess -> model -> ensemble.
@@ -40,8 +40,10 @@ export diagnostics!, output!, time_loop!
 export build_monthly_climatology, apply_scenario_anomalies, compute_annual_ice_climatology, global_mean
 export qflux_correction!, greb_model!, run_ensemble
 export xdim, ydim, nstep_yr
+export step_of_year, day_of_year, month_of_step, decimal_year
 
 include("core/constants.jl")
+include("core/calendar.jl")
 include("config/processes.jl")
 include("config/scenario.jl")
 include("config/presets.jl")

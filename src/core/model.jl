@@ -116,9 +116,9 @@ place as it integrates. `ws_a`/`ws_q` are forwarded to [`tendencies!`](@ref).
 function qflux_correction!(CO2_ctrl, Ts, Ta, q, To, fields::ClimateFields, state::ModelState, timestate, r::ResolvedConfig, ws::CirculationWorkspace, years;
     ws_a::CirculationWorkspace=ws, ws_q::CirculationWorkspace=ws)
     cap_surf = fields.cap_surf
-    for it in 1:(years*ndt_days*ndays_yr)
-        timestate.jday = mod((it - 1) ÷ ndt_days, ndays_yr) + 1
-        timestate.ityr = mod(it - 1, nstep_yr) + 1
+    for it in 1:(years*nstep_yr)
+        timestate.jday = day_of_year(it)
+        timestate.ityr = step_of_year(it)
         ityr = timestate.ityr
 
         tend = tendencies!(CO2_ctrl, Ts, Ta, To, q, fields, state, ws, timestate, r; ws_a=ws_a, ws_q=ws_q)
@@ -304,7 +304,7 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
         (mon, irec) = time_loop!(it, year, CO2_ctrl, mon, irec,
             Ts, Ta, q, To, ctrl_output, fields, state, ws, acc, timestate, r;
             ws_a=ws_a, ws_q=ws_q, observer=observer, phase=:ctrl)
-        if mod(it, nstep_yr) == 0
+        if is_year_end(it)
             year += 1
         end
     end
@@ -350,14 +350,14 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
 
         # Forced‑boundary experiments: overwrite Ts with climatology
         if is_forced_boundary
-            ityr_now = mod(it - 1, nstep_yr) + 1
+            ityr_now = step_of_year(it)
             Ts .= @view fields.Tclim[:, :, ityr_now]
         end
 
         # Ocean surface held at climatology plus an offset, CO2 at control
         if s.surface isa SSTOffset
             CO2 = CO2_ctrl
-            ityr_now = mod(it - 1, nstep_yr) + 1
+            ityr_now = step_of_year(it)
             @views @. Ts = ifelse(!is_land(fields.z_topo), fields.Tclim[:, :, ityr_now] + s.surface.K, Ts)
         end
 
@@ -365,7 +365,7 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
             Ts, Ta, q, To, scnr_output, fields, state, ws, acc, timestate, r;
             ws_a=ws_a, ws_q=ws_q, observer=observer, phase=:scnr)
 
-        if mod(it, nstep_yr) == 0
+        if is_year_end(it)
             year += 1
         end
     end

@@ -6,7 +6,7 @@ Returns a 12-month climatology taken from the *final* year of `records`.
 function build_monthly_climatology(records::Vector{MonthlyRecord})::Vector{MonthlyRecord}
     isempty(records) && return MonthlyRecord[]
 
-    nmonths = 12
+    nmonths = MONTHS_PER_YEAR
     n = length(records)
     final_year = records[max(1, n - nmonths + 1):n]
 
@@ -32,7 +32,7 @@ function apply_scenario_anomalies(scnr_records::Vector{MonthlyRecord}, ctrl_clim
     anom = MonthlyRecord[]
 
     for (idx, rec) in enumerate(scnr_records)
-        mon = mod(idx - 1, 12) + 1
+        mon = mod(idx - 1, MONTHS_PER_YEAR) + 1
         ref = ctrl_clim[mon]
         push!(anom, NamedTuple{fields}(
             Tuple(getfield(rec, fld) .- getfield(ref, fld) for fld in fields)))
@@ -47,10 +47,10 @@ Returns `ctrl_output`'s `ice` field from the *final* year, as an
 `(xdim, ydim, 12)` array.
 """
 function compute_annual_ice_climatology(ctrl_output::Vector{MonthlyRecord})
-    ice_months = zeros(Float32, xdim, ydim, 12)
+    ice_months = zeros(Float32, xdim, ydim, MONTHS_PER_YEAR)
     isempty(ctrl_output) && return ice_months
 
-    nmonths = 12
+    nmonths = MONTHS_PER_YEAR
     n = length(ctrl_output)
     final_year = ctrl_output[max(1, n - nmonths + 1):n]
 
