@@ -18,27 +18,27 @@ resets the accumulators for the next year. `tend` is the `NamedTuple`
 """
 function diagnostics!(it, year, CO2, surf::SurfaceState, tend, fields::ClimateFields, state::ModelState, timestate)
     # Accumulate
-    Tsmn = state.Tsmn
+    Ts_annual_mean = state.Ts_annual_mean
     Ts = surf.Ts
 
     @turbo for j in 1:ydim
         for i in 1:xdim
-            Tsmn[i, j] += Ts[i, j]
+            Ts_annual_mean[i, j] += Ts[i, j]
         end
     end
 
     if timestate.ityr == nstep_yr
         # Compute annual means
         n = nstep_yr
-        state.Tsmn ./= n
+        state.Ts_annual_mean ./= n
 
         # Annual-mean surface temperature (°C): global mean and the two sample cells
         celsius(T) = round(T - 273.15; digits=2)
-        cells = join(("$label $(celsius(state.Tsmn[i, j]))" for (label, i, j) in _SAMPLE_CELLS), "; ")
-        @info "$year: Ts global mean $(celsius(global_mean(state.Tsmn))) °C; $cells"
+        cells = join(("$label $(celsius(state.Ts_annual_mean[i, j]))" for (label, i, j) in _SAMPLE_CELLS), "; ")
+        @info "$year: Ts global mean $(celsius(global_mean(state.Ts_annual_mean))) °C; $cells"
 
         # Reset accumulators
-        fill!(state.Tsmn, 0.0f0)
+        fill!(state.Ts_annual_mean, 0.0f0)
     end
     return nothing
 end
@@ -53,7 +53,7 @@ and advances to the next month. Returns `(mon, irec)`. `tend` is the
 `qcrcl` hold this step's converted precipitation/evaporation/moisture-
 circulation output.
 """
-function output!(it, irec, mon, surf::SurfaceState, tend, ws::CirculationWorkspace,
+function output!(it, irec, mon, surf::SurfaceState, tend, ws::ModelWorkspace,
     output_buf::Vector{MonthlyRecord}, acc::MonthlyAccumulator, timestate)
     mon = clamp(mon, 1, months_per_year)
 
@@ -101,8 +101,8 @@ enable. `observer` is called before and after the update (see
 [`greb_model!`](@ref)); `phase` is passed on to it.
 """
 function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
-    fields::ClimateFields, state::ModelState, ws::CirculationWorkspace, acc::MonthlyAccumulator,
-    timestate, r::ResolvedConfig; ws_a::CirculationWorkspace=ws, ws_q::CirculationWorkspace=ws,
+    fields::ClimateFields, state::ModelState, ws::ModelWorkspace, acc::MonthlyAccumulator,
+    timestate, r::ResolvedConfig; ws_a::ModelWorkspace=ws, ws_q::ModelWorkspace=ws,
     observer=nothing, phase::Symbol=:ctrl)
     timestate.jday = day_of_year(it)
     timestate.ityr = step_of_year(it)
@@ -115,9 +115,9 @@ function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
         observer(:after_tendencies, _step_view(phase, it, year, ityr, CO2, Ts, Ta, To, q, tend, fields, r))
 
     # Correction views
-    TF_corr = @view fields.TF_correct[:, :, ityr]
-    qF_corr = @view fields.qF_correct[:, :, ityr]
-    ToF_corr = @view fields.ToF_correct[:, :, ityr]
+    TF_corr = @view fields.Ts_flux_correction[:, :, ityr]
+    qF_corr = @view fields.q_flux_correction[:, :, ityr]
+    ToF_corr = @view fields.To_flux_correction[:, :, ityr]
     cap_surf = fields.cap_surf
     wz_vapor = fields.wz_vapor
 
@@ -150,8 +150,8 @@ function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
             tb = hydro_on * tb
             q[i, j] = q[i, j] + tb
 
-            precip[i, j] = (-dq_rain_use[i, j]) * wz_vapor[i, j] * conv_factor
-            evap[i, j] = dq_eva_use[i, j] * wz_vapor[i, j] * conv_factor
+            precip[i, j] = (-dq_rain_use[i, j]) * wz_vapor[i, j] * q_to_mm_per_day
+            evap[i, j] = dq_eva_use[i, j] * wz_vapor[i, j] * q_to_mm_per_day
             qcrcl[i, j] = dq_crcl_use[i, j]
         end
     end

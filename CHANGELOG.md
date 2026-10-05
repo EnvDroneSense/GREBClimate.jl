@@ -43,7 +43,31 @@ Notable changes to GREBClimate.jl, following
   spelling of every other name in the package.
 - **Breaking:** the fields of `CirculationWorkspace` have no `_buf` or `_out`
   suffix: `ws.Q_lat_buf` is `ws.Q_lat`, `ws.precip_out` is `ws.precip`, and
-  so on for all 24.
+  so on for all 24. The type itself is `ModelWorkspace`; it was
+  `CirculationWorkspace`, although every kernel uses it.
+- **Breaking:** the fields of `ClimateFields` separate their words:
+
+  | Before | Now |
+  |---|---|
+  | `Tclim`, `Toclim`, `qclim` | `Ts_clim`, `To_clim`, `q_clim` |
+  | `uclim`, `vclim`, `wsclim` | `u_clim`, `v_clim`, `wind_speed_clim` |
+  | `omegaclim`, `omegastdclim` | `omega_clim`, `omega_std_clim` |
+  | `mldclim`, `cldclim`, `swetclim` | `mld_clim`, `cloud_clim`, `soil_wetness_clim` |
+  | `TF_correct`, `qF_correct`, `ToF_correct` | `Ts_flux_correction`, `q_flux_correction`, `To_flux_correction` |
+
+  The anomaly and split-wind fields follow their stem (`Ts_clim_anom_cc`,
+  `u_clim_pos`). `ModelState.Tsmn` is `Ts_annual_mean`, and
+  `ResolvedHydrology.c_omegastd` is `c_omega_std`.
+- **Breaking:** scenario fields say what they hold: `SSTOffset.offset` (was
+  `K`), `SolarConstant.offset` (was `dW`), `EarthSunDistance.percent` (was
+  `pct`), `SeasonalCO2.in_season` and `.out_of_season` (were `inside` and
+  `outside`). The keyword of the preset follows:
+  `preset(:earth_sun_distance; percent = 1.5)`. Positional construction is
+  unchanged.
+- **Breaking:** `build_monthly_climatology` is `monthly_climatology`,
+  `apply_scenario_anomalies` is `scenario_anomalies`,
+  `compute_annual_ice_climatology` is `ice_climatology`, and
+  `apply_dynamic_co2_mask!` is `apply_surface_mask!`.
 - **Breaking:** the kernels and loop functions are no longer exported, only
   what a user calls is. `SWradiation!`, `LWradiation!`, `hydro!`,
   `convergence!`, `seaice!`, `deep_ocean!`, `diffusion!`, `advection!`,
@@ -52,7 +76,10 @@ Notable changes to GREBClimate.jl, following
   or with `using GREBClimate: name`. Their names and behaviour are unchanged.
 - Internal constants that take part in the model's formulas are lower case
   (`is_polar`, `polar_diff_time2`, `ΔT_air_factor`); capitals are kept for
-  the package's own settings and tables. No exported name is affected.
+  the package's own settings and tables. Some are named after what they are:
+  `pi_f32` (was `const_pi`), `convergence_factor` (`const_factor`),
+  `q_to_mm_per_day` (`conv_factor`), `solar_percent` (`S0_var`) and
+  `emissivity_fit` (`p_emi`). No exported name is affected.
 - What a run and the loaders report goes through the logger (`@info`) and no
   longer through `println`: the lines carry an `[ Info:` prefix, go to
   standard error, and are silenced with

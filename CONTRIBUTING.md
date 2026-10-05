@@ -117,7 +117,7 @@ The model is written to run many simulated years, and the kernels are built
 around that:
 
 - Fields are `Float32` throughout, on a fixed `xdim x ydim` grid.
-- Physics kernels write into pre-allocated `CirculationWorkspace` buffers
+- Physics kernels write into pre-allocated `ModelWorkspace` buffers
   instead of allocating. `test/test_invariants.jl` enforces a small byte
   budget per physics kernel and checks its return type is concrete - a change
   that allocates per grid cell will fail it immediately. A new kernel must be

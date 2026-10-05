@@ -14,8 +14,8 @@ buffers), so when the caller supplies distinct `ws_a`/`ws_q` workspaces
 while the remaining stages run on `ws`. With the default `ws_a=ws_q=ws` they
 run one after the other.
 """
-function tendencies!(CO2, Ts, Ta, To, q, fields::ClimateFields, state::ModelState, ws::CirculationWorkspace,
-    timestate, r::ResolvedConfig; ws_a::CirculationWorkspace=ws, ws_q::CirculationWorkspace=ws)
+function tendencies!(CO2, Ts, Ta, To, q, fields::ClimateFields, state::ModelState, ws::ModelWorkspace,
+    timestate, r::ResolvedConfig; ws_a::ModelWorkspace=ws, ws_q::ModelWorkspace=ws)
 
     p = r.config.processes
     parallel = Threads.nthreads() > 1 && ws_a !== ws_q

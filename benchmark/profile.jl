@@ -530,13 +530,13 @@ function profile_dispatch(jld2_dir::AbstractString; out_dir=nothing)
     r = resolve(cfg; jld2_dir)
     CO2 = init_model!(r, fields).CO2_ctrl
     state = ModelState()
-    ws = CirculationWorkspace()
+    ws = ModelWorkspace()
     acc = GREBClimate.MonthlyAccumulator()
     timestate = TimeState(1, 1)
-    Ts = fields.Tclim[:, :, 1]
+    Ts = fields.Ts_clim[:, :, 1]
     Ta = copy(Ts)
-    To = fields.Toclim[:, :, 1]
-    q = fields.qclim[:, :, 1]
+    To = fields.To_clim[:, :, 1]
+    q = fields.q_clim[:, :, 1]
     records = GREBClimate.MonthlyRecord[]
 
     step = () -> GREBClimate.time_loop!(1, 1, CO2, 1, 0, Ts, Ta, q, To, records, fields, state, ws, acc, timestate, r)

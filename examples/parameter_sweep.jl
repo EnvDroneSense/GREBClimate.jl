@@ -24,7 +24,7 @@ config/fields instance and CO2 table. Returns a Vector of
 examples/parameter_sweep_results.csv.
 
 `result.scnr` holds one `MonthlyRecord` per month and is already an anomaly
-against the control's final-year monthly climatology (`apply_scenario_anomalies`
+against the control's final-year monthly climatology (`scenario_anomalies`
 in src/core/postprocess.jl), so no further subtraction happens here. Each anomaly
 below is the mean over the scenario's final 12 records, i.e. its final year.
 """

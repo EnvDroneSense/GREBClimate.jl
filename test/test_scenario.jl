@@ -21,7 +21,7 @@ end
     # not the default rows (32, 95): an ignored `index` must show
     @test preset(:eccentricity; index = 5).scenario.solar == SolarTable(:eccentricity, 5)
     @test preset(:obliquity; index = 10).scenario.solar == SolarTable(:obliquity, 10)
-    @test preset(:earth_sun_distance; pct = 2.5).scenario.solar == EarthSunDistance(2.5)
+    @test preset(:earth_sun_distance; percent = 2.5).scenario.solar == EarthSunDistance(2.5)
     @test preset(:custom_co2; path = "co2.txt").scenario.co2 == CO2File("co2.txt")
 end
 

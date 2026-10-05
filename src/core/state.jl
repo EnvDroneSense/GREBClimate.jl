@@ -1,10 +1,10 @@
 """
-    CirculationWorkspace
+    ModelWorkspace
 
 Pre-allocated buffers for diffusion, advection, and circulation calculations.
 Reused across all time steps to eliminate allocations.
 """
-Base.@kwdef mutable struct CirculationWorkspace
+Base.@kwdef mutable struct ModelWorkspace
     # Polar sub-stepping buffers. `T1h` carries ghost cells (see `nghost`).
     T1h::Vector{Float32} = zeros(Float32, xghost)  # polar sub-stepping (ghosted)
     dTxh::Vector{Float32} = zeros(Float32, xdim)  # polar increment (Jacobi scratch)
@@ -176,45 +176,45 @@ Base.@kwdef mutable struct ClimateFields
     wz_vapor::Matrix{Float32} = zeros(Float32, xdim, ydim)  # exp(-z_topo / z_vapor)
     rain_limit::Matrix{Float32} = zeros(Float32, xdim, ydim)  # -0.0015/(wz_vapor*r_qviwv*86400)
     # 3D climate fields (xdim, ydim, nstep_yr)
-    Tclim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # surface temperature [K]
-    uclim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # zonal wind [m/s]
-    vclim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # meridional wind [m/s]
-    qclim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # atmospheric humidity [kg/kg]
-    mldclim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # mixed-layer depth [m]
-    omegaclim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # vertical velocity [Pa/s]
-    omegastdclim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # omega std deviation [Pa/s]
-    wsclim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # wind speed [m/s]
+    Ts_clim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # surface temperature [K]
+    u_clim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # zonal wind [m/s]
+    v_clim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # meridional wind [m/s]
+    q_clim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # atmospheric humidity [kg/kg]
+    mld_clim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # mixed-layer depth [m]
+    omega_clim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # vertical velocity [Pa/s]
+    omega_std_clim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # omega std deviation [Pa/s]
+    wind_speed_clim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # wind speed [m/s]
 
     # Anomaly fields for ENSO/climate-change experiments
-    Tclim_anom_enso::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
-    uclim_anom_enso::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
-    vclim_anom_enso::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
-    omegaclim_anom_enso::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
-    wsclim_anom_enso::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
-    Tclim_anom_cc::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
-    uclim_anom_cc::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
-    vclim_anom_cc::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
-    omegaclim_anom_cc::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
-    wsclim_anom_cc::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
+    Ts_clim_anom_enso::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
+    u_clim_anom_enso::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
+    v_clim_anom_enso::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
+    omega_clim_anom_enso::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
+    wind_speed_clim_anom_enso::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
+    Ts_clim_anom_cc::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
+    u_clim_anom_cc::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
+    v_clim_anom_cc::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
+    omega_clim_anom_cc::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
+    wind_speed_clim_anom_cc::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
 
     # The winds split by sign (derive_fields!): pos + neg = the wind
-    uclim_pos::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # eastward part, 0 elsewhere
-    uclim_neg::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # westward part, 0 elsewhere
-    vclim_pos::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # northward part, 0 elsewhere
-    vclim_neg::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # southward part, 0 elsewhere
+    u_clim_pos::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # eastward part, 0 elsewhere
+    u_clim_neg::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # westward part, 0 elsewhere
+    v_clim_pos::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # northward part, 0 elsewhere
+    v_clim_neg::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # southward part, 0 elsewhere
 
-    Toclim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # deep ocean temperature [K]
-    cldclim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # cloud cover fraction
-    swetclim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # soil wetness [0-1]
+    To_clim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # deep ocean temperature [K]
+    cloud_clim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # cloud cover fraction
+    soil_wetness_clim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # soil wetness [0-1]
 
     # Solar / radiation
     sw_solar::Matrix{Float32} = zeros(Float32, ydim, nstep_yr)  # 24hr mean solar radiation [W/m²] (ydim, nstep_yr)
     dTrad::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # Tatmos-radiation offset
 
     # Flux correction arrays (zeros unless loaded from file)
-    TF_correct::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
-    qF_correct::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
-    ToF_correct::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
+    Ts_flux_correction::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
+    q_flux_correction::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
+    To_flux_correction::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
 
     # Regional CO2 mask (1.0 = full CO2, 0.5 = half CO2)
     co2_part::Matrix{Float32} = ones(Float32, xdim, ydim)
@@ -259,19 +259,19 @@ is_land(z_topo) = @is_land(z_topo)
     derive_fields!(fields::ClimateFields, p::Processes)
 
 Compute every field of `fields` that follows from its input maps: the
-radiation-temperature offset `dTrad` (from `Tclim`), the deep-ocean depth
-`z_ocean` (from `mldclim`), the pressure weights `wz_air`/`wz_vapor` and the
+radiation-temperature offset `dTrad` (from `Ts_clim`), the deep-ocean depth
+`z_ocean` (from `mld_clim`), the pressure weights `wz_air`/`wz_vapor` and the
 rain limit (from `z_topo`), the surface heat capacity `cap_surf` (from
-`z_topo` and `mldclim`) and the winds split by sign. Call it again after
+`z_topo` and `mld_clim`) and the winds split by sign. Call it again after
 changing an input map; [`init_model!`](@ref) calls it once per run.
 """
 function derive_fields!(fields::ClimateFields, p::Processes)
     z_topo = fields.z_topo
-    mldclim = fields.mldclim
+    mld_clim = fields.mld_clim
 
-    @. fields.dTrad = -0.16f0 * fields.Tclim - 5.0f0
+    @. fields.dTrad = -0.16f0 * fields.Ts_clim - 5.0f0
     # Three times the deepest mixed layer of the year
-    fields.z_ocean .= 3.0f0 .* dropdims(maximum(mldclim; dims=3); dims=3)
+    fields.z_ocean .= 3.0f0 .* dropdims(maximum(mld_clim; dims=3); dims=3)
 
     @. fields.wz_air = exp(-z_topo / z_air)
     @. fields.wz_vapor = exp(-z_topo / z_vapor)
@@ -279,7 +279,7 @@ function derive_fields!(fields::ClimateFields, p::Processes)
 
     cap_surf = fields.cap_surf
     for j in 1:ydim, i in 1:xdim
-        cap_surf[i, j] = is_land(z_topo[i, j]) || p.ocean === :none ? cap_land : cap_ocean * mldclim[i, j, 1]
+        cap_surf[i, j] = is_land(z_topo[i, j]) || p.ocean === :none ? cap_land : cap_ocean * mld_clim[i, j, 1]
     end
 
     split_winds!(fields)
@@ -288,8 +288,8 @@ end
 
 # Upwind advection reads the eastward/westward and northward/southward parts
 function split_winds!(fields::ClimateFields)
-    _split_sign!(fields.uclim_pos, fields.uclim_neg, fields.uclim)
-    _split_sign!(fields.vclim_pos, fields.vclim_neg, fields.vclim)
+    _split_sign!(fields.u_clim_pos, fields.u_clim_neg, fields.u_clim)
+    _split_sign!(fields.v_clim_pos, fields.v_clim_neg, fields.v_clim)
     return fields
 end
 
@@ -309,14 +309,14 @@ multiplier (`SWradiation!` reads it) and the surface-temperature accumulator
 behind the annual progress line (`diagnostics!` reads/writes it). One instance
 per `greb_model!` run.
 
-This is scratch space for the printed summary, not an output path - `Tsmn` is
+This is scratch space for the printed summary, not an output path - `Ts_annual_mean` is
 averaged, printed and zeroed within a single `diagnostics!` call, so it never
 holds a readable annual mean once the call returns. Model output is the
 `Vector{MonthlyRecord}` that [`greb_model!`](@ref) returns.
 """
 mutable struct ModelState
     sw_solar_forcing::Float32   # runtime solar multiplier used by SWradiation!
-    Tsmn::Matrix{Float32}       # surface-temperature accumulator for the progress line
+    Ts_annual_mean::Matrix{Float32}       # surface-temperature accumulator for the progress line
 end
 
 function ModelState()

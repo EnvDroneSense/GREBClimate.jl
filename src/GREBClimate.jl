@@ -28,13 +28,13 @@ export CO2Path, ConstantCO2, CO2Table, CO2File, A1BRamp, CO2SineWave, CO2Step, S
 export CO2Mask, UniformMask, LatitudeMask, SurfaceMask
 export Solar, ModernSolar, SolarConstant, SolarCycle, SolarTable, EarthSunDistance
 export SurfaceForcing, NoSurfaceForcing, BoundaryAnomaly, SSTOffset
-export RunSpec, CirculationWorkspace, MonthlyAccumulator, TimeState, MonthlyRecord
+export RunSpec, ModelWorkspace, MonthlyAccumulator, TimeState, MonthlyRecord
 export ClimateFields, ModelState, SurfaceState
 export greb_data_dir
 export load_climatology, load_flux_corrections!, load_boundary_anomaly!, read_field
 export load_co2_scenario, load_co2_custom, load_solar_forcing
-export apply_co2_mask!, apply_dynamic_co2_mask!, forcing
-export build_monthly_climatology, apply_scenario_anomalies, compute_annual_ice_climatology, global_mean
+export apply_co2_mask!, apply_surface_mask!, forcing
+export monthly_climatology, scenario_anomalies, ice_climatology, global_mean
 export greb_model!, run_ensemble
 export xdim, ydim, nstep_yr
 export step_of_year, day_of_year, month_of_step, decimal_year

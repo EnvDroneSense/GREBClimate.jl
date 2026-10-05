@@ -20,14 +20,14 @@ const TERMS = [
     "shortwave absorbed by the surface [W/m2]"      => (v, c) -> gmean((i, j) -> v.tend.SW[i, j]),
     "longwave out to space (olr) [W/m2]"            => (v, c) -> gmean((i, j) -> -v.tend.LW_up[i, j] - (1 - v.tend.em[i, j]) * v.tend.LW_surf[i, j]),
     "net flux into the surface [W/m2]"              => (v, c) -> gmean((i, j) -> G.surface_flux(v.tend, i, j)),
-    "surface flux correction [W/m2]"                => (v, c) -> gmean((i, j) -> v.fields.TF_correct[i, j, v.ityr]),
+    "surface flux correction [W/m2]"                => (v, c) -> gmean((i, j) -> v.fields.Ts_flux_correction[i, j, v.ityr]),
     "heat from the deep ocean to the surface [W/m2]" => (v, c) -> gmean((i, j) -> c[i, j] * v.tend.dT_ocean[i, j] / G.Δt),
     "net flux into the air [W/m2]"                  => (v, c) -> gmean((i, j) -> G.atmosphere_flux(v.tend, i, j)),
     "latent heat: surface loss + air gain [W/m2]"   => (v, c) -> gmean((i, j) -> v.tend.Q_lat[i, j] + v.tend.Q_lat_air[i, j]),
     "air temperature change by transport [K/step]"  => (v, c) -> gmean((i, j) -> v.tend.dTa_crcl[i, j]),
     "evaporation minus rain [kg/kg per step]"       => (v, c) -> gmean((i, j) -> G.Δt * (v.tend.dq_eva[i, j] + v.tend.dq_rain[i, j])),
     "humidity change by transport [kg/kg per step]" => (v, c) -> gmean((i, j) -> v.tend.dq_crcl[i, j]),
-    "humidity flux correction [kg/kg per step]"     => (v, c) -> gmean((i, j) -> v.fields.qF_correct[i, j, v.ityr]),
+    "humidity flux correction [kg/kg per step]"     => (v, c) -> gmean((i, j) -> v.fields.q_flux_correction[i, j, v.ityr]),
 ]
 
 mutable struct Phase

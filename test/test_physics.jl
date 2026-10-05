@@ -4,7 +4,7 @@
     # Q_sens = ct_sens * (Ta - Ts), checked against a hand-computed value.
     fields = ClimateFields()
     state = ModelState()
-    ws = CirculationWorkspace()
+    ws = ModelWorkspace()
     ts = TimeState(1, 1)
     r = resolve(preset(:full_model))
 
@@ -32,7 +32,7 @@ end
     # goes with the ocean
     fields = ClimateFields()
     fields.z_topo[1, 1], fields.z_topo[2, 1], fields.z_topo[3, 1] = -1.0f0, 0.0f0, 1.0f0
-    sw = SWradiation!(fill(270.0f0, X, Y), fields, ModelState(), TimeState(1, 1), Processes(), CirculationWorkspace())
+    sw = SWradiation!(fill(270.0f0, X, Y), fields, ModelState(), TimeState(1, 1), Processes(), ModelWorkspace())
     @test sw.ice_cover[2, 1] == sw.ice_cover[1, 1]
     @test sw.ice_cover[3, 1] > sw.ice_cover[1, 1]
     @test sw.albedo[2, 1] == sw.albedo[1, 1]
@@ -46,12 +46,12 @@ end
     fields.wz_air .= wz
     fields.wz_vapor .= wz
     for it in 1:GREBClimate.nstep_yr, k in 1:ydim_, i in 1:xdim_
-        fields.uclim_neg[i, k, it] = 0.5 + 0.0001 * i
-        fields.uclim_pos[i, k, it] = 0.3 + 0.0001 * k
-        fields.vclim_neg[i, k, it] = 0.4 + 0.0002 * i
-        fields.vclim_pos[i, k, it] = 0.2 + 0.0002 * k
+        fields.u_clim_neg[i, k, it] = 0.5 + 0.0001 * i
+        fields.u_clim_pos[i, k, it] = 0.3 + 0.0001 * k
+        fields.v_clim_neg[i, k, it] = 0.4 + 0.0002 * i
+        fields.v_clim_pos[i, k, it] = 0.2 + 0.0002 * k
     end
-    ws = CirculationWorkspace()
+    ws = ModelWorkspace()
     ts = TimeState(1, 1)
     p = Processes()
 
@@ -122,7 +122,7 @@ end
     Ts = fill(290.0, GREBClimate.xdim, GREBClimate.ydim)
     q = fill(0.005, GREBClimate.xdim, GREBClimate.ydim)
     h = ResolvedHydrology(:fitted, :bogus, 1, 0, 0, 0)
-    @test_throws ErrorException hydro!(Ts, q, ClimateFields(), TimeState(1, 1), Processes(), h, CirculationWorkspace())
+    @test_throws ErrorException hydro!(Ts, q, ClimateFields(), TimeState(1, 1), Processes(), h, ModelWorkspace())
 end
 
 @testset "hydro! fitted rain: dq_rain and Q_lat_air values, with no limit on rain" begin
@@ -135,7 +135,7 @@ end
     Ts = fill(290.0f0, GREBClimate.xdim, GREBClimate.ydim)
     q = fill(0.008f0, GREBClimate.xdim, GREBClimate.ydim)
     ts = TimeState(1, 1)
-    ws = CirculationWorkspace()
+    ws = ModelWorkspace()
     result = hydro!(Ts, q, fields, ts, Processes(), h, ws)
 
     expected_dq_rain = h.c_q * GREBClimate.cq_rain * q[1, 1]
@@ -166,7 +166,7 @@ end
         )
         for scheme in keys(expected)
             h = resolve(preset(:full_model; hydrology = (evaporation = scheme,))).hydrology
-            result = hydro!(Ts, q, fields, TimeState(1, 1), Processes(), h, CirculationWorkspace())
+            result = hydro!(Ts, q, fields, TimeState(1, 1), Processes(), h, ModelWorkspace())
             @test isapprox(result.Q_lat[1, 1], expected[scheme]; rtol = 1e-5)
             @test isapprox(result.dq_eva[1, 1], -expected[scheme] / G.cq_latent / G.r_qviwv; rtol = 1e-5)
         end
@@ -184,7 +184,7 @@ end
     Ts[1:2, 1] .= (260.0f0, (G.To_ice1 + G.To_ice2) / 2)
     Ts[1:2, 2] .= (250.0f0, (G.Tl_ice1 + G.Tl_ice2) / 2)
     state = ModelState()
-    run(p) = map(copy, SWradiation!(Ts, fields, state, TimeState(1, 1), p, CirculationWorkspace()))
+    run(p) = map(copy, SWradiation!(Ts, fields, state, TimeState(1, 1), p, ModelWorkspace()))
 
     a_atmos = 0.5 * G.a_cloud
     combined(a_surf) = a_surf + a_atmos - a_surf * a_atmos
@@ -218,14 +218,14 @@ end
 
 @testset "LWradiation!: emissivity and the longwave fluxes" begin
     G = GREBClimate
-    fields = constant_fields(z_topo = 1500.0)   # cloud cover 0.5, Tclim 280 K
+    fields = constant_fields(z_topo = 1500.0)   # cloud cover 0.5, Ts_clim 280 K
     G.derive_fields!(fields, Processes())
     Ts, Ta, q = fill(288.0f0, X, Y), fill(280.0f0, X, Y), fill(0.006f0, X, Y)
     run(co2; p = Processes(), f = fields) =
-        map(copy, LWradiation!(Ts, Ta, q, co2, f, TimeState(1, 1), p, CirculationWorkspace()))
+        map(copy, LWradiation!(Ts, Ta, q, co2, f, TimeState(1, 1), p, ModelWorkspace()))
     lw = run(340.0f0)
 
-    p1, p2, p3, p4, p5, p6, p7, p8, p9, p10 = Float64.(G.p_emi)
+    p1, p2, p3, p4, p5, p6, p7, p8, p9, p10 = Float64.(G.emissivity_fit)
     wz = exp(-1500 / G.z_air)
     co2, vapor = wz * 340, wz * G.r_qviwv * 0.006
     clear = p4 * log(p1 * co2 + p2 * vapor + p3) + p7 + p5 * log(p1 * co2 + p3) + p6 * log(p2 * vapor + p3)
@@ -278,13 +278,13 @@ end
     G = GREBClimate
     fields = constant_fields(z_topo = -1.0)   # ocean, 50 m mixed layer at every step
     fields.z_topo[4, 1] = 1.0f0               # land
-    fields.mldclim[1, 1, N] = 40.0f0          # the step before step 1: the layer deepens by 10 m
-    fields.mldclim[2, 1, N] = 60.0f0          # ... or shoals by 10 m
+    fields.mld_clim[1, 1, N] = 40.0f0          # the step before step 1: the layer deepens by 10 m
+    fields.mld_clim[2, 1, N] = 60.0f0          # ... or shoals by 10 m
     G.derive_fields!(fields, Processes())     # deep-ocean depth: 3 x the deepest mixed layer
     Ts = fill(290.0f0, X, Y)
     Ts[3, 1] = 260.0f0                        # under sea ice
     To = fill(280.0f0, X, Y)
-    ws = CirculationWorkspace()
+    ws = ModelWorkspace()
     r = deep_ocean!(Ts, To, fields, TimeState(1, 1), Processes(), ws)
     turb, mix = G.turb_coeff, G.c_effmix
     close(a, b) = isapprox(a, b; rtol = 1e-4)
@@ -316,7 +316,7 @@ end
     # only term left to move q is the flux correction. SpinUp(0) keeps the one
     # set here.
     fields = synthetic_fields()
-    fields.qF_correct .= 1.0f-4
+    fields.q_flux_correction .= 1.0f-4
     cfg = preset(:full_model; processes = (hydrology = :none,), corrections = SpinUp(0))
     q_ini = quiet(() -> init_model!(resolve(cfg), deepcopy(fields))).q_ini
     result = quiet() do

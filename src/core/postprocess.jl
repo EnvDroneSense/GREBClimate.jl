@@ -1,9 +1,9 @@
 """
-    build_monthly_climatology(records::Vector{MonthlyRecord})::Vector{MonthlyRecord}
+    monthly_climatology(records::Vector{MonthlyRecord})::Vector{MonthlyRecord}
 
 Returns a 12-month climatology taken from the *final* year of `records`.
 """
-function build_monthly_climatology(records::Vector{MonthlyRecord})::Vector{MonthlyRecord}
+function monthly_climatology(records::Vector{MonthlyRecord})::Vector{MonthlyRecord}
     isempty(records) && return MonthlyRecord[]
 
     nmonths = months_per_year
@@ -18,13 +18,13 @@ function build_monthly_climatology(records::Vector{MonthlyRecord})::Vector{Month
 end
 
 """
-    apply_scenario_anomalies(scnr_records, ctrl_clim)::Vector{MonthlyRecord}
+    scenario_anomalies(scnr_records, ctrl_clim)::Vector{MonthlyRecord}
 
 Subtracts the matching calendar month of `ctrl_clim` (from
-[`build_monthly_climatology`](@ref)) from each record in `scnr_records`,
+[`monthly_climatology`](@ref)) from each record in `scnr_records`,
 turning absolute monthly output into anomalies relative to the control run.
 """
-function apply_scenario_anomalies(scnr_records::Vector{MonthlyRecord}, ctrl_clim::Vector{MonthlyRecord})::Vector{MonthlyRecord}
+function scenario_anomalies(scnr_records::Vector{MonthlyRecord}, ctrl_clim::Vector{MonthlyRecord})::Vector{MonthlyRecord}
     isempty(scnr_records) && return scnr_records
     isempty(ctrl_clim) && return scnr_records
 
@@ -41,12 +41,12 @@ function apply_scenario_anomalies(scnr_records::Vector{MonthlyRecord}, ctrl_clim
 end
 
 """
-    compute_annual_ice_climatology(ctrl_output::Vector{MonthlyRecord})
+    ice_climatology(ctrl_output::Vector{MonthlyRecord})
 
 Returns `ctrl_output`'s `ice` field from the *final* year, as an
 `(xdim, ydim, 12)` array.
 """
-function compute_annual_ice_climatology(ctrl_output::Vector{MonthlyRecord})
+function ice_climatology(ctrl_output::Vector{MonthlyRecord})
     ice_months = zeros(Float32, xdim, ydim, months_per_year)
     isempty(ctrl_output) && return ice_months
 

@@ -1,11 +1,11 @@
 """
-    SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, p::Processes, ws::CirculationWorkspace)
+    SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, p::Processes, ws::ModelWorkspace)
 
 Computes ice cover, surface/atmospheric/combined albedo, and net shortwave
 flux from `Ts` and the current cloud climatology. Returns
 `(SW, albedo, ice_cover)`.
 """
-function SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, p::Processes, ws::CirculationWorkspace)
+function SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, p::Processes, ws::ModelWorkspace)
     # Reuse workspace buffers
     ice_cover = ws.ice_cover # output: ice fraction
     a_surf = ws.a_surf       # surface albedo
@@ -24,7 +24,7 @@ function SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, p
     end
 
     # 2. Atmospheric albedo
-    cld = fields.cldclim
+    cld = fields.cloud_clim
     ityr = timestate.ityr
 
     # 3. Surface albedo
@@ -45,7 +45,7 @@ function SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, p
 
     # 4. albedo + shortwave flux.
     sw_solar = fields.sw_solar
-    multiplier = state.sw_solar_forcing * 0.01f0 * S0_var
+    multiplier = state.sw_solar_forcing * 0.01f0 * solar_percent
     @turbo for j in 1:ydim
         sf = sw_solar[j, ityr] * multiplier
         for i in 1:xdim
@@ -60,7 +60,7 @@ function SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, p
 end
 
 """
-    LWradiation!(Ts, Ta, q, CO2, fields::ClimateFields, timestate, p::Processes, ws::CirculationWorkspace)
+    LWradiation!(Ts, Ta, q, CO2, fields::ClimateFields, timestate, p::Processes, ws::ModelWorkspace)
 
 Computes atmospheric emissivity from CO2/water-vapor/cloud columns, then
 surface/upward/downward longwave flux. Without an atmosphere (`p.atmosphere = false`) only
@@ -69,7 +69,7 @@ value (decouples surface from atmospheric downwelling feedback without
 touching the atmosphere's own emission term). Returns
 `(LW_surf, LW_up, LW_down, em)`.
 """
-function LWradiation!(Ts, Ta, q, CO2, fields::ClimateFields, timestate, p::Processes, ws::CirculationWorkspace)
+function LWradiation!(Ts, Ta, q, CO2, fields::ClimateFields, timestate, p::Processes, ws::ModelWorkspace)
     # Extract workspace buffers
     e_co2 = ws.e_co2      # CO2 [ppm scaled by pressure]
     e_vapor = ws.e_vapor  # water vapor [kg/m²]
@@ -81,9 +81,9 @@ function LWradiation!(Ts, Ta, q, CO2, fields::ClimateFields, timestate, p::Proce
     wz_air = fields.wz_air
     co2_part = fields.co2_part
     ityr = timestate.ityr
-    cldclim = fields.cldclim
+    cloud_clim = fields.cloud_clim
     dTrad = fields.dTrad
-    p1, p2, p3, p4, p5, p6, p7, p8, p9, p10 = p_emi
+    p1, p2, p3, p4, p5, p6, p7, p8, p9, p10 = emissivity_fit
 
     # ── Effective columns, emissivity (log-regression, 10 parameters),
     # cloud adjustment, and surface/downward longwave flux
@@ -95,7 +95,7 @@ function LWradiation!(Ts, Ta, q, CO2, fields::ClimateFields, timestate, p::Proce
                      p7 +
                      p5 * log(p1 * e_co2[i, j] + p3) +
                      p6 * log(p2 * e_vapor[i, j] + p3)
-            em_val = (p8 - cldclim[i, j, ityr]) / p9 * (em_val - p10) + p10
+            em_val = (p8 - cloud_clim[i, j, ityr]) / p9 * (em_val - p10) + p10
             em[i, j] = em_val
             LW_surf[i, j] = -σ * Ts[i, j]^4
             LW_down_val = -em_val * σ * (Ta[i, j] + dTrad[i, j, ityr])^4

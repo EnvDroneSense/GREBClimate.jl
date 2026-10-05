@@ -53,13 +53,13 @@ end
         @test all(iszero, getfield(cf, f))
     end
 
-    # CirculationWorkspace: four vectors, the rest matrices. The zonal-stencil
+    # ModelWorkspace: four vectors, the rest matrices. The zonal-stencil
     # buffers carry longitude ghost cells, so their first dimension is `xghost`.
-    cw = CirculationWorkspace()
+    cw = ModelWorkspace()
     XP = GREBClimate.xghost
     cw_vec = (:T1h, :dTxh, :term_north, :term_south)
     cw_ghosted = (:T1h, :X_work, :wz_ghost)
-    for f in fieldnames(CirculationWorkspace)
+    for f in fieldnames(ModelWorkspace)
         v = getfield(cw, f)
         n = f in cw_ghosted ? XP : X
         @test eltype(v) === Float32
@@ -80,12 +80,12 @@ end
 @testset "derive_fields! follows the input maps" begin
     fields = synthetic_fields()
     quiet(() -> init_model!(resolve(preset(:full_model)), fields))
-    @test fields.cap_surf[60, 10] == GREBClimate.cap_ocean * fields.mldclim[60, 10, 1]
+    @test fields.cap_surf[60, 10] == GREBClimate.cap_ocean * fields.mld_clim[60, 10, 1]
 
     fields.z_topo[60, 10] = 500.0f0          # an ocean cell becomes land
-    fields.mldclim[70, 20, :] .= 80.0f0
-    fields.uclim[1, 1, 1] = -3.0f0
-    fields.vclim[2, 2, 2] = 4.0f0
+    fields.mld_clim[70, 20, :] .= 80.0f0
+    fields.u_clim[1, 1, 1] = -3.0f0
+    fields.v_clim[2, 2, 2] = 4.0f0
     GREBClimate.derive_fields!(fields, Processes())
 
     @test fields.cap_surf[60, 10] == GREBClimate.cap_land
@@ -93,9 +93,9 @@ end
     @test fields.wz_vapor[60, 10] == exp(-500.0f0 / GREBClimate.z_vapor)
     @test fields.z_ocean[70, 20] == 240.0f0
     @test fields.cap_surf[70, 20] == GREBClimate.cap_ocean * 80.0f0
-    @test (fields.uclim_neg[1, 1, 1], fields.uclim_pos[1, 1, 1]) == (-3.0f0, 0.0f0)
-    @test (fields.vclim_neg[2, 2, 2], fields.vclim_pos[2, 2, 2]) == (0.0f0, 4.0f0)
-    @test fields.uclim_pos .+ fields.uclim_neg == fields.uclim
-    @test fields.vclim_pos .+ fields.vclim_neg == fields.vclim
-    @test all(>=(0), fields.uclim_pos) && all(<=(0), fields.uclim_neg)
+    @test (fields.u_clim_neg[1, 1, 1], fields.u_clim_pos[1, 1, 1]) == (-3.0f0, 0.0f0)
+    @test (fields.v_clim_neg[2, 2, 2], fields.v_clim_pos[2, 2, 2]) == (0.0f0, 4.0f0)
+    @test fields.u_clim_pos .+ fields.u_clim_neg == fields.u_clim
+    @test fields.v_clim_pos .+ fields.v_clim_neg == fields.v_clim
+    @test all(>=(0), fields.u_clim_pos) && all(<=(0), fields.u_clim_neg)
 end

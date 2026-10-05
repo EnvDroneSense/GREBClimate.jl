@@ -51,7 +51,7 @@ function capture_preset(p::Symbol)
     static_mask = copy(fields.co2_part)
     ice = zeros(Float32, X, Y, 12)
     ice[:, abs.(GREBClimate.lat_grid) .> 60, :] .= 1.0f0
-    GREBClimate.apply_dynamic_co2_mask!(s.co2_mask, fields, ice)
+    GREBClimate.apply_surface_mask!(s.co2_mask, fields, ice)
 
     co2, solar = Float32[], Float32[]
     for y in 0:(NYEARS - 1), step in SAMPLE_STEPS

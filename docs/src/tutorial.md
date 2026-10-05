@@ -51,7 +51,7 @@ cfg = preset(:custom_co2; path = "my_co2.txt")                     # "year CO2" 
 cfg = preset(:decon_mean_climate; processes = (ocean = :none,))
 cfg = preset(:decon_2xco2; processes = (clouds = :uniform,))
 cfg = preset(:obliquity; index = 3)
-cfg = preset(:earth_sun_distance; pct = 1.5)
+cfg = preset(:earth_sun_distance; percent = 1.5)
 cfg = Config(scenario = Scenario(co2 = ConstantCO2(500)))
 ```
 

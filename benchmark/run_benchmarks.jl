@@ -110,14 +110,14 @@ function time_stages(jld2_dir::AbstractString; cfg=preset(:full_model), reps::In
     p = r.config.processes
     CO2 = init_model!(r, fields).CO2_ctrl
     state = ModelState()
-    ws = CirculationWorkspace()
+    ws = ModelWorkspace()
     timestate = TimeState(1, 1)
 
     ityr = timestate.ityr
-    Ts = copy(fields.Tclim[:, :, ityr])
+    Ts = copy(fields.Ts_clim[:, :, ityr])
     Ta = copy(Ts)
-    To = copy(fields.Toclim[:, :, ityr])
-    q = copy(fields.qclim[:, :, ityr])
+    To = copy(fields.To_clim[:, :, ityr])
+    q = copy(fields.q_clim[:, :, ityr])
 
     stages = [
         ("circulation!(Ta)", () -> circulation!(Ta, GREBClimate.z_air, ws.dTa_crcl, fields, ws, timestate, p)),
@@ -203,14 +203,14 @@ function check_allocations(jld2_dir::AbstractString)
     fields = load_climatology(jld2_dir; dataset=:ncep)
     CO2 = init_model!(r, fields).CO2_ctrl
     state = ModelState()
-    ws = CirculationWorkspace()
+    ws = ModelWorkspace()
     timestate = TimeState(1, 1)
 
     ityr = timestate.ityr
-    Ts = copy(fields.Tclim[:, :, ityr])
+    Ts = copy(fields.Ts_clim[:, :, ityr])
     Ta = copy(Ts)
-    To = copy(fields.Toclim[:, :, ityr])
-    q = copy(fields.qclim[:, :, ityr])
+    To = copy(fields.To_clim[:, :, ityr])
+    q = copy(fields.q_clim[:, :, ityr])
 
     tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, timestate, r)  # warm-up
     bytes = @allocated tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, timestate, r)

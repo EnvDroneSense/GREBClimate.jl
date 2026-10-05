@@ -53,7 +53,7 @@ Markdown.parse("| Preset | CO₂ | Where | Sunlight | Surface | Control CO₂ | 
 
 Three presets take a parameter: `preset(:obliquity; index = ...)` and
 `preset(:eccentricity; index = ...)` pick the table row (default: the row
-nearest today), `preset(:earth_sun_distance; pct = ...)` the distance change,
+nearest today), `preset(:earth_sun_distance; percent = ...)` the distance change,
 `preset(:custom_co2; path = ...)` the CO₂ file. `:decon_mean_climate` is the
 mean-climate deconstruction: switch processes off with
 `processes = (...)` and run it with `RunSpec(scnr = 0)`. On its stored

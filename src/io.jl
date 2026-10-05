@@ -7,34 +7,34 @@ const _JLD2_LOCK = ReentrantLock()
 # (`tools/dataset/fields.jl`); a test checks that it holds every file named here.
 const _STATIC_FILES = (z_topo="global.topography", glacier="greb.glaciers")
 const _CLIMATOLOGY_FILES = (
-    ncep=(Tclim="ncep.tsurf.1948-2007.clim", uclim="ncep.zonal_wind.850hpa.clim",
-          vclim="ncep.meridional_wind.850hpa.clim", qclim="ncep.atmospheric_humidity.clim",
-          swetclim="ncep.soil_moisture.clim"),
+    ncep=(Ts_clim="ncep.tsurf.1948-2007.clim", u_clim="ncep.zonal_wind.850hpa.clim",
+          v_clim="ncep.meridional_wind.850hpa.clim", q_clim="ncep.atmospheric_humidity.clim",
+          soil_wetness_clim="ncep.soil_moisture.clim"),
     # ERA-Interim has no soil moisture file; it uses the NCEP one
-    era=(Tclim="erainterim.tsurf.1979-2015.clim", uclim="erainterim.zonal_wind.850hpa.clim",
-         vclim="erainterim.meridional_wind.850hpa.clim", qclim="erainterim.atmospheric_humidity.clim",
-         swetclim="ncep.soil_moisture.clim"),
+    era=(Ts_clim="erainterim.tsurf.1979-2015.clim", u_clim="erainterim.zonal_wind.850hpa.clim",
+         v_clim="erainterim.meridional_wind.850hpa.clim", q_clim="erainterim.atmospheric_humidity.clim",
+         soil_wetness_clim="ncep.soil_moisture.clim"),
 )
 const _COMMON_CLIMATOLOGY_FILES = (
-    cldclim="isccp.cloud_cover.clim", mldclim="woce.ocean_mixed_layer_depth.clim",
-    Toclim="Tocean.clim", omegaclim="erainterim.omega.vertmean.clim",
-    omegastdclim="erainterim.omega_std.vertmean.clim", wsclim="erainterim.windspeed.850hpa.clim",
+    cloud_clim="isccp.cloud_cover.clim", mld_clim="woce.ocean_mixed_layer_depth.clim",
+    To_clim="Tocean.clim", omega_clim="erainterim.omega.vertmean.clim",
+    omega_std_clim="erainterim.omega_std.vertmean.clim", wind_speed_clim="erainterim.windspeed.850hpa.clim",
 )
 const _SOLAR_FILE = "solar_radiation.clim"
 const _CC_ANOMALY_FILES = (
-    Tclim_anom_cc="cmip5.tsurf.rcp85.ensmean.forcing", uclim_anom_cc="cmip5.zonal.wind.rcp85.ensmean.forcing",
-    vclim_anom_cc="cmip5.meridional.wind.rcp85.ensmean.forcing", wsclim_anom_cc="cmip5.windspeed.rcp85.ensmean.forcing",
-    omegaclim_anom_cc="cmip5.omega.rcp85.ensmean.forcing",
+    Ts_clim_anom_cc="cmip5.tsurf.rcp85.ensmean.forcing", u_clim_anom_cc="cmip5.zonal.wind.rcp85.ensmean.forcing",
+    v_clim_anom_cc="cmip5.meridional.wind.rcp85.ensmean.forcing", wind_speed_clim_anom_cc="cmip5.windspeed.rcp85.ensmean.forcing",
+    omega_clim_anom_cc="cmip5.omega.rcp85.ensmean.forcing",
 )
 const _ENSO_EVENTS = (:elnino, :lanina)
 _enso_anomaly_files(event::Symbol) = (
-    Tclim_anom_enso="erainterim.tsurf.$event.forcing", uclim_anom_enso="erainterim.zonal.wind.$event.forcing",
-    vclim_anom_enso="erainterim.meridional.wind.$event.forcing", wsclim_anom_enso="erainterim.windspeed.$event.forcing",
-    omegaclim_anom_enso="erainterim.omega.$event.forcing",
+    Ts_clim_anom_enso="erainterim.tsurf.$event.forcing", u_clim_anom_enso="erainterim.zonal.wind.$event.forcing",
+    v_clim_anom_enso="erainterim.meridional.wind.$event.forcing", wind_speed_clim_anom_enso="erainterim.windspeed.$event.forcing",
+    omega_clim_anom_enso="erainterim.omega.$event.forcing",
 )
 # The combined file `climatology/flux_corrections.jld2`: its keys, by the array each fills
-const _FLUX_CORRECTION_KEYS = (TF_correct="Tsurf_flux_correction", qF_correct="vapour_flux_correction",
-                               ToF_correct="Tocean_flux_correction")
+const _FLUX_CORRECTION_KEYS = (Ts_flux_correction="Tsurf_flux_correction", q_flux_correction="vapour_flux_correction",
+                               To_flux_correction="Tocean_flux_correction")
 # Files that hold several tables each and are read by their own loaders
 const _COMBINED_FILES = ("flux_corrections", "ipcc_scenarios", "solar_paleo", "solar_eccentricity", "solar_obliquity")
 
@@ -201,8 +201,8 @@ end
 
 Loads the anomaly fields of a [`BoundaryAnomaly`](@ref) scenario into `fields`.
 `source` is `:cmip5_rcp85` (the CMIP5 RCP8.5 ensemble mean, into
-`fields.Tclim_anom_cc`/`uclim_anom_cc`/`vclim_anom_cc`/`omegaclim_anom_cc`/
-`wsclim_anom_cc`), or `:elnino` or `:lanina` (the ERA-Interim composite mean,
+`fields.Ts_clim_anom_cc`/`u_clim_anom_cc`/`v_clim_anom_cc`/`omega_clim_anom_cc`/
+`wind_speed_clim_anom_cc`), or `:elnino` or `:lanina` (the ERA-Interim composite mean,
 into `fields.*_anom_enso`). Errors on a missing file rather than defaulting to
 zero.
 

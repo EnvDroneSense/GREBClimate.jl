@@ -4,13 +4,13 @@ function _budget_run(; steps, setup! = (Ts, Ta, q, To, fields) -> nothing, confi
     fields = synthetic_fields()
     r = resolve(config)
     ini = quiet(() -> init_model!(r, fields))
-    fields.TF_correct .= 0.25f0
-    fields.ToF_correct .= 0.01f0
-    fields.qF_correct .= 1.0f-7
+    fields.Ts_flux_correction .= 0.25f0
+    fields.To_flux_correction .= 0.01f0
+    fields.q_flux_correction .= 1.0f-7
     Ts, Ta, q, To = copy(ini.Ts_ini), copy(ini.Ta_ini), copy(ini.q_ini), copy(ini.To_ini)
     setup!(Ts, Ta, q, To, fields)
     check = GREBClimate.BudgetCheck()
-    state, ws, acc, ts = ModelState(), CirculationWorkspace(), MonthlyAccumulator(), TimeState(1, 1)
+    state, ws, acc, ts = ModelState(), ModelWorkspace(), MonthlyAccumulator(), TimeState(1, 1)
     mon, irec = 1, 0
     quiet() do
         for it in 1:steps
@@ -42,7 +42,7 @@ end
     seen = Dict{Symbol,Matrix{Float32}}()
     quiet() do
         time_loop!(1, 1970, ini.CO2_ctrl, 1, 0, Ts, copy(ini.Ta_ini), copy(ini.q_ini), copy(ini.To_ini),
-                   MonthlyRecord[], fields, ModelState(), CirculationWorkspace(), MonthlyAccumulator(),
+                   MonthlyRecord[], fields, ModelState(), ModelWorkspace(), MonthlyAccumulator(),
                    TimeState(1, 1), r; observer = (point, view) -> (seen[point] = copy(view.Ts)))
     end
     @test seen[:after_tendencies] == ini.Ts_ini
@@ -77,7 +77,7 @@ end
     @test (cold.floor_Ts, cold.floor_Ta) == (0, 1)
 
     wet = _budget_run(steps = 1,
-        setup! = (Ts, Ta, q, To, fields) -> (fields.qF_correct[7, 8, 1] = 0.5f0; fields.qF_correct[9, 10, 1] = -0.5f0))
+        setup! = (Ts, Ta, q, To, fields) -> (fields.q_flux_correction[7, 8, 1] = 0.5f0; fields.q_flux_correction[9, 10, 1] = -0.5f0))
     # The fixture's coldest row rains out more than it holds on its own
     base = _budget_run(steps = 1)
     @test wet.humidity_high == base.humidity_high + 1

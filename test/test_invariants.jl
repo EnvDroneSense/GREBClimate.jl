@@ -19,7 +19,7 @@ function _kernel_fixture()
         p = r.config.processes,
         h = r.hydrology,
         state = ModelState(),
-        ws = CirculationWorkspace(),
+        ws = ModelWorkspace(),
         ts = TimeState(1, 1),
         Ts = fill(290.0f0, X, Y),
         Ta = fill(280.0f0, X, Y),
@@ -84,15 +84,15 @@ end
 
     F32 = Matrix{Float32}
     signatures = [
-        (SWradiation!, (F32, ClimateFields, ModelState, TimeState, Processes, CirculationWorkspace)),
-        (LWradiation!, (F32, F32, F32, Float32, ClimateFields, TimeState, Processes, CirculationWorkspace)),
-        (hydro!, (F32, F32, ClimateFields, TimeState, Processes, ResolvedHydrology, CirculationWorkspace)),
+        (SWradiation!, (F32, ClimateFields, ModelState, TimeState, Processes, ModelWorkspace)),
+        (LWradiation!, (F32, F32, F32, Float32, ClimateFields, TimeState, Processes, ModelWorkspace)),
+        (hydro!, (F32, F32, ClimateFields, TimeState, Processes, ResolvedHydrology, ModelWorkspace)),
         (seaice!, (F32, ClimateFields, TimeState, Processes)),
-        (deep_ocean!, (F32, F32, ClimateFields, TimeState, Processes, CirculationWorkspace)),
-        (convergence!, (F32, ClimateFields, TimeState, CirculationWorkspace)),
-        (diffusion!, (F32, Float32, ClimateFields, CirculationWorkspace, TimeState)),
-        (advection!, (F32, Float32, ClimateFields, CirculationWorkspace, TimeState, Processes)),
-        (circulation!, (F32, Float32, F32, ClimateFields, CirculationWorkspace, TimeState, Processes)),
+        (deep_ocean!, (F32, F32, ClimateFields, TimeState, Processes, ModelWorkspace)),
+        (convergence!, (F32, ClimateFields, TimeState, ModelWorkspace)),
+        (diffusion!, (F32, Float32, ClimateFields, ModelWorkspace, TimeState)),
+        (advection!, (F32, Float32, ClimateFields, ModelWorkspace, TimeState, Processes)),
+        (circulation!, (F32, Float32, F32, ClimateFields, ModelWorkspace, TimeState, Processes)),
     ]
 
     for (kernel, argtypes) in signatures

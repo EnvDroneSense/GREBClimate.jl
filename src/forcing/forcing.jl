@@ -7,7 +7,7 @@
 The scenario's CO2 (ppm) and solar multiplier at scenario step `it` in
 calendar `year`, from its [`CO2Path`](@ref) and [`Solar`](@ref) parts. CO2 is
 0 with `Processes(co2 = false)`. Pure: where the CO2 applies is set once, at
-the start of the scenario, by `apply_co2_mask!` and `apply_dynamic_co2_mask!`.
+the start of the scenario, by `apply_co2_mask!` and `apply_surface_mask!`.
 """
 function forcing(it, year, r::ResolvedConfig)
     s = r.config.scenario
@@ -51,13 +51,13 @@ const _winter_last_step = first_step_of(4, 1)
 function _co2_at(c::SeasonalCO2, it, year, r)
     step = step_of_year(it)
     winter = step <= _winter_last_step || step >= _winter_first_step
-    return winter == (c.season === :boreal_winter) ? c.inside : c.outside
+    return winter == (c.season === :boreal_winter) ? c.in_season : c.out_of_season
 end
 
 _solar_factor(::Union{ModernSolar,SolarTable}, year) = 1.0f0
-_solar_factor(s::SolarConstant, year) = (1365.0f0 + s.dW) / 1365.0f0
+_solar_factor(s::SolarConstant, year) = (1365.0f0 + s.offset) / 1365.0f0
 _solar_factor(s::SolarCycle, year) = (1365.0f0 + s.amplitude * sin(2f0*Float32(π) * year / s.period)) / 1365.0f0
-_solar_factor(s::EarthSunDistance, year) = (1.0f0 / (1.0f0 + 0.01f0 * s.pct))^2
+_solar_factor(s::EarthSunDistance, year) = (1.0f0 / (1.0f0 + 0.01f0 * s.percent))^2
 
 """
     apply_co2_mask!(mask::CO2Mask, fields::ClimateFields)
@@ -66,7 +66,7 @@ Sets `fields.co2_part`, the fraction of the scenario CO2 each cell gets: 1
 everywhere, then 0.5 outside a [`LatitudeMask`](@ref) band. `greb_model!`
 calls it at the start of the scenario; the spin-up and the control run on the
 full CO2 everywhere. A [`SurfaceMask`](@ref) needs the control run's ice cover
-and is set by `apply_dynamic_co2_mask!`.
+and is set by `apply_surface_mask!`.
 """
 function apply_co2_mask!(mask::CO2Mask, fields::ClimateFields)
     fields.co2_part .= 1.0f0
@@ -100,15 +100,15 @@ function _latitude_mask!(co2_part, m::LatitudeMask)
 end
 
 """
-    apply_dynamic_co2_mask!(mask::CO2Mask, fields::ClimateFields, icmn_ctrl)
+    apply_surface_mask!(mask::CO2Mask, fields::ClimateFields, icmn_ctrl)
 
 Sets `fields.co2_part` for a [`SurfaceMask`](@ref) from the control run's
 annual-mean ice cover `icmn_ctrl`: `:ocean` halves CO2 over land and over ice,
 `:land_ice` halves it over ice-free ocean. A no-op for every other mask.
 """
-apply_dynamic_co2_mask!(::CO2Mask, fields::ClimateFields, icmn_ctrl) = nothing
+apply_surface_mask!(::CO2Mask, fields::ClimateFields, icmn_ctrl) = nothing
 
-function apply_dynamic_co2_mask!(mask::SurfaceMask, fields::ClimateFields, icmn_ctrl)
+function apply_surface_mask!(mask::SurfaceMask, fields::ClimateFields, icmn_ctrl)
     co2_part = fields.co2_part
     z_topo = fields.z_topo
     co2_part .= 1.0f0

@@ -17,7 +17,7 @@ const max_humidity_change = 0.020f0 # Maximum humidity increment [kg/kg]
 const min_humidity_change = 0.9f0   # Fraction of humidity that can be removed
 
 # ── Natural constants ────────────────────────────────────────────
-const const_pi = Float32(pi)   # π (model precision)
+const pi_f32 = Float32(pi)   # π (model precision)
 const σ = 5.6704f-8            # Stefan-Boltzmann constant [W/m²/K⁴]
 const ρ_ocean = 999.1f0        # density of water at T=15°C [kg/m³]
 const ρ_land = 2600.0f0        # density of solid rock [kg/m³]
@@ -78,24 +78,24 @@ const cq_rain = -0.1f0 / 24.0f0 / 3600.0f0   # rain-related vapor decrease [1/s]
 # ── Scaling heights [m] ─────────────────────────────────────────
 const z_air = 8400.0f0                 # heat & CO2 scaling height
 const z_vapor = 5000.0f0               # water vapor scaling height
-const const_factor = Δt_crcl / z_vapor * 2.5f0 / (ρ_air * grav)
+const convergence_factor = Δt_crcl / z_vapor * 2.5f0 / (ρ_air * grav)
 
 # ── Regression factor [kg/m³] ───────────────────────────────────
 const r_qviwv = 2.6736f3               # VIWV ↔ q_air regression factor
-const conv_factor = r_qviwv * 86400.0f0  # kg/kg → mm/day conversion
+const q_to_mm_per_day = r_qviwv * 86400.0f0  # kg/kg → mm/day conversion
 
 # ── solar factor [%] ────────────────────────────────────────────
-const S0_var = 100.0f0        # default 100%
+const solar_percent = 100.0f0        # default 100%
 
 # ── Emissivity parameters (LWradiation!) ──────────────────────────
-const p_emi = Float32[9.0721, 106.7252, 61.5562, 0.0179, 0.0028,
+const emissivity_fit = Float32[9.0721, 106.7252, 61.5562, 0.0179, 0.0028,
                       0.0570, 0.3462, 2.3406, 0.7032, 1.0662]
 
 # ── Transport geometry [m, degrees] ───────────────────────────────
-const deg_grid = 2.0f0 * const_pi * 6.371f6 / 360.0f0
+const deg_grid = 2.0f0 * pi_f32 * 6.371f6 / 360.0f0
 const dyy_grid = dlat * deg_grid
 const lat_grid = Float32[dlat * k - dlat / 2.0f0 - 90.0f0 for k in 1:ydim]
-const dxlat_grid = Float32[dlon * deg_grid * cos(2.0f0 * const_pi / 360.0f0 * lat_grid[k]) for k in 1:ydim]
+const dxlat_grid = Float32[dlon * deg_grid * cos(2.0f0 * pi_f32 / 360.0f0 * lat_grid[k]) for k in 1:ydim]
 
 # ── Diffusion coefficients ──────────────────────────────────────
 const ccy_diff = κ * Δt_crcl / dyy_grid^2

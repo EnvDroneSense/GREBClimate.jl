@@ -33,8 +33,8 @@
         @test_throws ArgumentError load_flux_corrections!(tmpdir, ClimateFields())
         # `corrections = false` loads the rest and leaves the corrections at zero
         without = load_climatology(tmpdir; dataset = :ncep, corrections = false)
-        @test without.loaded && all(==(3.0), without.Tclim)
-        @test all(iszero, without.TF_correct) && all(iszero, without.qF_correct) && all(iszero, without.ToF_correct)
+        @test without.loaded && all(==(3.0), without.Ts_clim)
+        @test all(iszero, without.Ts_flux_correction) && all(iszero, without.q_flux_correction) && all(iszero, without.To_flux_correction)
 
         # A dataset name the loader does not know is an error, not NCEP
         @test_throws ArgumentError load_climatology(tmpdir; dataset = :era5)
@@ -55,12 +55,12 @@
         fields = load_climatology(tmpdir; dataset = :ncep)
         @test all(==(1.0), fields.z_topo)
         @test all(==(2.0), fields.glacier)
-        @test all(==(3.0), fields.Tclim)
-        @test all(==(4.0), fields.uclim)
+        @test all(==(3.0), fields.Ts_clim)
+        @test all(==(4.0), fields.u_clim)
         @test all(==(14.0), fields.sw_solar)
-        @test all(==(15.0), fields.TF_correct)
-        @test all(==(16.0), fields.qF_correct)
-        @test all(==(17.0), fields.ToF_correct)
+        @test all(==(15.0), fields.Ts_flux_correction)
+        @test all(==(16.0), fields.q_flux_correction)
+        @test all(==(17.0), fields.To_flux_correction)
 
         # Tasks reading the same file at once all get its content
         path = joinpath(tmpdir, "climatology", "Tocean.clim.jld2")

@@ -88,10 +88,10 @@ function _check_step!(b::BudgetCheck, view)
                    config.hydrology.rain === :rh
     for j in 1:ydim, i in 1:xdim
         Ts = b.Ts[i, j] + tend.dT_ocean[i, j] +
-             Δt * (surface_flux(tend, i, j) + fields.TF_correct[i, j, ityr]) / b.cap_surf[i, j]
+             Δt * (surface_flux(tend, i, j) + fields.Ts_flux_correction[i, j, ityr]) / b.cap_surf[i, j]
         Ta = b.Ta[i, j] + tend.dTa_crcl[i, j] + Δt * atmosphere_flux(tend, i, j) / cap_air
-        To = b.To[i, j] + tend.dTo[i, j] + fields.ToF_correct[i, j, ityr]
-        dq = Δt * (tend.dq_eva[i, j] + tend.dq_rain[i, j]) + tend.dq_crcl[i, j] + fields.qF_correct[i, j, ityr]
+        To = b.To[i, j] + tend.dTo[i, j] + fields.To_flux_correction[i, j, ityr]
+        dq = Δt * (tend.dq_eva[i, j] + tend.dq_rain[i, j]) + tend.dq_crcl[i, j] + fields.q_flux_correction[i, j, ityr]
         low = dq <= -b.q[i, j]
         low && (dq = -min_humidity_change * b.q[i, j])
         high = dq > max_humidity_change

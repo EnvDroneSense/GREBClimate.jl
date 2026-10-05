@@ -5,7 +5,7 @@
     ResolvedHydrology
 
 A [`Hydrology`](@ref) scheme with its rain-regression coefficients `c_q`,
-`c_rq`, `c_omega`, `c_omegastd`; what [`hydro!`](@ref) reads. Build it with
+`c_rq`, `c_omega`, `c_omega_std`; what [`hydro!`](@ref) reads. Build it with
 [`resolve`](@ref)`(hydrology)`.
 """
 struct ResolvedHydrology
@@ -14,10 +14,10 @@ struct ResolvedHydrology
     c_q::Float32
     c_rq::Float32
     c_omega::Float32
-    c_omegastd::Float32
+    c_omega_std::Float32
 end
 
-# (c_q, c_rq, c_omega, c_omegastd) per (rain, rain_fit); only :fitted has an
+# (c_q, c_rq, c_omega, c_omega_std) per (rain, rain_fit); only :fitted has an
 # :ncep fit, the constructor of Hydrology rejects it for the others
 const _RAIN_COEFFICIENTS = Dict(
     (:original, :era) => (1.0f0, 0.0f0, 0.0f0, 0.0f0),

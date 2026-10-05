@@ -59,18 +59,18 @@ and non-zero winds/humidity so circulation actually transports something.
 """
 function synthetic_fields()
     f = ClimateFields()
-    f.mldclim .= 50.0f0
+    f.mld_clim .= 50.0f0
     f.z_topo[1:(X - 48), :] .= 100.0f0
     for k in 1:N, j in 1:Y, i in 1:X
-        f.Tclim[i, j, k] = 288.0f0 - 40.0f0 * abs(j - Y / 2) / (Y / 2)
-        f.uclim[i, j, k] = 5.0f0 * sinpi(2 * j / Y)
-        f.vclim[i, j, k] = 2.0f0 * cospi(2 * i / X)
-        f.qclim[i, j, k] = 0.005f0
-        f.wsclim[i, j, k] = 6.0f0
+        f.Ts_clim[i, j, k] = 288.0f0 - 40.0f0 * abs(j - Y / 2) / (Y / 2)
+        f.u_clim[i, j, k] = 5.0f0 * sinpi(2 * j / Y)
+        f.v_clim[i, j, k] = 2.0f0 * cospi(2 * i / X)
+        f.q_clim[i, j, k] = 0.005f0
+        f.wind_speed_clim[i, j, k] = 6.0f0
     end
-    f.Toclim .= 283.0f0
-    f.cldclim .= 0.5f0
-    f.swetclim .= 0.4f0
+    f.To_clim .= 283.0f0
+    f.cloud_clim .= 0.5f0
+    f.soil_wetness_clim .= 0.4f0
     GREBClimate.split_winds!(f)
     return f
 end
@@ -83,20 +83,20 @@ A `ClimateFields` that is the same in every cell and at every step: topography
 soil wetness, winds and vertical velocity. For checking a kernel against a
 hand calculation.
 """
-function constant_fields(; z_topo, swet = 1.0, u = 0.0, v = 0.0, omega = 0.0, omegastd = 0.0, ws = 0.0)
+function constant_fields(; z_topo, swet = 1.0, u = 0.0, v = 0.0, omega = 0.0, omega_std = 0.0, ws = 0.0)
     f = ClimateFields()
     f.z_topo .= z_topo
-    f.mldclim .= 50.0
-    f.Tclim .= 280.0
-    f.Toclim .= 285.0
-    f.qclim .= 0.006
-    f.cldclim .= 0.5
-    f.swetclim .= swet
-    f.uclim .= u
-    f.vclim .= v
-    f.omegaclim .= omega
-    f.omegastdclim .= omegastd
-    f.wsclim .= ws
+    f.mld_clim .= 50.0
+    f.Ts_clim .= 280.0
+    f.To_clim .= 285.0
+    f.q_clim .= 0.006
+    f.cloud_clim .= 0.5
+    f.soil_wetness_clim .= swet
+    f.u_clim .= u
+    f.v_clim .= v
+    f.omega_clim .= omega
+    f.omega_std_clim .= omega_std
+    f.wind_speed_clim .= ws
     return f
 end
 

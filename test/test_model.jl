@@ -20,7 +20,7 @@ end
         quiet() do
             init_model!(r, fields)
         end
-        out = hydro!(Ts, q, fields, TimeState(1, 1), Processes(), r.hydrology, CirculationWorkspace())
+        out = hydro!(Ts, q, fields, TimeState(1, 1), Processes(), r.hydrology, ModelWorkspace())
         @test all(isfinite, out.Q_lat)
         @test all(isfinite, out.dq_rain)
     end
@@ -29,18 +29,18 @@ end
 @testset "qflux_correction! pulls Ts/To/q to climatology; Ta gets no correction" begin
     # All ocean (topography 0 m), so it needs a mixed layer
     fields = ClimateFields()
-    fields.mldclim .= 50.0
+    fields.mld_clim .= 50.0
     fields.cap_surf .= GREBClimate.cap_ocean * 50.0f0
     for j in 1:GREBClimate.ydim, i in 1:GREBClimate.xdim
-        fields.Tclim[i, j, :] .= 280.0 + 5.0 * sin(i / 10.0) * cos(j / 8.0)
-        fields.Toclim[i, j, :] .= 279.0
-        fields.qclim[i, j, :] .= 0.006
+        fields.Ts_clim[i, j, :] .= 280.0 + 5.0 * sin(i / 10.0) * cos(j / 8.0)
+        fields.To_clim[i, j, :] .= 279.0
+        fields.q_clim[i, j, :] .= 0.006
     end
     # Rain coefficients (1, 0, 0, 0): this hand-made climatology has no omega
     r = resolve(preset(:full_model; hydrology = (rain = :original,)))
     state = ModelState()
     ts = TimeState(1, 1)
-    ws = CirculationWorkspace()
+    ws = ModelWorkspace()
 
     Ts = fill(290.0, GREBClimate.xdim, GREBClimate.ydim)
     Ta = fill(290.0, GREBClimate.xdim, GREBClimate.ydim)
@@ -49,16 +49,16 @@ end
 
     GREBClimate.qflux_correction!(340.0, Ts, Ta, q, To, fields, state, ts, r, ws, 1)
 
-    @test any(!=(0.0), fields.TF_correct)
-    @test any(!=(0.0), fields.ToF_correct)
-    @test any(!=(0.0), fields.qF_correct)
-    @test all(isfinite, fields.TF_correct)
-    @test all(isfinite, fields.ToF_correct)
-    @test all(isfinite, fields.qF_correct)
+    @test any(!=(0.0), fields.Ts_flux_correction)
+    @test any(!=(0.0), fields.To_flux_correction)
+    @test any(!=(0.0), fields.q_flux_correction)
+    @test all(isfinite, fields.Ts_flux_correction)
+    @test all(isfinite, fields.To_flux_correction)
+    @test all(isfinite, fields.q_flux_correction)
 
-    @test Ts ≈ fields.Tclim[:, :, 1]
-    @test To ≈ fields.Toclim[:, :, 1]
-    @test q ≈ fields.qclim[:, :, 1]
+    @test Ts ≈ fields.Ts_clim[:, :, 1]
+    @test To ≈ fields.To_clim[:, :, 1]
+    @test q ≈ fields.q_clim[:, :, 1]
 
     @test all(isfinite, Ta)
     @test Ta != fill(290.0, GREBClimate.xdim, GREBClimate.ydim)
@@ -131,20 +131,20 @@ end
     icmn_ctrl[2, 1, 1] = 0.0
     icmn_ctrl[2, 1, 2:12] .= 1.0
 
-    GREBClimate.apply_dynamic_co2_mask!(SurfaceMask(:ocean), fields, icmn_ctrl)
+    GREBClimate.apply_surface_mask!(SurfaceMask(:ocean), fields, icmn_ctrl)
     @test fields.co2_part[1, 1] == 1.0  # January said "ice"; annual mean says no
     @test fields.co2_part[2, 1] == 0.5  # January said "no ice"; annual mean says yes
 
     # The land/ice variant inverts the ocean mask and exempts ice cells.
     f_li = ClimateFields()
-    GREBClimate.apply_dynamic_co2_mask!(SurfaceMask(:land_ice), f_li, icmn_ctrl)
+    GREBClimate.apply_surface_mask!(SurfaceMask(:land_ice), f_li, icmn_ctrl)
     @test f_li.co2_part[1, 1] == 0.5  # ocean cell, not annual-mean ice
     @test f_li.co2_part[2, 1] == 1.0  # annual-mean ice -> exempted back to 1.0
 
     # Every other mask is a no-op here.
     for mask in (UniformMask(), LatitudeMask(:sh))
         f_noop = ClimateFields()
-        GREBClimate.apply_dynamic_co2_mask!(mask, f_noop, icmn_ctrl)
+        GREBClimate.apply_surface_mask!(mask, f_noop, icmn_ctrl)
         @test all(isone, f_noop.co2_part)
     end
 end
@@ -258,7 +258,7 @@ end
         end
         expected = ClimateFields()
         expected.z_topo .= f.z_topo
-        GREBClimate.apply_dynamic_co2_mask!(cfg.scenario.co2_mask, expected, compute_annual_ice_climatology(result.ctrl))
+        GREBClimate.apply_surface_mask!(cfg.scenario.co2_mask, expected, ice_climatology(result.ctrl))
         (got = copy(f.co2_part), expected = expected.co2_part)
     end
     ocean = run_mask(:regional_co2_ocean)
@@ -301,42 +301,42 @@ end
 
         fields = ClimateFields()
         load_boundary_anomaly!(tmpdir_anom, fields, :cmip5_rcp85)
-        @test all(==(2.0), fields.Tclim_anom_cc)
-        @test all(==(3.0), fields.uclim_anom_cc)
-        @test all(==(4.0), fields.vclim_anom_cc)
-        @test all(==(5.0), fields.omegaclim_anom_cc)
-        @test all(==(6.0), fields.wsclim_anom_cc)
+        @test all(==(2.0), fields.Ts_clim_anom_cc)
+        @test all(==(3.0), fields.u_clim_anom_cc)
+        @test all(==(4.0), fields.v_clim_anom_cc)
+        @test all(==(5.0), fields.omega_clim_anom_cc)
+        @test all(==(6.0), fields.wind_speed_clim_anom_cc)
 
         # The scenario-start step applies the anomaly on top of the (here
-        # all-zero) base climatology - Tclim must reflect it, not stay at zero.
+        # all-zero) base climatology - Ts_clim must reflect it, not stay at zero.
         quiet() do
-            GREBClimate._apply_boundary_anomalies!(BoundaryAnomaly(:cmip5_rcp85), fields)
+            GREBClimate._add_boundary_anomaly!(BoundaryAnomaly(:cmip5_rcp85), fields)
         end
-        @test all(==(2.0), fields.Tclim)
+        @test all(==(2.0), fields.Ts_clim)
 
         for (sym, suffix) in ((:elnino, "elnino"), (:lanina, "lanina"))
             fields2 = ClimateFields()
             load_boundary_anomaly!(tmpdir_anom, fields2, sym)
-            @test all(==(7.0), fields2.Tclim_anom_enso)
-            @test all(==(8.0), fields2.uclim_anom_enso)
-            @test all(==(9.0), fields2.vclim_anom_enso)
-            @test all(==(10.0), fields2.omegaclim_anom_enso)
-            @test all(==(11.0), fields2.wsclim_anom_enso)
+            @test all(==(7.0), fields2.Ts_clim_anom_enso)
+            @test all(==(8.0), fields2.u_clim_anom_enso)
+            @test all(==(9.0), fields2.v_clim_anom_enso)
+            @test all(==(10.0), fields2.omega_clim_anom_enso)
+            @test all(==(11.0), fields2.wind_speed_clim_anom_enso)
 
             # Both composite files already carry their sign (the La Nina one is
             # a cold anomaly), so both experiments add them, as the Fortran does.
             quiet() do
-                GREBClimate._apply_boundary_anomalies!(BoundaryAnomaly(sym), fields2)
+                GREBClimate._add_boundary_anomaly!(BoundaryAnomaly(sym), fields2)
             end
-            @test all(==(7.0), fields2.Tclim)
-            @test all(==(8.0), fields2.uclim)
+            @test all(==(7.0), fields2.Ts_clim)
+            @test all(==(8.0), fields2.u_clim)
         end
 
         # In a run the anomaly reaches the climatology at the start of the
         # scenario; the control runs on the plain one.
         for (p, anomaly) in ((:rcp85_boundary, 2.0f0), (:lanina, 7.0f0))
             cfg = preset(p; corrections = NoCorrections())
-            tclim(phase, run) = at_first_step(v -> copy(v.fields.Tclim), run, cfg; phase,
+            tclim(phase, run) = at_first_step(v -> copy(v.fields.Ts_clim), run, cfg; phase,
                                               jld2_dir = tmpdir_anom, fields = ClimateFields())
             @test all(iszero, tclim(:ctrl, RunSpec(ctrl = 1, scnr = 0)))
             @test all(==(anomaly), tclim(:scnr, RunSpec(ctrl = 0, scnr = 1)))
@@ -345,17 +345,17 @@ end
         # A second run on the same fields and directory does not read the files
         # again; another event or another directory does.
         reused = ClimateFields()
-        first_tclim(p, dir) = at_first_step(v -> copy(v.fields.Tclim), RunSpec(ctrl = 0, scnr = 1),
+        first_tclim(p, dir) = at_first_step(v -> copy(v.fields.Ts_clim), RunSpec(ctrl = 0, scnr = 1),
                                             preset(p; corrections = NoCorrections()); phase = :scnr,
                                             jld2_dir = dir, fields = reused)
         @test all(==(7.0f0), first_tclim(:lanina, tmpdir_anom))
         @test reused.anom_enso_source == (tmpdir_anom, :lanina)
-        reused.Tclim_anom_enso .= 70.0f0                     # a mark a reload would erase
+        reused.Ts_clim_anom_enso .= 70.0f0                     # a mark a reload would erase
         @test all(==(70.0f0), first_tclim(:lanina, tmpdir_anom))
         @test all(==(7.0f0), first_tclim(:elnino, tmpdir_anom))
         @test reused.anom_enso_source == (tmpdir_anom, :elnino)
         @test all(==(2.0f0), first_tclim(:rcp85_boundary, tmpdir_anom))
-        reused.Tclim_anom_cc .= 20.0f0
+        reused.Ts_clim_anom_cc .= 20.0f0
         @test all(==(20.0f0), first_tclim(:rcp85_boundary, tmpdir_anom))
         @test_throws ErrorException first_tclim(:rcp85_boundary, joinpath(tmpdir_anom, "elsewhere"))
         @test reused.anom_cc_source == ""                   # a failed load leaves no source
@@ -369,10 +369,10 @@ end
     end
 end
 
-@testset "flux-correction round trip: a run step from the spin-up's start lands on Tclim" begin
-    # The spin-up solves for TF_correct so its step ends on Tclim; the run step
-    # adds the same surface flux sum plus that TF_correct. A flux term added to
-    # one of the two update loops but not the other moves Ts off Tclim here.
+@testset "flux-correction round trip: a run step from the spin-up's start lands on Ts_clim" begin
+    # The spin-up solves for Ts_flux_correction so its step ends on Ts_clim; the run step
+    # adds the same surface flux sum plus that Ts_flux_correction. A flux term added to
+    # one of the two update loops but not the other moves Ts off Ts_clim here.
     f = synthetic_fields()
     r = resolve(preset(:full_model))
     ini = quiet(() -> init_model!(r, f))
@@ -381,29 +381,29 @@ end
     Ts, Ta, q, To = start()
     quiet() do
         qflux_correction!(ini.CO2_ctrl, Ts, Ta, q, To, f, ModelState(), TimeState(1, 1), r,
-                          CirculationWorkspace(), 1)
+                          ModelWorkspace(), 1)
     end
     function run_step()
         f.cap_surf .= cap0
         Ts, Ta, q, To = start()
         quiet() do
             time_loop!(1, 1970, ini.CO2_ctrl, 1, 0, Ts, Ta, q, To, MonthlyRecord[], f, ModelState(),
-                       CirculationWorkspace(), MonthlyAccumulator(), TimeState(1, 1), r)
+                       ModelWorkspace(), MonthlyAccumulator(), TimeState(1, 1), r)
         end
         return Ts
     end
-    @test isapprox(run_step(), f.Tclim[:, :, 1]; rtol = 1e-6)
+    @test isapprox(run_step(), f.Ts_clim[:, :, 1]; rtol = 1e-6)
     # Negative control: without the correction the same step does not land
-    f.TF_correct[:, :, 1] .= 0.0f0
-    @test !isapprox(run_step(), f.Tclim[:, :, 1]; rtol = 1e-6)
+    f.Ts_flux_correction[:, :, 1] .= 0.0f0
+    @test !isapprox(run_step(), f.Ts_clim[:, :, 1]; rtol = 1e-6)
 end
 
 @testset "greb_model! restores the fields it changes, so one fields serves several runs" begin
     f = synthetic_fields()
-    f.TF_correct .= 1.0f0   # stands in for loaded corrections; the run zeroes them here
+    f.Ts_flux_correction .= 1.0f0   # stands in for loaded corrections; the run zeroes them here
     # sw_solar is not in this list: no part of this config swaps the solar
     # table, so the paleo testset is where its restore is checked.
-    names = (:TF_correct, :qF_correct, :ToF_correct, :z_topo, :cldclim, :qclim, :mldclim)
+    names = (:Ts_flux_correction, :q_flux_correction, :To_flux_correction, :z_topo, :cloud_clim, :q_clim, :mld_clim)
     before = Dict(n => copy(getfield(f, n)) for n in names)
     # Running without corrections zeroes them; flat topography, uniform clouds
     # and humidity and the mixed-layer ocean replace their climatologies.
@@ -439,7 +439,7 @@ end
             # Ts after the first control step; `preloaded` stands in for corrections already in `fields`
             function first_ts(c; preloaded = 0.0f0, jld2_dir = dir)
                 f = synthetic_fields()
-                f.TF_correct .= preloaded
+                f.Ts_flux_correction .= preloaded
                 cfg = preset(:full_model; processes = (topography = topography,), corrections = c)
                 return at_first_step(v -> copy(v.Ts), RunSpec(ctrl = 1, scnr = 0), cfg; phase = :ctrl, jld2_dir, fields = f)
             end
