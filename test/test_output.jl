@@ -70,14 +70,14 @@ end
         em=fill(0.9, GREBClimate.xdim, GREBClimate.ydim))
 
     ts.ityr = 1
-    diagnostics!(1, 1970, 340.0, surf, tend, fields, state, ts)
+    diagnostics!(1970, surf, state, ts)
     @test all(==(280.0), state.Ts_annual_mean)   # accumulated once, no averaging/reset yet
 
     ts.ityr = GREBClimate.nstep_yr
     # Logs the annual summary line. Two steps of 280 K over a year of 730: 0.77 K,
     # the same in the global mean and in the two cells
     @test_logs (:info, "1970: Ts global mean -272.38 °C; 178 E 9 N -272.38; 58 E 51 N -272.38") diagnostics!(
-        GREBClimate.nstep_yr, 1970, 340.0, surf, tend, fields, state, ts)
+        1970, surf, state, ts)
     @test all(iszero, state.Ts_annual_mean)      # reset after year end
 end
 

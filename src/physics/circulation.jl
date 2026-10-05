@@ -77,13 +77,13 @@ end
 end
 
 """
-    diffusion!(T1, h_scl, fields::ClimateFields, ws::ModelWorkspace, timestate)
+    diffusion!(T1, h_scl, fields::ClimateFields, ws::ModelWorkspace)
 
 Meridional + zonal diffusion of `T1` (temperature or humidity), writing the
 tendency into `ws.dX_diff`. `h_scl` (`z_air` or `z_vapor`) selects the
 topographic weighting field.
 """
-function diffusion!(T1, h_scl, fields::ClimateFields, ws::ModelWorkspace, timestate)
+function diffusion!(T1, h_scl, fields::ClimateFields, ws::ModelWorkspace)
     wz = _wz_for(h_scl, fields)
     to_ghosted!(ws.X_work, T1)
     to_ghosted!(ws.wz_ghost, wz)

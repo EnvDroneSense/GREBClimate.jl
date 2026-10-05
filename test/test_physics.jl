@@ -58,7 +58,7 @@ end
     test_is = [1, 2, 3, 50, 94, 95, 96]
     test_ks = [1, 11, 48]
 
-    diffusion!(T1, GREBClimate.z_air, fields, ws, ts)
+    diffusion!(T1, GREBClimate.z_air, fields, ws)
     dX_diff_ref = Dict(
         (1,1)=>4517.8355192140425, (2,1)=>3542.95440832927, (3,1)=>2652.6121358299374,
         (50,1)=>1.2269892658145531, (94,1)=>-2709.198844945152, (95,1)=>-3576.970530673063,
@@ -79,9 +79,9 @@ end
     # the snapshots above never reach. These values are exactly representable in
     # Float32, so both paths must agree bit for bit.
     dX_diff_f32 = copy(ws.dX_diff)
-    diffusion!(Float64.(T1), GREBClimate.z_air, fields, ws, ts)
+    diffusion!(Float64.(T1), GREBClimate.z_air, fields, ws)
     @test ws.dX_diff == dX_diff_f32
-    diffusion!(view(T1, :, :), GREBClimate.z_air, fields, ws, ts)
+    diffusion!(view(T1, :, :), GREBClimate.z_air, fields, ws)
     @test ws.dX_diff == dX_diff_f32
 
     advection!(T1, GREBClimate.z_air, fields, ws, ts, p)

@@ -165,7 +165,7 @@ function qflux_correction!(CO2_ctrl, Ts, Ta, q, To, fields::ClimateFields, state
         seaice!(ws.Ts0, fields, timestate, r.config.processes)
 
         surf = SurfaceState(ws.Ts0, ws.Ta0, ws.To0, ws.q0)
-        diagnostics!(it, _SpinUpYear((it - 1) ÷ nstep_yr + 1), CO2_ctrl, surf, tend, fields, state, timestate)
+        diagnostics!(_SpinUpYear((it - 1) ÷ nstep_yr + 1), surf, state, timestate)
 
         # Advance state
         @. Ts = ws.Ts0

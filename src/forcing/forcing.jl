@@ -18,10 +18,9 @@ end
 _co2_at(c::ConstantCO2, it, year, r) = c.ppm
 
 function _co2_at(::Union{CO2Table,CO2File}, it, year, r)
-    yr = round(Int, year)
-    haskey(r.co2_table, yr) ||
-        error("No CO2 data for year $yr in the scenario's CO2 table (loaded $(length(r.co2_table)) years)")
-    return r.co2_table[yr]
+    haskey(r.co2_table, year) ||
+        error("No CO2 data for year $year in the scenario's CO2 table (loaded $(length(r.co2_table)) years)")
+    return r.co2_table[year]
 end
 
 # After 2100 the ramp falls back to 340 ppm, as the original code does

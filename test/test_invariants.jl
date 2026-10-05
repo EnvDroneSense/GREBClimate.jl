@@ -46,7 +46,7 @@ end
         ("seaice!", () -> seaice!(f.Ts, f.fields, f.ts, f.p), 0),
         ("deep_ocean!", () -> deep_ocean!(f.Ts, f.To, f.fields, f.ts, f.p, f.ws), 64),
         ("convergence!", () -> convergence!(f.T1, f.fields, f.ts, f.ws), 0),
-        ("diffusion!", () -> diffusion!(f.T1, GREBClimate.z_air, f.fields, f.ws, f.ts), 0),
+        ("diffusion!", () -> diffusion!(f.T1, GREBClimate.z_air, f.fields, f.ws), 0),
         ("advection!", () -> advection!(f.T1, GREBClimate.z_air, f.fields, f.ws, f.ts, f.p), 0),
         ("circulation!", () -> circulation!(f.T1, GREBClimate.z_air, f.dX, f.fields, f.ws, f.ts, f.p), 0),
         ("tendencies!", () -> tendencies!(340.0f0, f.Ts, f.Ta, f.To, f.q, f.fields, f.state, f.ws, f.ts, f.r), 256),
@@ -90,7 +90,7 @@ end
         (seaice!, (F32, ClimateFields, TimeState, Processes)),
         (deep_ocean!, (F32, F32, ClimateFields, TimeState, Processes, ModelWorkspace)),
         (convergence!, (F32, ClimateFields, TimeState, ModelWorkspace)),
-        (diffusion!, (F32, Float32, ClimateFields, ModelWorkspace, TimeState)),
+        (diffusion!, (F32, Float32, ClimateFields, ModelWorkspace)),
         (advection!, (F32, Float32, ClimateFields, ModelWorkspace, TimeState, Processes)),
         (circulation!, (F32, Float32, F32, ClimateFields, ModelWorkspace, TimeState, Processes)),
     ]

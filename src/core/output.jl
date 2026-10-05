@@ -8,15 +8,14 @@ Base.show(io::IO, y::_SpinUpYear) = print(io, "spin-up year ", y.n)
 const _SAMPLE_CELLS = (("178 E 9 N", 48, 27), ("58 E 51 N", 16, 38))
 
 """
-    diagnostics!(it, year, CO2, surf::SurfaceState, tend, fields, state, timestate)
+    diagnostics!(year, surf::SurfaceState, state, timestate)
 
 Accumulates the current timestep into `state`'s annual-mean buffers; at the
 last timestep of the year, averages them, logs the annual summary line
 (the area-weighted global mean and two sample cells, in °C) with `@info`, and
-resets the accumulators for the next year. `tend` is the `NamedTuple`
-[`tendencies!`](@ref) returns.
+resets the accumulators for the next year.
 """
-function diagnostics!(it, year, CO2, surf::SurfaceState, tend, fields::ClimateFields, state::ModelState, timestate)
+function diagnostics!(year, surf::SurfaceState, state::ModelState, timestate)
     # Accumulate
     Ts_annual_mean = state.Ts_annual_mean
     Ts = surf.Ts
@@ -165,7 +164,7 @@ function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
     # Output and diagnostics
     surf = SurfaceState(Ts, Ta, To, q)
     (mon, irec) = output!(it, irec, mon, surf, tend, ws, output_buf, acc, timestate)
-    diagnostics!(it, year, CO2, surf, tend, fields, state, timestate)
+    diagnostics!(year, surf, state, timestate)
 
     return (mon=mon, irec=irec)
 end

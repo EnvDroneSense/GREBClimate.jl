@@ -74,6 +74,11 @@ Notable changes to GREBClimate.jl, following
   `circulation!`, `tendencies!`, `time_loop!`, `output!`, `diagnostics!`,
   `qflux_correction!` and `init_model!` are reached as `GREBClimate.name`
   or with `using GREBClimate: name`. Their names and behaviour are unchanged.
+- **Breaking:** arguments that were never read are gone. `diagnostics!` is
+  `diagnostics!(year, surf, state, timestate)` and `diffusion!` is
+  `diffusion!(T1, h_scl, fields, ws)`.
+- **Breaking:** `ModelWorkspace` and `MonthlyAccumulator` are immutable. Their
+  arrays are written in place as before; a field can no longer be replaced.
 - Internal constants that take part in the model's formulas are lower case
   (`is_polar`, `polar_diff_time2`, `ΔT_air_factor`); capitals are kept for
   the package's own settings and tables. Some are named after what they are:

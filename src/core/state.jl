@@ -4,7 +4,7 @@
 Pre-allocated buffers for diffusion, advection, and circulation calculations.
 Reused across all time steps to eliminate allocations.
 """
-Base.@kwdef mutable struct ModelWorkspace
+Base.@kwdef struct ModelWorkspace
     # Polar sub-stepping buffers. `T1h` carries ghost cells (see `nghost`).
     T1h::Vector{Float32} = zeros(Float32, xghost)  # polar sub-stepping (ghosted)
     dTxh::Vector{Float32} = zeros(Float32, xdim)  # polar increment (Jacobi scratch)
@@ -86,7 +86,7 @@ month via `reset!`. `olrmm` and `lwdownmm` are summed with the signs of
 [`MonthlyRecord`](@ref) (`olr` positive upward, `lwdown` positive into the
 surface).
 """
-Base.@kwdef mutable struct MonthlyAccumulator
+Base.@kwdef struct MonthlyAccumulator
     Tmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface temperature accumulator
     Tamm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Air temperature accumulator
     Tomm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Ocean temperature accumulator
