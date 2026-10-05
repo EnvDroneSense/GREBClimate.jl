@@ -1,39 +1,43 @@
+# What the annual summary line of a spin-up year shows in place of a calendar year
+struct _SpinUpYear
+    n::Int
+end
+Base.show(io::IO, y::_SpinUpYear) = print(io, "spin-up year ", y.n)
+
+# The two cells of the annual summary line: label, longitude index, latitude index
+const _SAMPLE_CELLS = (("178 E 9 N", 48, 27), ("58 E 51 N", 16, 38))
+
 """
-    diagnostics!(it, year, CO2, surf::SurfaceState, tend, fields, state, timestate)
+    diagnostics!(year, surf::SurfaceState, state, timestate)
 
 Accumulates the current timestep into `state`'s annual-mean buffers; at the
-last timestep of the year, averages them, prints the annual summary line
-(global mean + two sample points), and resets the accumulators for the next
-year. `tend` is the `NamedTuple` [`tendencies!`](@ref) returns.
+last timestep of the year, averages them, logs the annual summary line
+(the area-weighted global mean and two sample cells, in °C) with `@info`, and
+resets the accumulators for the next year.
 """
-function diagnostics!(it, year, CO2, surf::SurfaceState, tend, fields::ClimateFields, state::ModelState, timestate)
+function diagnostics!(year, surf::SurfaceState, state::ModelState, timestate)
     # Accumulate
-    Tsmn = state.Tsmn
+    Ts_annual_mean = state.Ts_annual_mean
     Ts = surf.Ts
 
     @turbo for j in 1:ydim
         for i in 1:xdim
-            Tsmn[i, j] += Ts[i, j]
+            Ts_annual_mean[i, j] += Ts[i, j]
         end
     end
 
     if timestate.ityr == nstep_yr
         # Compute annual means
         n = nstep_yr
-        state.Tsmn ./= n
+        state.Ts_annual_mean ./= n
 
-        # Global mean and sample points (°C)
-        global_mean = sum(state.Tsmn[i, j] * dxlat_grid[j] for i in 1:xdim, j in 1:ydim) /
-                      (xdim * sum(dxlat_grid)) - 273.15f0
-        point1 = state.Tsmn[48, 27] - 273.15f0   # Tropical Pacific
-        point2 = state.Tsmn[16, 38] - 273.15f0   # 58 E, 51 N
-
-        println(year, "  ", round(global_mean, digits=2),
-            "  ", round(point1, digits=2),
-            "  ", round(point2, digits=2))
+        # Annual-mean surface temperature (°C): global mean and the two sample cells
+        celsius(T) = round(T - 273.15; digits=2)
+        cells = join(("$label $(celsius(state.Ts_annual_mean[i, j]))" for (label, i, j) in _SAMPLE_CELLS), "; ")
+        @info "$year: Ts global mean $(celsius(global_mean(state.Ts_annual_mean))) °C; $cells"
 
         # Reset accumulators
-        fill!(state.Tsmn, 0.0f0)
+        fill!(state.Ts_annual_mean, 0.0f0)
     end
     return nothing
 end
@@ -44,21 +48,21 @@ end
 Accumulates the current timestep into `acc`; on the last timestep of `mon`,
 pushes a monthly-mean [`MonthlyRecord`](@ref) onto `output_buf`, resets `acc`,
 and advances to the next month. Returns `(mon, irec)`. `tend` is the
-`NamedTuple` [`tendencies!`](@ref) returns; `ws.precip_out`/`evap_out`/
-`qcrcl_out` hold this step's converted precipitation/evaporation/moisture-
+`NamedTuple` [`tendencies!`](@ref) returns; `ws.precip`/`evap`/
+`qcrcl` hold this step's converted precipitation/evaporation/moisture-
 circulation output.
 """
-function output!(it, irec, mon, surf::SurfaceState, tend, ws::CirculationWorkspace,
+function output!(it, irec, mon, surf::SurfaceState, tend, ws::ModelWorkspace,
     output_buf::Vector{MonthlyRecord}, acc::MonthlyAccumulator, timestate)
-    mon = clamp(mon, 1, 12)
+    mon = clamp(mon, 1, months_per_year)
 
     accumulate!(acc, surf.Ts, surf.Ta, surf.To, surf.q, tend.albedo, tend.ice_cover,
-        ws.precip_out, ws.evap_out, ws.qcrcl_out, tend.SW, tend.LW_surf, tend.Q_lat, tend.Q_sens,
+        ws.precip, ws.evap, ws.qcrcl, tend.SW, tend.LW_surf, tend.Q_lat, tend.Q_sens,
         tend.LW_up, tend.LW_down, tend.em)
 
     # ----- Check end of month -----
-    if timestate.jday == jday_mon_cumsum[mon] && (it % ndt_days == 0)
-        ndm = cjday_mon[mon] * ndt_days
+    if timestate.jday == jday_mon_cumsum[mon] && is_day_end(it)
+        ndm = steps_in_month(mon)
         irec += 1
         push!(output_buf, (
             Ts=acc.Tmm ./ ndm,
@@ -78,7 +82,7 @@ function output!(it, irec, mon, surf::SurfaceState, tend, ws::CirculationWorkspa
             lwdown=acc.lwdownmm ./ ndm
         ))
         reset!(acc)
-        mon = mon == 12 ? 1 : mon + 1
+        mon = mod(mon, months_per_year) + 1
     end
     return (mon=mon, irec=irec)
 end
@@ -96,16 +100,11 @@ enable. `observer` is called before and after the update (see
 [`greb_model!`](@ref)); `phase` is passed on to it.
 """
 function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
-    fields::ClimateFields, state::ModelState, ws::CirculationWorkspace, acc::MonthlyAccumulator,
-    timestate, r::ResolvedConfig; ws_a::CirculationWorkspace=ws, ws_q::CirculationWorkspace=ws,
+    fields::ClimateFields, state::ModelState, ws::ModelWorkspace, acc::MonthlyAccumulator,
+    timestate, r::ResolvedConfig; ws_a::ModelWorkspace=ws, ws_q::ModelWorkspace=ws,
     observer=nothing, phase::Symbol=:ctrl)
-    # Calendar lookup
-    cal = it <= max_timesteps ? calendar_lookup[it] : (
-        day=mod((it - 1) ÷ ndt_days, ndays_yr) + 1,
-        step=mod(it - 1, nstep_yr) + 1
-    )
-    timestate.jday = cal.day
-    timestate.ityr = cal.step
+    timestate.jday = day_of_year(it)
+    timestate.ityr = step_of_year(it)
     ityr = timestate.ityr
 
     # Compute tendencies
@@ -115,9 +114,9 @@ function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
         observer(:after_tendencies, _step_view(phase, it, year, ityr, CO2, Ts, Ta, To, q, tend, fields, r))
 
     # Correction views
-    TF_corr = @view fields.TF_correct[:, :, ityr]
-    qF_corr = @view fields.qF_correct[:, :, ityr]
-    ToF_corr = @view fields.ToF_correct[:, :, ityr]
+    TF_corr = @view fields.Ts_flux_correction[:, :, ityr]
+    qF_corr = @view fields.q_flux_correction[:, :, ityr]
+    ToF_corr = @view fields.To_flux_correction[:, :, ityr]
     cap_surf = fields.cap_surf
     wz_vapor = fields.wz_vapor
 
@@ -131,8 +130,7 @@ function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
     Q_lat = tend.Q_lat; Q_sens = tend.Q_sens; dTa_crcl = tend.dTa_crcl
     LW_up = tend.LW_up; em = tend.em; Q_lat_air = tend.Q_lat_air
     dTo = tend.dTo; dT_ocean = tend.dT_ocean
-    precip_out = ws.precip_out
-    evap_out = ws.evap_out; qcrcl_out = ws.qcrcl_out
+    precip = ws.precip; evap = ws.evap; qcrcl = ws.qcrcl
 
     # Surface/air temperature, deep ocean, and humidity update
     @turbo for j in 1:ydim
@@ -151,9 +149,9 @@ function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
             tb = hydro_on * tb
             q[i, j] = q[i, j] + tb
 
-            precip_out[i, j] = (-dq_rain_use[i, j]) * wz_vapor[i, j] * conv_factor
-            evap_out[i, j] = dq_eva_use[i, j] * wz_vapor[i, j] * conv_factor
-            qcrcl_out[i, j] = dq_crcl_use[i, j]
+            precip[i, j] = (-dq_rain_use[i, j]) * wz_vapor[i, j] * q_to_mm_per_day
+            evap[i, j] = dq_eva_use[i, j] * wz_vapor[i, j] * q_to_mm_per_day
+            qcrcl[i, j] = dq_crcl_use[i, j]
         end
     end
 
@@ -166,7 +164,7 @@ function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
     # Output and diagnostics
     surf = SurfaceState(Ts, Ta, To, q)
     (mon, irec) = output!(it, irec, mon, surf, tend, ws, output_buf, acc, timestate)
-    diagnostics!(it, year, CO2, surf, tend, fields, state, timestate)
+    diagnostics!(year, surf, state, timestate)
 
     return (mon=mon, irec=irec)
 end

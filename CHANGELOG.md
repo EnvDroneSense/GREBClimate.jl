@@ -5,6 +5,110 @@ Notable changes to GREBClimate.jl, following
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-05
+
+### Added
+
+- Calendar functions `step_of_year`, `day_of_year`, `month_of_step` and
+  `decimal_year`. The calendar is computed in one place and the 200-year
+  lookup table is gone (2.3 MB less memory); results are unchanged.
+- `run_ensemble([reduce,] run, configs; fields, jld2_dir, ntasks, logger)`: runs
+  many configurations side by side as tasks, each on its own copy of the
+  fields, and returns one entry per member. Every member gives exactly the
+  result of running it alone.
+- `global_mean(field)`: the area-weighted global mean of a field on the model
+  grid. The examples use it; their plain means read 8 to 11 K too cold.
+- `GREBClimate.RangeCheck()`: an observer that records the first step at which
+  `Ts`, `Ta`, `To` or `q` leaves a physical range, for a run that diverges
+  without going non-finite.
+- `load_climatology(dir; corrections = false)` loads a dataset without the
+  stored flux corrections; the correction arrays stay zero.
+
+### Changed
+
+- **Breaking:** the loaders no longer carry the file format in their names,
+  and the two anomaly loaders are one function that takes the source:
+
+  | Before | Now |
+  |---|---|
+  | `load_greb_jld2!(dir)` | `load_climatology(dir)` |
+  | `load_flux_corrections_jld2!(dir, fields)` | `load_flux_corrections!(dir, fields)` |
+  | `load_co2_scenario_jld2(dir, key)` | `load_co2_scenario(dir, key)` |
+  | `load_custom_co2_scenario(path)` | `load_co2_custom(path)` |
+  | `load_solar_forcing_jld2(dir, kind, index)` | `load_solar_forcing(dir, kind, index)` |
+  | `load_cc_anomaly_jld2!(dir, fields)` | `load_boundary_anomaly!(dir, fields, :cmip5_rcp85)` |
+  | `load_enso_anomaly_jld2!(dir, fields, event)` | `load_boundary_anomaly!(dir, fields, event)` |
+  | `read_jld2(path)` | `read_field(path)` |
+
+- **Breaking:** the `Processes` switches `vapour_diffusion` and
+  `vapour_advection` are `vapor_diffusion` and `vapor_advection`, the
+  spelling of every other name in the package.
+- **Breaking:** the fields of `CirculationWorkspace` have no `_buf` or `_out`
+  suffix: `ws.Q_lat_buf` is `ws.Q_lat`, `ws.precip_out` is `ws.precip`, and
+  so on for all 24. The type itself is `ModelWorkspace`; it was
+  `CirculationWorkspace`, although every kernel uses it.
+- **Breaking:** the fields of `ClimateFields` separate their words:
+
+  | Before | Now |
+  |---|---|
+  | `Tclim`, `Toclim`, `qclim` | `Ts_clim`, `To_clim`, `q_clim` |
+  | `uclim`, `vclim`, `wsclim` | `u_clim`, `v_clim`, `wind_speed_clim` |
+  | `omegaclim`, `omegastdclim` | `omega_clim`, `omega_std_clim` |
+  | `mldclim`, `cldclim`, `swetclim` | `mld_clim`, `cloud_clim`, `soil_wetness_clim` |
+  | `TF_correct`, `qF_correct`, `ToF_correct` | `Ts_flux_correction`, `q_flux_correction`, `To_flux_correction` |
+
+  The anomaly and split-wind fields follow their stem (`Ts_clim_anom_cc`,
+  `u_clim_pos`). `ModelState.Tsmn` is `Ts_annual_mean`, and
+  `ResolvedHydrology.c_omegastd` is `c_omega_std`.
+- **Breaking:** scenario fields say what they hold: `SSTOffset.offset` (was
+  `K`), `SolarConstant.offset` (was `dW`), `EarthSunDistance.percent` (was
+  `pct`), `SeasonalCO2.in_season` and `.out_of_season` (were `inside` and
+  `outside`). The keyword of the preset follows:
+  `preset(:earth_sun_distance; percent = 1.5)`. Positional construction is
+  unchanged.
+- **Breaking:** `build_monthly_climatology` is `monthly_climatology`,
+  `apply_scenario_anomalies` is `scenario_anomalies`,
+  `compute_annual_ice_climatology` is `ice_climatology`, and
+  `apply_dynamic_co2_mask!` is `apply_surface_mask!`.
+- **Breaking:** the kernels and loop functions are no longer exported, only
+  what a user calls is. `SWradiation!`, `LWradiation!`, `hydro!`,
+  `convergence!`, `seaice!`, `deep_ocean!`, `diffusion!`, `advection!`,
+  `circulation!`, `tendencies!`, `time_loop!`, `output!`, `diagnostics!`,
+  `qflux_correction!` and `init_model!` are reached as `GREBClimate.name`
+  or with `using GREBClimate: name`. Their names and behaviour are unchanged.
+- **Breaking:** arguments that were never read are gone. `diagnostics!` is
+  `diagnostics!(year, surf, state, timestate)` and `diffusion!` is
+  `diffusion!(T1, h_scl, fields, ws)`.
+- **Breaking:** `ModelWorkspace` and `MonthlyAccumulator` are immutable. Their
+  arrays are written in place as before; a field can no longer be replaced.
+- Internal constants that take part in the model's formulas are lower case
+  (`is_polar`, `polar_diff_time2`, `ΔT_air_factor`); capitals are kept for
+  the package's own settings and tables. Some are named after what they are:
+  `pi_f32` (was `const_pi`), `convergence_factor` (`const_factor`),
+  `q_to_mm_per_day` (`conv_factor`), `solar_percent` (`S0_var`) and
+  `emissivity_fit` (`p_emi`). No exported name is affected.
+- What a run and the loaders report goes through the logger (`@info`) and no
+  longer through `println`: the lines carry an `[ Info:` prefix, go to
+  standard error, and are silenced with
+  `with_logger(NullLogger())` instead of `redirect_stdout(devnull)`.
+- The precompile workload runs a scenario year as well as a control year, so
+  the first scenario run of a session compiles less.
+- The yearly line names what it shows:
+  `1970: Ts global mean 13.82 °C; 178 E 9 N 26.79; 58 E 51 N 4.85`. A spin-up
+  year reads `spin-up year 1: ...`, and a run without a scenario no longer
+  reports a scenario of 0 years.
+- **Breaking:** the RCP6.0 CO2 table is `CO2Table(:rcp60)`, the name of its
+  preset. `load_co2_scenario(dir, :rcp6)`, and so a `CO2Table(:rcp6)` run, raise an
+  `ArgumentError`. The `:rcp60` preset is unchanged.
+- `load_climatology` and `load_flux_corrections!` raise an `ArgumentError`
+  when `climatology/flux_corrections.jld2` or one of its three tables is
+  missing. They used to fill the corrections with zeros and warn. For a
+  dataset without the file, pass `corrections = false`.
+- A `BoundaryAnomaly` scenario (`:rcp85_boundary`, `:elnino`, `:lanina`) reads
+  its anomaly files once per `ClimateFields`: a later run on the same fields,
+  directory and source reuses the arrays. `ClimateFields` has two new fields
+  for this, `anom_cc_source` and `anom_enso_source`. Results are unchanged.
+
 ## [2.0.1] - 2026-10-04
 
 ### Changed

@@ -19,20 +19,20 @@ end
     function init(processes; corrections = SpinUp(3))
         f = synthetic_fields()
         f.z_topo[1, 1] = 500.0f0
-        f.TF_correct .= 1.0f0
+        f.Ts_flux_correction .= 1.0f0
         config = Config(; processes = Processes(; processes...), corrections)
         ini = quiet(() -> init_model!(resolve(config), f))
         return f, ini
     end
     f, ini = init((;))
-    @test f.z_topo[1, 1] == 500.0f0 && all(==(1.0f0), f.TF_correct) && ini.CO2_ctrl == 340
-    @test all(==(0.0f0), init((clouds = :none,))[1].cldclim)
-    @test all(==(0.7f0), init((clouds = :uniform,))[1].cldclim)
-    @test all(==(0.0f0), init((hydrology = :none,))[1].qclim)
-    @test all(==(0.0052f0), init((hydrology = :none, humidity = :uniform))[1].qclim)   # uniform wins
-    @test all(==(GREBClimate.d_ocean), init((ocean = :mixed_layer,))[1].mldclim)
+    @test f.z_topo[1, 1] == 500.0f0 && all(==(1.0f0), f.Ts_flux_correction) && ini.CO2_ctrl == 340
+    @test all(==(0.0f0), init((clouds = :none,))[1].cloud_clim)
+    @test all(==(0.7f0), init((clouds = :uniform,))[1].cloud_clim)
+    @test all(==(0.0f0), init((hydrology = :none,))[1].q_clim)
+    @test all(==(0.0052f0), init((hydrology = :none, humidity = :uniform))[1].q_clim)   # uniform wins
+    @test all(==(GREBClimate.d_ocean), init((ocean = :mixed_layer,))[1].mld_clim)
     @test all(==(GREBClimate.cap_land), init((ocean = :none,))[1].cap_surf)
     @test init((topography = :flat,))[1].z_topo[1, 1] == 1.0f0
     @test init((co2 = false,))[2].CO2_ctrl == 0
-    @test all(==(0.0f0), init((;); corrections = NoCorrections())[1].TF_correct)
+    @test all(==(0.0f0), init((;); corrections = NoCorrections())[1].Ts_flux_correction)
 end

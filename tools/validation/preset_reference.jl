@@ -6,7 +6,7 @@
 # (control CO2, CO2 masks, start year, output mode, loaded tables and table row,
 # boundary forcing, the CO2 and solar multiplier over 150 scenario years, and
 # its processes, hydrology and corrections), captured from the current code by
-# test/presetcapture.jl. test/test_presets.jl checks
+# test/support/presetcapture.jl. test/test_presets.jl checks
 # the package against it. Regenerate only on purpose, when a preset is meant
 # to change, and say so in the commit.
 #
@@ -15,8 +15,8 @@
 
 using GREBClimate
 const TEST = joinpath(@__DIR__, "..", "..", "test")
-include(joinpath(TEST, "testutils.jl"))
-include(joinpath(TEST, "presetcapture.jl"))
+include(joinpath(TEST, "support", "testutils.jl"))
+include(joinpath(TEST, "support", "presetcapture.jl"))
 
 out = joinpath(TEST, "data", "preset_reference.jl")
 mkpath(dirname(out))

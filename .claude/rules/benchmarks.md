@@ -20,3 +20,11 @@ threading change with a same-process comparison.
 Never record wall-clock test timings as if they were benchmark results.
 Assertion counts from the test suite are stable across runs; timings from
 this harness are not — don't conflate the two kinds of number.
+
+To find where the time goes, use `benchmark/profile.jl` (modes `step`,
+`setup`, `allocs`, `dispatch`, `compare`; see `benchmark/README.md`) and read
+`category.txt`, then `owned.txt`. Run it at `-t 1`: on Windows the sampler
+records the first thread only. A share in a profile is the ceiling of a gain,
+not a measurement of one - a row smaller than three of its standard errors
+(the `+/-` column) is noise, and a speed-up still needs the same-process
+comparison above.

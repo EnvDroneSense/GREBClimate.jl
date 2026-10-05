@@ -5,7 +5,7 @@
     ResolvedHydrology
 
 A [`Hydrology`](@ref) scheme with its rain-regression coefficients `c_q`,
-`c_rq`, `c_omega`, `c_omegastd`; what [`hydro!`](@ref) reads. Build it with
+`c_rq`, `c_omega`, `c_omega_std`; what [`hydro!`](@ref) reads. Build it with
 [`resolve`](@ref)`(hydrology)`.
 """
 struct ResolvedHydrology
@@ -14,18 +14,19 @@ struct ResolvedHydrology
     c_q::Float32
     c_rq::Float32
     c_omega::Float32
-    c_omegastd::Float32
+    c_omega_std::Float32
 end
 
-# (c_q, c_rq, c_omega, c_omegastd) per rain scheme; :fitted is the ERA-Interim fit
+# (c_q, c_rq, c_omega, c_omega_std) per (rain, rain_fit); only :fitted has an
+# :ncep fit, the constructor of Hydrology rejects it for the others
 const _RAIN_COEFFICIENTS = Dict(
-    :original => (1.0f0, 0.0f0, 0.0f0, 0.0f0),
-    :rh => (-1.391649f0, 3.018774f0, 0.0f0, 0.0f0),
-    :omega => (0.862162f0, 0.0f0, -29.02096f0, 0.0f0),
-    :rh_omega => (-0.2685845f0, 1.4591853f0, -26.9858807f0, 0.0f0),
-    :fitted => (-1.88f0, 2.25f0, -17.69f0, 59.07f0),
+    (:original, :era) => (1.0f0, 0.0f0, 0.0f0, 0.0f0),
+    (:rh, :era) => (-1.391649f0, 3.018774f0, 0.0f0, 0.0f0),
+    (:omega, :era) => (0.862162f0, 0.0f0, -29.02096f0, 0.0f0),
+    (:rh_omega, :era) => (-0.2685845f0, 1.4591853f0, -26.9858807f0, 0.0f0),
+    (:fitted, :era) => (-1.88f0, 2.25f0, -17.69f0, 59.07f0),
+    (:fitted, :ncep) => (-1.27f0, 1.99f0, -16.54f0, 21.15f0),
 )
-const _RAIN_FIT_NCEP = (-1.27f0, 1.99f0, -16.54f0, 21.15f0)
 
 """
     ResolvedConfig
@@ -63,16 +64,15 @@ function resolve(config::Config; jld2_dir::AbstractString="")
 end
 
 function resolve(h::Hydrology)
-    c = h.rain === :fitted && h.rain_fit === :ncep ? _RAIN_FIT_NCEP : _RAIN_COEFFICIENTS[h.rain]
-    return ResolvedHydrology(h.rain, h.evaporation, c...)
+    return ResolvedHydrology(h.rain, h.evaporation, _RAIN_COEFFICIENTS[(h.rain, h.rain_fit)]...)
 end
 
 _co2_table(::CO2Path, jld2_dir) = Dict{Int,Float32}()
-_co2_table(c::CO2Table, jld2_dir) = load_co2_scenario_jld2(String(jld2_dir), c.key)
+_co2_table(c::CO2Table, jld2_dir) = load_co2_scenario(String(jld2_dir), c.key)
 function _co2_table(c::CO2File, jld2_dir)
     isempty(c.path) && throw(ArgumentError("CO2File needs the path of a CO2 file"))
-    return load_custom_co2_scenario(c.path)
+    return load_co2_custom(c.path)
 end
 
 _solar_table(::Solar, jld2_dir) = nothing
-_solar_table(s::SolarTable, jld2_dir) = Matrix{Float32}(load_solar_forcing_jld2(String(jld2_dir), s.kind, s.index))
+_solar_table(s::SolarTable, jld2_dir) = Matrix{Float32}(load_solar_forcing(String(jld2_dir), s.kind, s.index))

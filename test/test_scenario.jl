@@ -21,7 +21,7 @@ end
     # not the default rows (32, 95): an ignored `index` must show
     @test preset(:eccentricity; index = 5).scenario.solar == SolarTable(:eccentricity, 5)
     @test preset(:obliquity; index = 10).scenario.solar == SolarTable(:obliquity, 10)
-    @test preset(:earth_sun_distance; pct = 2.5).scenario.solar == EarthSunDistance(2.5)
+    @test preset(:earth_sun_distance; percent = 2.5).scenario.solar == EarthSunDistance(2.5)
     @test preset(:custom_co2; path = "co2.txt").scenario.co2 == CO2File("co2.txt")
 end
 
@@ -65,4 +65,14 @@ end
     r = resolved(Config(scenario = Scenario(co2 = SeasonalCO2(1000, 300, :boreal_summer))))
     @test forcing(1, 1950, r).CO2 == 300 && forcing(300, 1950, r).CO2 == 1000
     @test_throws ErrorException forcing(1, 1951, resolved(preset(:rcp45)))    # year not in the table
+end
+
+@testset "SeasonalCO2 season is half the year, from 1 October" begin
+    r = resolve(Config(scenario=Scenario(co2=SeasonalCO2(680, 340, :boreal_winter))))
+    co2(step) = GREBClimate.forcing(step, 1950, r).CO2
+    @test GREBClimate._winter_first_step == GREBClimate.first_step_of(10, 1) == 547
+    @test GREBClimate._winter_last_step == GREBClimate.first_step_of(4, 1) == 181
+    @test co2.([1, 181, 182, 546, 547, 730]) == Float32[680, 680, 340, 340, 680, 680]
+    @test count(==(680.0f0), co2.(1:nstep_yr)) == nstep_yr ÷ 2
+    @test co2(731) == 680.0f0     # the second year starts in winter again
 end

@@ -22,7 +22,7 @@ end
 """
     CO2Table(key)
 
-CO2 per year from the dataset's IPCC table `key`: `:rcp26`, `:rcp45`, `:rcp6`,
+CO2 per year from the dataset's IPCC table `key`: `:rcp26`, `:rcp45`, `:rcp60`,
 `:rcp85`, `:ssp119`, `:ssp126`, `:ssp245`, `:ssp460`, `:ssp585` or `:hist`
 (1850-2017).
 """
@@ -34,7 +34,7 @@ end
     CO2File(path)
 
 CO2 per year from a text file of `year ppm` lines (see
-[`load_custom_co2_scenario`](@ref)).
+[`load_co2_custom`](@ref)).
 """
 struct CO2File <: CO2Path
     path::String
@@ -67,19 +67,19 @@ struct CO2Step <: CO2Path
 end
 
 """
-    SeasonalCO2(inside, outside, season)
+    SeasonalCO2(in_season, out_of_season, season)
 
-`inside` ppm during `season`, `outside` ppm for the rest of the year.
-`:boreal_winter` is October to March (steps 547-730 and 1-181),
+`in_season` ppm during `season`, `out_of_season` ppm for the rest of the year.
+`:boreal_winter` is 1 October through the first step of 1 April (steps 547-730 and 1-181), half the year,
 `:boreal_summer` is April to September.
 """
 struct SeasonalCO2 <: CO2Path
-    inside::Float32
-    outside::Float32
+    in_season::Float32
+    out_of_season::Float32
     season::Symbol
-    function SeasonalCO2(inside, outside, season::Symbol)
+    function SeasonalCO2(in_season, out_of_season, season::Symbol)
         _check_option(:season, season, (:boreal_winter, :boreal_summer))
-        return new(inside, outside, season)
+        return new(in_season, out_of_season, season)
     end
 end
 
@@ -144,12 +144,12 @@ Present-day insolation from the dataset.
 struct ModernSolar <: Solar end
 
 """
-    SolarConstant(dW)
+    SolarConstant(offset)
 
-The solar constant raised from 1365 by `dW` W/m².
+The solar constant raised from 1365 by `offset` W/m².
 """
 struct SolarConstant <: Solar
-    dW::Float32
+    offset::Float32
 end
 
 """
@@ -184,14 +184,14 @@ end
 const _MODERN_ROW = Dict(:obliquity => 95, :eccentricity => 32)
 
 """
-    EarthSunDistance(pct)
+    EarthSunDistance(percent)
 
-The Earth-Sun distance changed by `pct` percent of today's; positive is
-further away. Insolation scales with the inverse square, so `pct = 1` gives
+The Earth-Sun distance changed by `percent` percent of today's; positive is
+further away. Insolation scales with the inverse square, so `percent = 1` gives
 about 2 % less sunlight.
 """
 struct EarthSunDistance <: Solar
-    pct::Float32
+    percent::Float32
 end
 
 """
@@ -225,13 +225,13 @@ struct BoundaryAnomaly <: SurfaceForcing
 end
 
 """
-    SSTOffset(K)
+    SSTOffset(offset)
 
-Ocean surface temperature held at the climatology plus `K`, with CO2 at its
+Ocean surface temperature held at the climatology plus `offset` K, with CO2 at its
 control value.
 """
 struct SSTOffset <: SurfaceForcing
-    K::Float32
+    offset::Float32
 end
 
 """

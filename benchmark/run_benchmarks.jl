@@ -11,6 +11,8 @@
 #             --ctrl=N, --scnr=N (default 10/10), --experiment=NAME (default full_model)
 
 using GREBClimate
+using GREBClimate: SWradiation!, LWradiation!, hydro!, convergence!, seaice!, deep_ocean!,
+    circulation!, tendencies!, output!, diagnostics!, init_model!
 
 include("common.jl")
 
@@ -27,17 +29,18 @@ function time_1yr(jld2_dir::AbstractString; cfg=preset(:full_model; corrections=
     reps >= 1 || throw(ArgumentError("reps must be at least 1, got $reps"))
 
     println("Threads.nthreads() = ", Threads.nthreads())
-    fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
+    calibration = machine_header()
+    fields = load_climatology(jld2_dir; dataset=:ncep)
 
     # Warm-up, so compilation is not timed.
-    redirect_stdout(devnull) do
+    Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
         greb_model!(RunSpec(scnr=0), cfg; jld2_dir=jld2_dir, fields=deepcopy(fields))
     end
 
     times = Float64[]
     for r in 1:reps
         fields_r = deepcopy(fields)  # a fresh copy per repetition
-        t = @elapsed redirect_stdout(devnull) do
+        t = @elapsed Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
             greb_model!(RunSpec(scnr=0), cfg; jld2_dir=jld2_dir, fields=fields_r)
         end
         push!(times, t)
@@ -46,6 +49,7 @@ function time_1yr(jld2_dir::AbstractString; cfg=preset(:full_model; corrections=
 
     println("mean: ", round(sum(times) / length(times), digits=3), " s  ",
         "(min ", round(minimum(times), digits=3), "s, max ", round(maximum(times), digits=3), "s)")
+    machine_footer(calibration, times)
     return times
 end
 
@@ -68,18 +72,19 @@ function time_years(jld2_dir::AbstractString; experiment::Symbol=:full_model,
 
     println("Threads.nthreads() = ", Threads.nthreads())
     println("ctrl=$ctrl scnr=$scnr ($total_years simulated years/rep), experiment=$experiment")
+    calibration = machine_header()
     cfg = preset(experiment; corrections=Stored())  # no spin-up, as in time_1yr
-    fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
+    fields = load_climatology(jld2_dir; dataset=:ncep)
 
     # Warm-up with a minimal run.
-    redirect_stdout(devnull) do
+    Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
         greb_model!(RunSpec(ctrl=1, scnr=0), cfg; jld2_dir=jld2_dir, fields=deepcopy(fields))
     end
 
     times = Float64[]
     for r in 1:reps
         fields_r = deepcopy(fields)  # a fresh copy per repetition
-        t = @elapsed redirect_stdout(devnull) do
+        t = @elapsed Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
             greb_model!(RunSpec(ctrl=ctrl, scnr=scnr), cfg; jld2_dir=jld2_dir, fields=fields_r)
         end
         push!(times, t)
@@ -91,6 +96,7 @@ function time_years(jld2_dir::AbstractString; experiment::Symbol=:full_model,
     println("mean: ", round(mean_t, digits=3), " s  ",
         "(min ", round(minimum(times), digits=3), "s, max ", round(maximum(times), digits=3), "s)  ",
         "= ", round(mean_t / total_years, digits=3), " s/simulated year over ", total_years, " years")
+    machine_footer(calibration, times)
     return times
 end
 
@@ -99,19 +105,19 @@ function time_stages(jld2_dir::AbstractString; cfg=preset(:full_model), reps::In
     _require_data(jld2_dir) || return nothing
     reps >= 1 || throw(ArgumentError("reps must be at least 1, got $reps"))
 
-    fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
+    fields = load_climatology(jld2_dir; dataset=:ncep)
     r = resolve(cfg; jld2_dir)
     p = r.config.processes
     CO2 = init_model!(r, fields).CO2_ctrl
     state = ModelState()
-    ws = CirculationWorkspace()
+    ws = ModelWorkspace()
     timestate = TimeState(1, 1)
 
     ityr = timestate.ityr
-    Ts = copy(fields.Tclim[:, :, ityr])
+    Ts = copy(fields.Ts_clim[:, :, ityr])
     Ta = copy(Ts)
-    To = copy(fields.Toclim[:, :, ityr])
-    q = copy(fields.qclim[:, :, ityr])
+    To = copy(fields.To_clim[:, :, ityr])
+    q = copy(fields.q_clim[:, :, ityr])
 
     stages = [
         ("circulation!(Ta)", () -> circulation!(Ta, GREBClimate.z_air, ws.dTa_crcl, fields, ws, timestate, p)),
@@ -125,6 +131,7 @@ function time_stages(jld2_dir::AbstractString; cfg=preset(:full_model), reps::In
     for (_, f) in stages
         f()
     end
+    calibration = machine_header()
 
     println("Per-stage timing (", reps, " calls each, single workspace, ",
         Threads.nthreads(), " thread(s) available but unused here):")
@@ -143,8 +150,10 @@ function time_stages(jld2_dir::AbstractString; cfg=preset(:full_model), reps::In
             round(share, digits=1), "% of measured total)")
     end
     println("  measured total (sum of stages): ", round(total * 1e6, digits=1), " µs")
-    println("  (convergence! is inside circulation!(q); seaice!/output!/diagnostics!")
-    println("   and the tendency assembly are not measured - see time_1yr for whole-model cost)")
+    println("  (convergence! is inside circulation!(q). The shares are of these six calls, not of")
+    println("   a step: seaice!, the update loop, output! and diagnostics! are not timed. For shares")
+    println("   of a whole run use benchmark/profile.jl step)")
+    machine_footer(calibration)
     return results
 end
 
@@ -191,17 +200,17 @@ function check_allocations(jld2_dir::AbstractString)
     _require_data(jld2_dir) || return nothing
 
     r = resolve(preset(:full_model))
-    fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
+    fields = load_climatology(jld2_dir; dataset=:ncep)
     CO2 = init_model!(r, fields).CO2_ctrl
     state = ModelState()
-    ws = CirculationWorkspace()
+    ws = ModelWorkspace()
     timestate = TimeState(1, 1)
 
     ityr = timestate.ityr
-    Ts = copy(fields.Tclim[:, :, ityr])
+    Ts = copy(fields.Ts_clim[:, :, ityr])
     Ta = copy(Ts)
-    To = copy(fields.Toclim[:, :, ityr])
-    q = copy(fields.qclim[:, :, ityr])
+    To = copy(fields.To_clim[:, :, ityr])
+    q = copy(fields.q_clim[:, :, ityr])
 
     tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, timestate, r)  # warm-up
     bytes = @allocated tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, timestate, r)

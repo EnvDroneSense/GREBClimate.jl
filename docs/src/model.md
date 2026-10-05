@@ -1,3 +1,7 @@
+```@meta
+CurrentModule = GREBClimate
+```
+
 # Model overview
 
 GREB is a conceptual climate model: it solves energy and moisture budgets on a
@@ -53,7 +57,7 @@ terms, integrates the four prognostic fields, then updates sea ice.
 | Component | Function | What it computes |
 |:----------|:---------|:-----------------|
 | Shortwave radiation | [`SWradiation!`](@ref) | Ice cover and surface albedo from `Ts` (albedo rises linearly as the surface cools through a band just below freezing), then the absorbed solar flux. Cloud albedo scales with the ISCCP cloud-cover climatology. |
-| Longwave radiation | [`LWradiation!`](@ref) | Atmospheric emissivity from CO₂, water vapour and clouds (a 10-parameter log fit), then the up- and downward longwave fluxes. This is where the greenhouse effect lives. |
+| Longwave radiation | [`LWradiation!`](@ref) | Atmospheric emissivity from CO₂, water vapor and clouds (a 10-parameter log fit), then the up- and downward longwave fluxes. This is where the greenhouse effect lives. |
 | Hydrology | [`hydro!`](@ref) | Evaporation by a bulk formula (four variants, `Hydrology.evaporation`), precipitation from humidity, relative humidity and vertical velocity (`Hydrology.rain`), and the latent heat flux (Stassen et al., 2019). |
 | Circulation | [`circulation!`](@ref) | Transport of `Ta` and `q` by advection with the climatological 850 hPa winds and isotropic diffusion, plus moisture convergence for `q` from the vertical-velocity climatology. Runs 24 half-hour sub-steps per timestep, more near the poles; about 93% of the run time. |
 | Deep ocean | [`deep_ocean!`](@ref) | Heat exchange between the mixed layer (`Ts`) and the deep ocean (`To`) by entrainment, detrainment and turbulent mixing. |

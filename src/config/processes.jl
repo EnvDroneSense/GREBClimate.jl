@@ -24,7 +24,7 @@ climatologies.
 | `co2` | `true`, `false` | CO2 0 ppm in the control and the scenario |
 | `ice_albedo` | `true`, `false` | No ice-albedo feedback |
 | `transport` | `true`, `false` | No atmospheric heat and moisture transport |
-| `heat_diffusion`, `heat_advection`, `vapour_diffusion`, `vapour_advection`, `moisture_convergence` | `true`, `false` | The single transport term switched off |
+| `heat_diffusion`, `heat_advection`, `vapor_diffusion`, `vapor_advection`, `moisture_convergence` | `true`, `false` | The single transport term switched off |
 """
 struct Processes
     atmosphere::Bool
@@ -38,14 +38,14 @@ struct Processes
     transport::Bool
     heat_diffusion::Bool
     heat_advection::Bool
-    vapour_diffusion::Bool
-    vapour_advection::Bool
+    vapor_diffusion::Bool
+    vapor_advection::Bool
     moisture_convergence::Bool
 end
 
 function Processes(; atmosphere=true, clouds=:observed, humidity=:observed, hydrology=:full,
     ocean=:full, topography=:observed, co2=true, ice_albedo=true, transport=true,
-    heat_diffusion=true, heat_advection=true, vapour_diffusion=true, vapour_advection=true,
+    heat_diffusion=true, heat_advection=true, vapor_diffusion=true, vapor_advection=true,
     moisture_convergence=true)
     return Processes(atmosphere,
         _check_option(:clouds, clouds, (:observed, :none, :uniform)),
@@ -54,7 +54,7 @@ function Processes(; atmosphere=true, clouds=:observed, humidity=:observed, hydr
         _check_option(:ocean, ocean, (:full, :mixed_layer, :none)),
         _check_option(:topography, topography, (:observed, :flat)),
         co2, ice_albedo, transport, heat_diffusion, heat_advection,
-        vapour_diffusion, vapour_advection, moisture_convergence)
+        vapor_diffusion, vapor_advection, moisture_convergence)
 end
 
 """
@@ -133,7 +133,7 @@ years); use [`SpinUp`](@ref) there.
 
 `greb_model!` reads them from `jld2_dir` when it is given, and a missing file
 is an error there. Without `jld2_dir` it uses the corrections already in
-`fields`, which `load_greb_jld2!` loads.
+`fields`, which `load_climatology` loads.
 """
 struct Stored <: Corrections end
 

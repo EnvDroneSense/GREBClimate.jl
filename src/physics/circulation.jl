@@ -39,27 +39,27 @@ function to_ghosted!(P::AbstractMatrix{Float32}, A::AbstractMatrix{<:Real})
 end
 
 """
-    convergence!(T1, fields::ClimateFields, timestate, ws::CirculationWorkspace)
+    convergence!(T1, fields::ClimateFields, timestate, ws::ModelWorkspace)
 
 Moisture flux convergence from `T1` (specific humidity, `[kg/kg]`) and the
-current `fields.omegaclim` (vertical velocity), writing the tendency into
+current `fields.omega_clim` (vertical velocity), writing the tendency into
 `ws.dX_conv`. Implements Eq. 18 from Stassen et al. (2019).
 """
-function convergence!(T1, fields::ClimateFields, timestate, ws::CirculationWorkspace)
-    omega = @view fields.omegaclim[:, :, timestate.ityr]
+function convergence!(T1, fields::ClimateFields, timestate, ws::ModelWorkspace)
+    omega = @view fields.omega_clim[:, :, timestate.ityr]
 
-    @. ws.dX_conv = -T1 * omega * const_factor
+    @. ws.dX_conv = -T1 * omega * convergence_factor
     return nothing
 end
 
 # Same tendency, reading a ghosted field.
-function _convergence!(Xp::Matrix{Float32}, fields::ClimateFields, timestate, ws::CirculationWorkspace)
-    omega = @view fields.omegaclim[:, :, timestate.ityr]
+function _convergence!(Xp::Matrix{Float32}, fields::ClimateFields, timestate, ws::ModelWorkspace)
+    omega = @view fields.omega_clim[:, :, timestate.ityr]
     dX_conv = ws.dX_conv
 
     @inbounds for k in 1:ydim
         @turbo for i in 1:xdim
-            dX_conv[i, k] = -Xp[i+nghost, k] * omega[i, k] * const_factor
+            dX_conv[i, k] = -Xp[i+nghost, k] * omega[i, k] * convergence_factor
         end
     end
     return nothing
@@ -77,13 +77,13 @@ end
 end
 
 """
-    diffusion!(T1, h_scl, fields::ClimateFields, ws::CirculationWorkspace, timestate)
+    diffusion!(T1, h_scl, fields::ClimateFields, ws::ModelWorkspace)
 
 Meridional + zonal diffusion of `T1` (temperature or humidity), writing the
 tendency into `ws.dX_diff`. `h_scl` (`z_air` or `z_vapor`) selects the
 topographic weighting field.
 """
-function diffusion!(T1, h_scl, fields::ClimateFields, ws::CirculationWorkspace, timestate)
+function diffusion!(T1, h_scl, fields::ClimateFields, ws::ModelWorkspace)
     wz = _wz_for(h_scl, fields)
     to_ghosted!(ws.X_work, T1)
     to_ghosted!(ws.wz_ghost, wz)
@@ -93,13 +93,12 @@ end
 
 # Core kernel. `Tp`/`wzp` are ghosted with valid ghost rows; the tendency lands in
 # the plain `(xdim, ydim)` `ws.dX_diff`.
-function _diffusion!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, ws::CirculationWorkspace)
+function _diffusion!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, ws::ModelWorkspace)
     dX_diff = ws.dX_diff
 
     # Precomputed geometry/coefficients
     ccy = ccy_diff
     ccx = ccx_diff
-    is_polar = IS_POLAR
 
     term_south = ws.term_south
     term_north = ws.term_north
@@ -158,8 +157,8 @@ function _diffusion!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, ws::CirculationW
             end
         else   # polar regions - sub-timestepping
             # Number of sub-steps for stability (precomputed, depends only on k)
-            time2 = POLAR_DIFF_TIME2[k]
-            cc2 = POLAR_DIFF_CCX2[k] * 0.05f0
+            time2 = polar_diff_time2[k]
+            cc2 = polar_diff_ccx2[k] * 0.05f0
 
             # Copy current row (ghosts included) into the temporary buffer
             @simd for i in 1:xghost
@@ -202,15 +201,15 @@ function _diffusion!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, ws::CirculationW
 end
 
 """
-    advection!(T1, h_scl, fields::ClimateFields, ws::CirculationWorkspace, timestate, p::Processes)
+    advection!(T1, h_scl, fields::ClimateFields, ws::ModelWorkspace, timestate, p::Processes)
 
 Meridional + zonal advection of `T1` (temperature or humidity), writing the
-tendency into `ws.dX_adv`. Gated by `p.heat_advection`/`p.vapour_advection`
+tendency into `ws.dX_adv`. Gated by `p.heat_advection`/`p.vapor_advection`
 depending on `h_scl`.
 """
-function advection!(T1, h_scl, fields::ClimateFields, ws::CirculationWorkspace, timestate, p::Processes)
-    # Disable advection for water vapour or heat according to switches
-    if (h_scl == z_vapor && !p.vapour_advection) || (h_scl == z_air && !p.heat_advection)
+function advection!(T1, h_scl, fields::ClimateFields, ws::ModelWorkspace, timestate, p::Processes)
+    # Disable advection for water vapor or heat according to switches
+    if (h_scl == z_vapor && !p.vapor_advection) || (h_scl == z_air && !p.heat_advection)
         fill!(ws.dX_adv, 0.0f0)
         return nothing
     end
@@ -223,19 +222,18 @@ end
 
 # Core kernel. `Tp`/`wzp` are ghosted; the switch check has already run.
 function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateFields,
-                     ws::CirculationWorkspace, timestate)
+                     ws::ModelWorkspace, timestate)
     dX_adv = ws.dX_adv
 
     # Extract 2D views for current time step
-    vclim_neg_t = @view fields.vclim_neg[:, :, timestate.ityr]
-    vclim_pos_t = @view fields.vclim_pos[:, :, timestate.ityr]
-    uclim_neg_t = @view fields.uclim_neg[:, :, timestate.ityr]
-    uclim_pos_t = @view fields.uclim_pos[:, :, timestate.ityr]
+    v_clim_neg_t = @view fields.v_clim_neg[:, :, timestate.ityr]
+    v_clim_pos_t = @view fields.v_clim_pos[:, :, timestate.ityr]
+    u_clim_neg_t = @view fields.u_clim_neg[:, :, timestate.ityr]
+    u_clim_pos_t = @view fields.u_clim_pos[:, :, timestate.ityr]
 
     # Precomputed constants
     ccy = ccy_adv
     ccx = ccx_adv
-    is_polar = IS_POLAR
 
     T1h = ws.T1h
     dTxh = ws.dTxh
@@ -244,7 +242,7 @@ function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateF
         # ----- Meridional (v) advection -----
         if k == 1          # southernmost row
             @turbo for j in 1:xdim
-                v_neg = vclim_neg_t[j, k]
+                v_neg = v_clim_neg_t[j, k]
                 dX_adv[j, k] = ccy * v_neg * (
                     wzp[j+nghost, 2] * (Tp[j+nghost, 1] - Tp[j+nghost, 2]) +
                     wzp[j+nghost, 3] * (Tp[j+nghost, 1] - Tp[j+nghost, 3])
@@ -252,8 +250,8 @@ function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateF
             end
         elseif k == 2
             @turbo for j in 1:xdim
-                v_pos = vclim_pos_t[j, k]
-                v_neg = vclim_neg_t[j, k]
+                v_pos = v_clim_pos_t[j, k]
+                v_neg = v_clim_neg_t[j, k]
                 dX_adv[j, k] = ccy * (
                     -v_pos * wzp[j+nghost, 1] * (Tp[j+nghost, 2] - Tp[j+nghost, 1]) +
                     v_neg * (wzp[j+nghost, 3] * (Tp[j+nghost, 2] - Tp[j+nghost, 3]) +
@@ -264,8 +262,8 @@ function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateF
             km1, km2 = k-1, k-2
             kp1, kp2 = k+1, k+2
             @turbo for j in 1:xdim
-                v_pos = vclim_pos_t[j, k]
-                v_neg = vclim_neg_t[j, k]
+                v_pos = v_clim_pos_t[j, k]
+                v_neg = v_clim_neg_t[j, k]
                 dX_adv[j, k] = ccy * (
                     -v_pos * (wzp[j+nghost, km1] * (Tp[j+nghost, k] - Tp[j+nghost, km1]) +
                             wzp[j+nghost, km2] * (Tp[j+nghost, k] - Tp[j+nghost, km2])) +
@@ -277,8 +275,8 @@ function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateF
             km1, km2 = k-1, k-2
             kp1 = k+1
             @turbo for j in 1:xdim
-                v_pos = vclim_pos_t[j, k]
-                v_neg = vclim_neg_t[j, k]
+                v_pos = v_clim_pos_t[j, k]
+                v_neg = v_clim_neg_t[j, k]
                 dX_adv[j, k] = ccy * (
                     -v_pos * (wzp[j+nghost, km1] * (Tp[j+nghost, k] - Tp[j+nghost, km1]) +
                             wzp[j+nghost, km2] * (Tp[j+nghost, k] - Tp[j+nghost, km2])) / 3.0f0 +
@@ -288,7 +286,7 @@ function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateF
         else               # k == ydim, the northernmost row
             km1, km2 = k-1, k-2
             @turbo for j in 1:xdim
-                v_pos = vclim_pos_t[j, k]
+                v_pos = v_clim_pos_t[j, k]
                 dX_adv[j, k] = ccy * (
                     -v_pos * (wzp[j+nghost, km1] * (Tp[j+nghost, k] - Tp[j+nghost, km1]) +
                             wzp[j+nghost, km2] * (Tp[j+nghost, k] - Tp[j+nghost, km2]))
@@ -305,8 +303,8 @@ function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateF
                 tm2 = Tp[j+1, k];  tm1 = Tp[j+2, k]
                 t0 = Tp[j+3, k]
                 tp1 = Tp[j+4, k];  tp2 = Tp[j+5, k]
-                u_pos = uclim_pos_t[j, k]
-                u_neg = uclim_neg_t[j, k]
+                u_pos = u_clim_pos_t[j, k]
+                u_neg = u_clim_neg_t[j, k]
                 dX_adv[j, k] += cc * (
                     -u_pos * (wm1 * (t0 - tm1) + wm2 * (t0 - tm2)) +
                     u_neg * (wp1 * (t0 - tp1) + wp2 * (t0 - tp2))
@@ -314,8 +312,8 @@ function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateF
             end
         else # polar regions - sub-timestepping
             # Number of sub-steps (CFL stability. Precomputed, depends only on k)
-            time2 = POLAR_ADV_TIME2[k]
-            ccx2 = POLAR_ADV_CCX2[k]
+            time2 = polar_adv_time2[k]
+            ccx2 = polar_adv_ccx2[k]
 
             # Copy current row (ghosts included) into the temporary buffer
             @simd for i in 1:xghost
@@ -330,8 +328,8 @@ function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateF
                     tm3 = T1h[j];      tm2 = T1h[j+1];    tm1 = T1h[j+2]
                     t0 = T1h[j+3]
                     tp1 = T1h[j+4];    tp2 = T1h[j+5];    tp3 = T1h[j+6]
-                    u_pos = uclim_pos_t[j, k]
-                    u_neg = uclim_neg_t[j, k]
+                    u_pos = u_clim_pos_t[j, k]
+                    u_neg = u_clim_neg_t[j, k]
 
                     dTxh[j] = ccx2 * (
                         -u_pos * (10.0f0 * wm1 * (t0 - tm1) +
@@ -343,7 +341,7 @@ function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateF
                     ) / 20.0f0
                 end
                 @turbo for j in 1:xdim
-                    # Stability clamp (avoid negative water vapour)
+                    # Stability clamp (avoid negative water vapor)
                     t0 = T1h[j+3]
                     dq = ifelse(dTxh[j] <= -t0, -0.9f0 * t0, dTxh[j])
                     T1h[j+3] = t0 + dq
@@ -362,7 +360,7 @@ function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateF
 end
 
 """
-    circulation!(X_in, h_scl, dX_out, fields::ClimateFields, ws::CirculationWorkspace, timestate, p::Processes)
+    circulation!(X_in, h_scl, dX_out, fields::ClimateFields, ws::ModelWorkspace, timestate, p::Processes)
 
 Sub-steps `X_in` through `ntime` iterations of [`diffusion!`](@ref),
 [`advection!`](@ref), and [`convergence!`](@ref) (each gated by its
@@ -370,7 +368,7 @@ Sub-steps `X_in` through `ntime` iterations of [`diffusion!`](@ref),
 without an atmosphere or transport. The sub-step loop is a genuine sequential
 recurrence and is not parallelized.
 """
-function circulation!(X_in, h_scl, dX_out, fields::ClimateFields, ws::CirculationWorkspace, timestate, p::Processes)
+function circulation!(X_in, h_scl, dX_out, fields::ClimateFields, ws::ModelWorkspace, timestate, p::Processes)
     # Early exit if atmospheric processes disabled
     if !p.atmosphere || !p.transport
         fill!(dX_out, 0.0f0)
@@ -378,9 +376,9 @@ function circulation!(X_in, h_scl, dX_out, fields::ClimateFields, ws::Circulatio
     end
 
     # Precompute flags
-    do_diff_v = p.vapour_diffusion && h_scl == z_vapor
+    do_diff_v = p.vapor_diffusion && h_scl == z_vapor
     do_diff_h = p.heat_diffusion && h_scl == z_air
-    do_adv_v = p.vapour_advection && h_scl == z_vapor
+    do_adv_v = p.vapor_advection && h_scl == z_vapor
     do_adv_h = p.heat_advection && h_scl == z_air
     do_conv = p.moisture_convergence && h_scl == z_vapor
 

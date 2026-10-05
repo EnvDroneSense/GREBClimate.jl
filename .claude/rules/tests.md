@@ -20,7 +20,7 @@ This is deliberate, not overhead to shave off: the code indexes ghost-cell
 buffers by hand under `@inbounds`/`@turbo`, exactly where bounds checking
 earns its cost. Do not disable or "optimize" it away.
 
-Shared fixtures live in `test/testutils.jl` (`synthetic_fields`,
+Shared fixtures live in `test/support/testutils.jl` (`synthetic_fields`,
 `constant_fields`, `uniform_record`, `quiet`, `with_tempdir`, `gmean`).
 `at_first_step` runs `greb_model!` to the first step of a phase through the
 observer and returns what it saw there: use it for what a preset decides at

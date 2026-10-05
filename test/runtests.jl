@@ -1,7 +1,11 @@
 using GREBClimate
+# The kernels and loop functions are internal: not exported, reached by name
+using GREBClimate: SWradiation!, LWradiation!, hydro!, convergence!, seaice!, deep_ocean!,
+    diffusion!, advection!, circulation!, tendencies!, time_loop!, output!, diagnostics!,
+    qflux_correction!, init_model!
 using Test
 
-include("testutils.jl")
+include(joinpath("support", "testutils.jl"))
 
 # One file per subject; `SHARD` decides which CI job runs each. Set
 # GREB_TEST_SHARD=light|heavy to run one group; unset (or "all") runs
@@ -9,6 +13,7 @@ include("testutils.jl")
 # integration suite, the golden regression and Aqua; light is the rest.
 const SHARD = [
     ("test_config.jl",     "light"),
+    ("test_calendar.jl",   "light"),
     ("test_presets.jl",    "light"),
     ("test_processes.jl",  "light"),
     ("test_scenario.jl",   "light"),
@@ -20,6 +25,7 @@ const SHARD = [
     ("test_invariants.jl", "light"),
     ("test_threading.jl",  "light"),
     ("test_model.jl",      "heavy"),
+    ("test_ensemble.jl",   "heavy"),
     ("test_golden.jl",     "heavy"),
     ("test_aqua.jl",       "heavy"),
 ]

@@ -53,7 +53,7 @@ Markdown.parse("| Preset | CO₂ | Where | Sunlight | Surface | Control CO₂ | 
 
 Three presets take a parameter: `preset(:obliquity; index = ...)` and
 `preset(:eccentricity; index = ...)` pick the table row (default: the row
-nearest today), `preset(:earth_sun_distance; pct = ...)` the distance change,
+nearest today), `preset(:earth_sun_distance; percent = ...)` the distance change,
 `preset(:custom_co2; path = ...)` the CO₂ file. `:decon_mean_climate` is the
 mean-climate deconstruction: switch processes off with
 `processes = (...)` and run it with `RunSpec(scnr = 0)`. On its stored
@@ -62,7 +62,7 @@ recompute the corrections for each configuration and pull every one back to
 the observed climate. `:decon_2xco2` is the 2×CO₂-response deconstruction.
 Both run the MSCM physics (`mscm_hydrology()`, no moisture convergence), which
 the deconstruction switches were designed for: with the default hydrology some
-switches make the run diverge, for example `vapour_diffusion = false` on the
+switches make the run diverge, for example `vapor_diffusion = false` on the
 stored corrections or `humidity = :uniform`.
 
 ## Writing a scenario from parts
@@ -88,6 +88,9 @@ julia> forcing(1, 1999, r).CO2, forcing(1, 2000, r).CO2
 A scenario that reads a table ([`CO2Table`](@ref), [`CO2File`](@ref),
 [`SolarTable`](@ref)) loads it when the configuration is resolved:
 [`greb_model!`](@ref) does this itself, from its `jld2_dir`.
+
+To compare several configurations, pass them as a list to
+[`run_ensemble`](@ref); the [Tutorial](@ref) shows how.
 
 ## Configuration types
 

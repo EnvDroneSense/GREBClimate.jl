@@ -4,7 +4,7 @@
     # `tendencies!` runs the two circulation! calls concurrently only when
     # `Threads.nthreads() > 1` and `ws_a !== ws_q`. Thread count is fixed at
     # Julia startup, so both counts are started as subprocesses.
-    utils = joinpath(@__DIR__, "testutils.jl")
+    utils = joinpath(@__DIR__, "support", "testutils.jl")
     script = """
         using GREBClimate
         using Test
@@ -53,8 +53,8 @@ end
     else
         script = """
             using GREBClimate
-            result = redirect_stdout(devnull) do
-                fields = load_greb_jld2!(raw"$(DATA_DIR)"; dataset = :ncep)
+            result = Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
+                fields = load_climatology(raw"$(DATA_DIR)"; dataset = :ncep)
                 greb_model!(RunSpec(ctrl = 1, scnr = 0), preset(:full_model; corrections = SpinUp(1));
                             jld2_dir = raw"$(DATA_DIR)", fields = fields)
             end

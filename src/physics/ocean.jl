@@ -6,7 +6,7 @@ Updates `fields.cap_surf` (surface heat capacity) for ocean points based on
 with `p.ocean = :none`; skips the ice blend with `p.ice_albedo = false`.
 """
 function seaice!(Ts0, fields::ClimateFields, timestate, p::Processes)
-    mld = @view fields.mldclim[:, :, timestate.ityr]
+    mld = @view fields.mld_clim[:, :, timestate.ityr]
     z_topo = fields.z_topo
     glacier = fields.glacier
     cap_surf = fields.cap_surf
@@ -24,9 +24,7 @@ function seaice!(Ts0, fields::ClimateFields, timestate, p::Processes)
             cap_open = cap_ocean * mld_val
 
             # Ice fraction (0 = no ice, 1 = full ice)
-            ice_frac = ifelse(T <= To_ice1, 1.0f0,
-                ifelse(T >= To_ice2, 0.0f0,
-                    1.0f0 - (T - To_ice1) * inv_To_ice_range))
+            ice_frac = @ice_ramp(T, To_ice1, To_ice2, inv_To_ice_range)
 
             # Blend between land (ice) and open ocean capacities
             cap_with_ice = cap_land * ice_frac + cap_open * (1.0f0 - ice_frac)
@@ -47,17 +45,17 @@ function seaice!(Ts0, fields::ClimateFields, timestate, p::Processes)
 end
 
 """
-    deep_ocean!(Ts, To, fields::ClimateFields, timestate, p::Processes, ws::CirculationWorkspace)
+    deep_ocean!(Ts, To, fields::ClimateFields, timestate, p::Processes, ws::ModelWorkspace)
 
 Computes surface/deep-ocean coupling tendencies (`dT_ocean`, `dTo`) from
 mixed-layer-depth entrainment/detrainment and turbulent mixing, active only
 where the point is ocean and above the sea-ice threshold. Returns zeros
 unless `p.ocean` is `:full`.
 """
-function deep_ocean!(Ts, To, fields::ClimateFields, timestate, p::Processes, ws::CirculationWorkspace)
+function deep_ocean!(Ts, To, fields::ClimateFields, timestate, p::Processes, ws::ModelWorkspace)
     # Use pre-allocated zero buffers
-    dT_ocean = ws.dT_ocean_buf
-    dTo = ws.dTo_buf
+    dT_ocean = ws.dT_ocean
+    dTo = ws.dTo
 
     # no deep-ocean coupling
     if p.ocean !== :full
@@ -70,8 +68,8 @@ function deep_ocean!(Ts, To, fields::ClimateFields, timestate, p::Processes, ws:
     z_ocean = fields.z_ocean
 
     # ── Change in mixed-layer depth ─────────────────────────
-    mld_now = @view fields.mldclim[:, :, timestate.ityr]
-    mld_prev = timestate.ityr > 1 ? @view(fields.mldclim[:, :, timestate.ityr-1]) : @view(fields.mldclim[:, :, nstep_yr])
+    mld_now = @view fields.mld_clim[:, :, timestate.ityr]
+    mld_prev = timestate.ityr > 1 ? @view(fields.mld_clim[:, :, timestate.ityr-1]) : @view(fields.mld_clim[:, :, nstep_yr])
 
     # Zero buffers first
     fill!(dT_ocean, 0.0f0)

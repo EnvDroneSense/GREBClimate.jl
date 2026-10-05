@@ -13,7 +13,7 @@ end
 end
 
 @testset "resolve(::Hydrology): rain coefficients per scheme" begin
-    coefficients(h) = (r = resolve(h); (r.c_q, r.c_rq, r.c_omega, r.c_omegastd))
+    coefficients(h) = (r = resolve(h); (r.c_q, r.c_rq, r.c_omega, r.c_omega_std))
     @test coefficients(Hydrology(rain = :original)) == (1.0f0, 0.0f0, 0.0f0, 0.0f0)
     @test coefficients(Hydrology(rain = :rh)) == (-1.391649f0, 3.018774f0, 0.0f0, 0.0f0)
     @test coefficients(Hydrology(rain = :omega)) == (0.862162f0, 0.0f0, -29.02096f0, 0.0f0)

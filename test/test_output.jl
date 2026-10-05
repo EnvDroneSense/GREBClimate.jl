@@ -1,15 +1,15 @@
 # Per-timestep bookkeeping: diagnostics!, output!, time_loop!, climatology helpers.
 
-@testset "build_monthly_climatology/apply_scenario_anomalies" begin
+@testset "monthly_climatology/scenario_anomalies" begin
     # Records with every field filled to one scalar value make the averaging
     # arithmetic trivial to check by hand.
     mkrec = uniform_record
 
-    @test build_monthly_climatology(MonthlyRecord[]) == MonthlyRecord[]
+    @test monthly_climatology(MonthlyRecord[]) == MonthlyRecord[]
 
     # Final-year-only.
     two_years = MonthlyRecord[mkrec(Float64(idx)) for idx in 1:24]
-    clim = build_monthly_climatology(two_years)
+    clim = monthly_climatology(two_years)
     @test length(clim) == 12
     for m in 1:12
         @test all(==(Float64(m + 12)), clim[m].Ts)
@@ -18,7 +18,7 @@
     # Non-12-multiple count: only 5 records -> months 6..12 never occur
     # and must fall back to records[1] exactly (not e.g. NaN/zero).
     five = MonthlyRecord[mkrec(Float64(idx)) for idx in 1:5]
-    clim5 = build_monthly_climatology(five)
+    clim5 = monthly_climatology(five)
     for m in 1:5
         @test all(==(Float64(m)), clim5[m].Ts)
     end
@@ -28,26 +28,26 @@
 
     ctrl_clim = MonthlyRecord[mkrec(100.0 + m) for m in 1:12]
     scnr = MonthlyRecord[mkrec(Float64(idx)) for idx in 1:24]
-    anom = apply_scenario_anomalies(scnr, ctrl_clim)
+    anom = scenario_anomalies(scnr, ctrl_clim)
     @test all(==(1.0 - 101.0), anom[1].Ts)
     @test all(==(13.0 - 101.0), anom[13].Ts)
     @test all(==(12.0 - 112.0), anom[12].Ts)
 
     # Early-return guards: empty scnr_records or empty ctrl_clim ->
     # scnr_records passed straight through, not turned into anomalies.
-    @test apply_scenario_anomalies(MonthlyRecord[], ctrl_clim) == MonthlyRecord[]
-    @test apply_scenario_anomalies(scnr, MonthlyRecord[]) == scnr
+    @test scenario_anomalies(MonthlyRecord[], ctrl_clim) == MonthlyRecord[]
+    @test scenario_anomalies(scnr, MonthlyRecord[]) == scnr
 end
 
-@testset "compute_annual_ice_climatology" begin
+@testset "ice_climatology" begin
     # Same record-index-encodes-value trick as the climatology test
     # above: final-year-only.
     mkrec(v) = uniform_record(0; ice = v)
 
-    @test all(iszero, compute_annual_ice_climatology(MonthlyRecord[]))
+    @test all(iszero, ice_climatology(MonthlyRecord[]))
 
     two_years = MonthlyRecord[mkrec(Float64(idx)) for idx in 1:24]
-    clim = compute_annual_ice_climatology(two_years)
+    clim = ice_climatology(two_years)
     @test size(clim) == (GREBClimate.xdim, GREBClimate.ydim, 12)
     for m in 1:12
         @test all(==(Float64(m + 12)), clim[:, :, m])
@@ -70,23 +70,19 @@ end
         em=fill(0.9, GREBClimate.xdim, GREBClimate.ydim))
 
     ts.ityr = 1
-    diagnostics!(1, 1970, 340.0, surf, tend, fields, state, ts)
-    @test all(==(280.0), state.Tsmn)   # accumulated once, no averaging/reset yet
+    diagnostics!(1970, surf, state, ts)
+    @test all(==(280.0), state.Ts_annual_mean)   # accumulated once, no averaging/reset yet
 
     ts.ityr = GREBClimate.nstep_yr
-    captured = mktemp() do path, io
-        redirect_stdout(io) do
-            diagnostics!(GREBClimate.nstep_yr, 1970, 340.0, surf, tend, fields, state, ts)
-        end
-        flush(io)
-        read(path, String)
-    end
-    @test occursin("1970", captured)   # prints the annual summary line
-    @test all(iszero, state.Tsmn)      # reset after year end
+    # Logs the annual summary line. Two steps of 280 K over a year of 730: 0.77 K,
+    # the same in the global mean and in the two cells
+    @test_logs (:info, "1970: Ts global mean -272.38 °C; 178 E 9 N -272.38; 58 E 51 N -272.38") diagnostics!(
+        1970, surf, state, ts)
+    @test all(iszero, state.Ts_annual_mean)      # reset after year end
 end
 
 @testset "output! pushes a monthly-mean MonthlyRecord at month boundaries" begin
-    ws = CirculationWorkspace()
+    ws = ModelWorkspace()
     acc = MonthlyAccumulator()
     ts = TimeState(1, 1)
     surf = SurfaceState(fill(280.0, GREBClimate.xdim, GREBClimate.ydim), fill(270.0, GREBClimate.xdim, GREBClimate.ydim),
@@ -96,9 +92,9 @@ end
         Q_lat=fill(-20.0, GREBClimate.xdim, GREBClimate.ydim), Q_sens=fill(-5.0, GREBClimate.xdim, GREBClimate.ydim),
         LW_up=fill(-200.0, GREBClimate.xdim, GREBClimate.ydim), LW_down=fill(-210.0, GREBClimate.xdim, GREBClimate.ydim),
         em=fill(0.75, GREBClimate.xdim, GREBClimate.ydim))
-    ws.precip_out .= 2.0
-    ws.evap_out .= 1.0
-    ws.qcrcl_out .= 0.5
+    ws.precip .= 2.0
+    ws.evap .= 1.0
+    ws.qcrcl .= 0.5
 
     output_buf = MonthlyRecord[]
     irec, mon = 0, 1
@@ -122,7 +118,7 @@ end
 end
 
 # All ocean, with wind and rising air
-_time_loop_fields() = constant_fields(z_topo = -1.0, swet = 0.5, u = 2.0, v = 1.0, omega = 0.001, omegastd = 0.01, ws = 4.0)
+_time_loop_fields() = constant_fields(z_topo = -1.0, swet = 0.5, u = 2.0, v = 1.0, omega = 0.001, omega_std = 0.01, ws = 4.0)
 
 @testset "time_loop! integrates one timestep and clamps at min_T_K" begin
     fields = _time_loop_fields()
@@ -130,7 +126,7 @@ _time_loop_fields() = constant_fields(z_topo = -1.0, swet = 0.5, u = 2.0, v = 1.
     ini = init_model!(cfg, fields)
 
     state = ModelState()
-    ws = CirculationWorkspace()
+    ws = ModelWorkspace()
     acc = MonthlyAccumulator()
     ts = TimeState(1, 1)
 
@@ -165,9 +161,27 @@ end
     Ta[40, 30] = NaN32
 
     time_loop!(1, 1970, ini.CO2_ctrl, 1, 0, Ts, Ta, copy(ini.q_ini), copy(ini.To_ini),
-        MonthlyRecord[], fields, ModelState(), CirculationWorkspace(), MonthlyAccumulator(),
+        MonthlyRecord[], fields, ModelState(), ModelWorkspace(), MonthlyAccumulator(),
         TimeState(1, 1), cfg)
 
     @test isnan(Ts[5, 5])
     @test isnan(Ta[40, 30])
+end
+
+@testset "global_mean weights each row by the cosine of its latitude" begin
+    X, Y = GREBClimate.xdim, GREBClimate.ydim
+    @test global_mean(fill(3.5f0, X, Y)) ≈ 3.5
+    # A field equal to the latitude weight: mean of cos^2 over mean of cos
+    w = cosd.(GREBClimate.lat_grid)
+    field = repeat(w', X, 1)
+    @test global_mean(field) ≈ sum(abs2, w) / sum(w) rtol = 1e-6
+    # The poles count less than in a plain mean
+    polar = zeros(Float32, X, Y); polar[:, 1] .= 1; polar[:, Y] .= 1
+    @test global_mean(polar) < sum(polar) / length(polar) / 10
+    @test_throws DimensionMismatch global_mean(zeros(Y, X))
+    # The sample cells of the annual line are where their labels say
+    for (label, i, j) in GREBClimate._SAMPLE_CELLS
+        lon, lat = (i - 0.5) * GREBClimate.dlon, GREBClimate.lat_grid[j]
+        @test label == "$(round(Int, lon)) E $(round(Int, lat)) N"
+    end
 end

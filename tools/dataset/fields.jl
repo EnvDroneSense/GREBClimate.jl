@@ -1,6 +1,7 @@
-# The dataset's file list, shared by the converter, the packager and
-# test/test_io.jl (which checks it against what src/io.jl loads). Add a name to
-# MODEL_FIELD_NAMES when the model starts reading a new field.
+# The dataset's file list, shared by the converter and the packager. It is the
+# tools' own list, so a file can be added here before the model reads it.
+# test/test_io.jl checks that every file the loaders read
+# (GREBClimate.dataset_field_files) is in MODEL_FIELD_NAMES.
 
 # Combined files that hold several fields. The converter writes them from
 # special-case code, so they are not per-field entries below.
@@ -25,11 +26,11 @@ const MODEL_FIELD_NAMES = Set{String}([
     "isccp.cloud_cover.clim", "woce.ocean_mixed_layer_depth.clim", "Tocean.clim",
     "erainterim.omega.vertmean.clim", "erainterim.omega_std.vertmean.clim",
     "erainterim.windspeed.850hpa.clim",
-    # CMIP5 RCP8.5 climate-change anomalies (load_cc_anomaly_jld2!)
+    # CMIP5 RCP8.5 climate-change anomalies (load_boundary_anomaly!, :cmip5_rcp85)
     "cmip5.tsurf.rcp85.ensmean.forcing", "cmip5.zonal.wind.rcp85.ensmean.forcing",
     "cmip5.meridional.wind.rcp85.ensmean.forcing", "cmip5.windspeed.rcp85.ensmean.forcing",
     "cmip5.omega.rcp85.ensmean.forcing",
-    # ENSO anomalies (load_enso_anomaly_jld2!), suffix elnino/lanina
+    # ENSO anomalies (load_boundary_anomaly!), suffix elnino/lanina
     ("erainterim.$f.$s.forcing" for f in ("tsurf", "zonal.wind", "meridional.wind",
                                           "windspeed", "omega")
                                 for s in ("elnino", "lanina"))...,

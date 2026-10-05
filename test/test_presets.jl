@@ -3,7 +3,7 @@
 # tools/validation/preset_reference.jl). A preset changed on purpose means
 # regenerating the reference in the same commit.
 
-include("presetcapture.jl")
+include(joinpath("support", "presetcapture.jl"))
 include(joinpath("data", "preset_reference.jl"))
 
 @testset "preset reference: $p" for p in PRESETS

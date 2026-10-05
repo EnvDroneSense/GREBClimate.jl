@@ -1,6 +1,6 @@
 # JLD2 loading, dataset resolution, and converter/archive consistency.
 
-@testset "load_greb_jld2!/load_flux_corrections_jld2! file-exists branches" begin
+@testset "load_climatology: every file is read; a missing flux-corrections file or table is an error" begin
     write2(path, v) = (mkpath(dirname(path)); GREBClimate.jldopen(path, "w") do f
         f["data"] = fill(v, GREBClimate.xdim, GREBClimate.ydim); f["dim_names"] = ["lon", "lat"]
     end)
@@ -28,51 +28,56 @@
         write3(joinpath(tmpdir, "climatology", "erainterim.windspeed.850hpa.clim.jld2"), 13.0)
         write_solar(joinpath(tmpdir, "solar", "solar_radiation.clim.jld2"), 14.0)
 
-        # "files missing" branch: no flux-correction files present yet ->
-        # load_flux_corrections_jld2! should warn and zero-fill, not error.
-        fields_nocorr = load_greb_jld2!(tmpdir; dataset = :ncep)
-        @test all(==(0.0), fields_nocorr.TF_correct)
-        @test all(==(0.0), fields_nocorr.qF_correct)
-        @test all(==(0.0), fields_nocorr.ToF_correct)
-        @test all(==(3.0), fields_nocorr.Tclim)  # loader itself still worked
+        # No flux-corrections file yet: an error that names it, not zeros
+        @test_throws "flux_corrections.jld2" load_climatology(tmpdir; dataset = :ncep)
+        @test_throws ArgumentError load_flux_corrections!(tmpdir, ClimateFields())
+        # `corrections = false` loads the rest and leaves the corrections at zero
+        without = load_climatology(tmpdir; dataset = :ncep, corrections = false)
+        @test without.loaded && all(==(3.0), without.Ts_clim)
+        @test all(iszero, without.Ts_flux_correction) && all(iszero, without.q_flux_correction) && all(iszero, without.To_flux_correction)
 
         # A dataset name the loader does not know is an error, not NCEP
-        @test_throws ArgumentError load_greb_jld2!(tmpdir; dataset = :era5)
+        @test_throws ArgumentError load_climatology(tmpdir; dataset = :era5)
 
-        # "files present" branch: add the combined flux-correction file and reload.
-        mkpath(joinpath(tmpdir, "climatology"))
-        GREBClimate.jldopen(joinpath(tmpdir, "climatology", "flux_corrections.jld2"), "w") do f
+        # A file that lacks one of the three tables is an error too
+        corrections = joinpath(tmpdir, "climatology", "flux_corrections.jld2")
+        GREBClimate.jldopen(corrections, "w") do f
+            f["Tsurf_flux_correction"] = fill(15.0, GREBClimate.xdim, GREBClimate.ydim, GREBClimate.nstep_yr)
+        end
+        @test_throws "vapour_flux_correction" load_climatology(tmpdir; dataset = :ncep)
+
+        GREBClimate.jldopen(corrections, "w") do f
             f["Tsurf_flux_correction"] = fill(15.0, GREBClimate.xdim, GREBClimate.ydim, GREBClimate.nstep_yr)
             f["vapour_flux_correction"] = fill(16.0, GREBClimate.xdim, GREBClimate.ydim, GREBClimate.nstep_yr)
             f["Tocean_flux_correction"] = fill(17.0, GREBClimate.xdim, GREBClimate.ydim, GREBClimate.nstep_yr)
         end
 
-        fields = load_greb_jld2!(tmpdir; dataset = :ncep)
+        fields = load_climatology(tmpdir; dataset = :ncep)
         @test all(==(1.0), fields.z_topo)
         @test all(==(2.0), fields.glacier)
-        @test all(==(3.0), fields.Tclim)
-        @test all(==(4.0), fields.uclim)
+        @test all(==(3.0), fields.Ts_clim)
+        @test all(==(4.0), fields.u_clim)
         @test all(==(14.0), fields.sw_solar)
-        @test all(==(15.0), fields.TF_correct)
-        @test all(==(16.0), fields.qF_correct)
-        @test all(==(17.0), fields.ToF_correct)
+        @test all(==(15.0), fields.Ts_flux_correction)
+        @test all(==(16.0), fields.q_flux_correction)
+        @test all(==(17.0), fields.To_flux_correction)
 
         # Tasks reading the same file at once all get its content
         path = joinpath(tmpdir, "climatology", "Tocean.clim.jld2")
-        reads = [Threads.@spawn read_jld2(path).data for _ in 1:8]
+        reads = [Threads.@spawn read_field(path).data for _ in 1:8]
         @test all(t -> all(==(10.0), fetch(t)), reads)
 
         # A solar table of the wrong shape is reported, with the file's name
         GREBClimate.jldopen(joinpath(tmpdir, "solar", "solar_radiation.clim.jld2"), "w") do f
             f["data"] = zeros(GREBClimate.ydim, 2); f["dim_names"] = ["lat", "time"]
         end
-        @test_throws "solar_radiation.clim.jld2" load_greb_jld2!(tmpdir; dataset = :ncep)
+        @test_throws "solar_radiation.clim.jld2" load_climatology(tmpdir; dataset = :ncep)
     finally
         rm(tmpdir; recursive = true, force = true)
     end
 
     missing_parent = mktempdir()
-    @test_throws ErrorException load_greb_jld2!(joinpath(missing_parent, "nonexistent"))
+    @test_throws ErrorException load_climatology(joinpath(missing_parent, "nonexistent"))
     rm(missing_parent; recursive = true, force = true)
 end
 
@@ -128,32 +133,21 @@ end
           GREBClimate.DATA_RELEASE_TAG
 end
 
-@testset "converter allowlist matches what src/io.jl loads" begin
-    repo = normpath(joinpath(@__DIR__, ".."))
-    fields = Module()
-    Base.include(fields, joinpath(repo, "tools", "dataset", "fields.jl"))
-    allowed = Set(fields.MODEL_FIELD_NAMES)
-    io_src = read(joinpath(repo, "src", "io.jl"), String)
+@testset "dataset file list: 33 single-field files, all of them in the dataset tools' list" begin
+    names = GREBClimate.dataset_field_files()
+    @test length(names) == 33
+    # Both ENSO events and both datasets are in it
+    @test "erainterim.omega.lanina.forcing" in names && "erainterim.tsurf.elnino.forcing" in names
+    @test "ncep.tsurf.1948-2007.clim" in names && "erainterim.tsurf.1979-2015.clim" in names
+    # Every name fills an array that ClimateFields has
+    lists = (GREBClimate._STATIC_FILES, values(GREBClimate._CLIMATOLOGY_FILES)..., GREBClimate._COMMON_CLIMATOLOGY_FILES,
+             GREBClimate._CC_ANOMALY_FILES, GREBClimate._enso_anomaly_files(:elnino), GREBClimate._FLUX_CORRECTION_KEYS)
+    @test all(l -> all(f -> hasfield(ClimateFields, f), keys(l)), lists)
 
-    @test length(allowed) == 33
-
-    # --- what io.jl actually loads, with $suffix expanded ---
-    loaded = Set{String}()
-    for m2 in eachmatch(r"\"([A-Za-z0-9_.\$-]+)\.jld2\"", io_src)
-        name = m2.captures[1]
-        # combined multi-field files are not per-field entries in the allowlist
-        name in fields.COMBINED_FILE_NAMES && continue
-        if occursin("\$suffix", name)
-            for s in ("elnino", "lanina")
-                push!(loaded, replace(name, "\$suffix" => s))
-            end
-        else
-            push!(loaded, name)
-        end
-    end
-
-    # Every field io.jl loads must be produced by the converter, and the
-    # converter must not carry entries nothing loads.
-    @test isempty(setdiff(loaded, allowed))
-    @test isempty(setdiff(allowed, loaded))
+    # The tools keep their own list: it may hold more, never less
+    tools = Module()
+    Base.include(tools, joinpath(@__DIR__, "..", "tools", "dataset", "fields.jl"))
+    @test issubset(names, tools.MODEL_FIELD_NAMES)
+    @test issubset(GREBClimate._COMBINED_FILES, tools.COMBINED_FILE_NAMES)
+    @test Set(tools.FLUX_CORRECTION_NAMES) == Set(values(GREBClimate._FLUX_CORRECTION_KEYS))
 end

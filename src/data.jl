@@ -59,12 +59,12 @@ Return the directory holding the JLD2 input dataset, resolving in this order:
 Pass `allow_download = false` to stop after step 4 and return `nothing` when no
 dataset is available locally.
 
-The result is a plain path, suitable for [`load_greb_jld2!`](@ref) and
+The result is a plain path, suitable for [`load_climatology`](@ref) and
 `greb_model!`'s `jld2_dir`:
 
 ```julia
 dir    = greb_data_dir()
-fields = load_greb_jld2!(dir; dataset = :ncep)
+fields = load_climatology(dir; dataset = :ncep)
 result = greb_model!(RunSpec(), preset(:co2_double); jld2_dir = dir, fields = fields)
 ```
 """

@@ -83,7 +83,7 @@ Things worth knowing before you add tests:
 - **A new test file must be added to the `SHARD` table in
   [test/runtests.jl](test/runtests.jl), or it will not run.** Nothing globs
   the directory.
-- Shared fixtures live in `test/testutils.jl`: `quiet()`, `with_tempdir()`,
+- Shared fixtures live in `test/support/testutils.jl`: `quiet()`, `with_tempdir()`,
   `synthetic_fields()`, `constant_fields()`, `uniform_record()`,
   `at_first_step()`, `DATA_DIR`, and the grid constants.
 - Any test that calls `greb_data_dir` must pass `allow_download=false`.
@@ -117,7 +117,7 @@ The model is written to run many simulated years, and the kernels are built
 around that:
 
 - Fields are `Float32` throughout, on a fixed `xdim x ydim` grid.
-- Physics kernels write into pre-allocated `CirculationWorkspace` buffers
+- Physics kernels write into pre-allocated `ModelWorkspace` buffers
   instead of allocating. `test/test_invariants.jl` enforces a small byte
   budget per physics kernel and checks its return type is concrete - a change
   that allocates per grid cell will fail it immediately. A new kernel must be

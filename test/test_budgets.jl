@@ -4,13 +4,13 @@ function _budget_run(; steps, setup! = (Ts, Ta, q, To, fields) -> nothing, confi
     fields = synthetic_fields()
     r = resolve(config)
     ini = quiet(() -> init_model!(r, fields))
-    fields.TF_correct .= 0.25f0
-    fields.ToF_correct .= 0.01f0
-    fields.qF_correct .= 1.0f-7
+    fields.Ts_flux_correction .= 0.25f0
+    fields.To_flux_correction .= 0.01f0
+    fields.q_flux_correction .= 1.0f-7
     Ts, Ta, q, To = copy(ini.Ts_ini), copy(ini.Ta_ini), copy(ini.q_ini), copy(ini.To_ini)
     setup!(Ts, Ta, q, To, fields)
     check = GREBClimate.BudgetCheck()
-    state, ws, acc, ts = ModelState(), CirculationWorkspace(), MonthlyAccumulator(), TimeState(1, 1)
+    state, ws, acc, ts = ModelState(), ModelWorkspace(), MonthlyAccumulator(), TimeState(1, 1)
     mon, irec = 1, 0
     quiet() do
         for it in 1:steps
@@ -42,7 +42,7 @@ end
     seen = Dict{Symbol,Matrix{Float32}}()
     quiet() do
         time_loop!(1, 1970, ini.CO2_ctrl, 1, 0, Ts, copy(ini.Ta_ini), copy(ini.q_ini), copy(ini.To_ini),
-                   MonthlyRecord[], fields, ModelState(), CirculationWorkspace(), MonthlyAccumulator(),
+                   MonthlyRecord[], fields, ModelState(), ModelWorkspace(), MonthlyAccumulator(),
                    TimeState(1, 1), r; observer = (point, view) -> (seen[point] = copy(view.Ts)))
     end
     @test seen[:after_tendencies] == ini.Ts_ini
@@ -77,7 +77,7 @@ end
     @test (cold.floor_Ts, cold.floor_Ta) == (0, 1)
 
     wet = _budget_run(steps = 1,
-        setup! = (Ts, Ta, q, To, fields) -> (fields.qF_correct[7, 8, 1] = 0.5f0; fields.qF_correct[9, 10, 1] = -0.5f0))
+        setup! = (Ts, Ta, q, To, fields) -> (fields.q_flux_correction[7, 8, 1] = 0.5f0; fields.q_flux_correction[9, 10, 1] = -0.5f0))
     # The fixture's coldest row rains out more than it holds on its own
     base = _budget_run(steps = 1)
     @test wet.humidity_high == base.humidity_high + 1
@@ -87,4 +87,44 @@ end
     limited = _budget_run(steps = 1, config = preset(:full_model; hydrology = Hydrology(rain = :rh)),
         setup! = (Ts, Ta, q, To, fields) -> (fields.rain_limit .= -1.0f0))
     @test limited.rain_limit == X * Y
+end
+
+@testset "RangeCheck: the first step outside the physical range is recorded" begin
+    G = GREBClimate
+    field(v) = fill(Float32(v), X, Y)
+    view(it; Ts = 280, Ta = 270, To = 285, q = 0.005) =
+        (; phase = :ctrl, it, year = 1950, Ts = field(Ts), Ta = field(Ta), To = field(To), q = field(q))
+
+    check = G.RangeCheck()
+    check(:after_tendencies, view(1; Ts = 1e24))     # only the state after the step is checked
+    @test check.steps == 0 && G.in_range(check)
+    check(:after_step, view(1))
+    check(:after_step, view(2; Ta = 265))
+    @test check.steps == 2 && G.in_range(check)
+    @test check.seen.Ta == (265.0f0, 270.0f0) && check.seen.Ts == (280.0f0, 280.0f0)
+
+    # A cell that ran away, then a later one: the first is kept
+    runaway = view(3)
+    runaway.Ts[5, 7] = 1.0f24
+    check(:after_step, runaway)
+    check(:after_step, view(4; q = -1))
+    @test !G.in_range(check)
+    @test check.first == (phase = :ctrl, it = 3, year = 1950, field = :Ts, value = 1.0f24)
+    @test check.seen.q[1] == -1.0f0
+
+    # A NaN is outside; limits can be set
+    nan = G.RangeCheck()
+    nan(:after_step, view(1; To = NaN))
+    @test !G.in_range(nan) && nan.first.field === :To
+    narrow = G.RangeCheck(Ts = (285, 300))
+    narrow(:after_step, view(1))
+    @test narrow.first.field === :Ts && narrow.first.value == 280.0f0
+
+    # In a run it sees every step of the control and the scenario
+    seen = G.RangeCheck(Ts = (-Inf, Inf), Ta = (-Inf, Inf), To = (-Inf, Inf), q = (-Inf, Inf))
+    quiet() do
+        greb_model!(RunSpec(ctrl = 1, scnr = 1), preset(:full_model; corrections = NoCorrections());
+                    fields = synthetic_fields(), allow_uninitialized = true, observer = seen)
+    end
+    @test seen.steps == 2N
 end

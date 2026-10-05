@@ -1,4 +1,4 @@
-# - Grid dimensions ──────────────────────────────────
+# ── Grid dimensions ───────────────────────────────────────────────
 "Number of longitude grid points."
 const xdim = 96
 "Number of latitude grid points."
@@ -6,36 +6,18 @@ const ydim = 48
 const dlon = 360.0f0 / xdim                     # longitude spacing [degrees]
 const dlat = 180.0f0 / ydim                     # latitude spacing  [degrees]
 
-# - Time stepping ────────────────────────────────────
-const ndays_yr = 365                            # days per year (no leap years)
+# ── Time stepping (the calendar is in calendar.jl) ────────────────
 const Δt = 12.0f0 * 3600.0f0                    # main time step [s] (12 hours)
 const Δt_crcl = 1800.0f0                        # circulation sub-time step [s] (30 min)
-const ndt_days = Int(round(24 * 3600 / Δt))     # time steps per day
-"""
-    nstep_yr
-
-Time steps per year (`ndays_yr * ndt_days` = 730). Together with [`xdim`](@ref)
-and [`ydim`](@ref) this fixes the shape of every field the model steps.
-
-```jldoctest
-julia> (xdim, ydim, nstep_yr)
-(96, 48, 730)
-```
-"""
-const nstep_yr = Int(ndays_yr * ndt_days)
 const ntime = max(1, Int(round(Δt / Δt_crcl)))  # Number of sub-steps within one main time step
 
-# - Calendar constants ───────────────────────────────
-const cjday_mon = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-const jday_mon_cumsum = cumsum(cjday_mon)
-
-# - Physical Constants & Numerical Limits ────────────
+# ── Numerical limits ──────────────────────────────────────────────
 const min_T_K = 40.0f0              # numerical-stability floor [K]
 const max_humidity_change = 0.020f0 # Maximum humidity increment [kg/kg]
 const min_humidity_change = 0.9f0   # Fraction of humidity that can be removed
 
 # ── Natural constants ────────────────────────────────────────────
-const const_pi = Float32(pi)   # π (model precision)
+const pi_f32 = Float32(pi)   # π (model precision)
 const σ = 5.6704f-8            # Stefan-Boltzmann constant [W/m²/K⁴]
 const ρ_ocean = 999.1f0        # density of water at T=15°C [kg/m³]
 const ρ_land = 2600.0f0        # density of solid rock [kg/m³]
@@ -54,6 +36,7 @@ const d_air = 5000.0f0                      # air column
 const cap_ocean = cp_ocean * ρ_ocean        # 1m ocean
 const cap_land = cp_land * ρ_land * d_land  # land column
 const cap_air = cp_air * ρ_air * d_air      # air column
+const ΔT_air_factor = Δt / cap_air           # [K m²/W]: flux to air temperature change per step
 
 # ── Sensible heat [W/K/m²] ──────────────────────────────────────
 const ct_sens = 22.5f0                       # sensible heat coupling
@@ -73,6 +56,12 @@ const To_ice2 = 273.15f0 - 1.7f0             # ocean: no ice albedo
 const inv_To_ice_range = 1.0f0 / (To_ice2 - To_ice1)
 const inv_Tl_ice_range = 1.0f0 / (Tl_ice2 - Tl_ice1)
 
+# Ice fraction at temperature `T`: 1 at or below `T1`, 0 at or above `T2`,
+# linear in between. A macro so that the `@turbo` loops see the expression.
+macro ice_ramp(T, T1, T2, inv_range)
+    return esc(:(ifelse($T <= $T1, 1.0f0, ifelse($T >= $T2, 0.0f0, 1.0f0 - ($T - $T1) * $inv_range))))
+end
+
 # ── Deep ocean ──────────────────────────────────────────────────
 const co_turb = 5.0f0                        # turbulent mixing coefficient [W/K/m²]
 const c_effmix = 0.5f0                       # mixing efficiency
@@ -89,20 +78,24 @@ const cq_rain = -0.1f0 / 24.0f0 / 3600.0f0   # rain-related vapor decrease [1/s]
 # ── Scaling heights [m] ─────────────────────────────────────────
 const z_air = 8400.0f0                 # heat & CO2 scaling height
 const z_vapor = 5000.0f0               # water vapor scaling height
-const const_factor = Δt_crcl / z_vapor * 2.5f0 / (ρ_air * grav)
+const convergence_factor = Δt_crcl / z_vapor * 2.5f0 / (ρ_air * grav)
 
 # ── Regression factor [kg/m³] ───────────────────────────────────
 const r_qviwv = 2.6736f3               # VIWV ↔ q_air regression factor
-const conv_factor = r_qviwv * 86400.0f0  # kg/kg → mm/day conversion
+const q_to_mm_per_day = r_qviwv * 86400.0f0  # kg/kg → mm/day conversion
 
 # ── solar factor [%] ────────────────────────────────────────────
-const S0_var = 100.0f0        # default 100%
+const solar_percent = 100.0f0        # default 100%
 
-# ── transport geometry & coefficients ───────────────────────────
-const deg_grid = 2.0f0 * const_pi * 6.371f6 / 360.0f0
+# ── Emissivity parameters (LWradiation!) ──────────────────────────
+const emissivity_fit = Float32[9.0721, 106.7252, 61.5562, 0.0179, 0.0028,
+                      0.0570, 0.3462, 2.3406, 0.7032, 1.0662]
+
+# ── Transport geometry [m, degrees] ───────────────────────────────
+const deg_grid = 2.0f0 * pi_f32 * 6.371f6 / 360.0f0
 const dyy_grid = dlat * deg_grid
 const lat_grid = Float32[dlat * k - dlat / 2.0f0 - 90.0f0 for k in 1:ydim]
-const dxlat_grid = Float32[dlon * deg_grid * cos(2.0f0 * const_pi / 360.0f0 * lat_grid[k]) for k in 1:ydim]
+const dxlat_grid = Float32[dlon * deg_grid * cos(2.0f0 * pi_f32 / 360.0f0 * lat_grid[k]) for k in 1:ydim]
 
 # ── Diffusion coefficients ──────────────────────────────────────
 const ccy_diff = κ * Δt_crcl / dyy_grid^2
@@ -112,7 +105,7 @@ const ccx_diff = Float32[κ * Δt_crcl / dxlat_grid[k]^2 for k in 1:ydim]
 const ccy_adv = Δt_crcl / dyy_grid / 2.0f0
 const ccx_adv = Float32[Δt_crcl / dxlat_grid[k] / 2.0f0 for k in 1:ydim]
 
-# ── periodic ghost cells (longitude) ─────────────────────────────
+# ── Periodic ghost cells (longitude) ──────────────────────────────
 """
     nghost
 
@@ -137,22 +130,10 @@ const xghost = xdim + 2 * nghost
 # More ghost cells than grid points would wrap past the opposite edge.
 @assert nghost <= xdim
 
-const ΔT_AIR_FACTOR = Δt / cap_air
-
-const p_emi = Float32[9.0721, 106.7252, 61.5562, 0.0179, 0.0028,
-                      0.0570, 0.3462, 2.3406, 0.7032, 1.0662]
-
-# Precomputed Calendar Lookup
-const max_timesteps = 200 * nstep_yr  # Support up to 200-year runs
-const calendar_lookup = [(
-    day=mod((it - 1) ÷ ndt_days, ndays_yr) + 1,
-    step=mod(it - 1, nstep_yr) + 1
-) for it in 1:max_timesteps]
-
+# ── Polar rows: sub-stepping of diffusion! and advection! ─────────
 const polar_threshold = 2.5f5  # 250 km in meters
-const IS_POLAR = [dxlat_grid[k] <= polar_threshold for k in 1:ydim]
+const is_polar = [dxlat_grid[k] <= polar_threshold for k in 1:ydim]
 
-# ── Polar sub-stepping constants (diffusion!/advection!) ──────────────
 function _polar_diff_step(k)
     dd = max(1, round(Int, Δt_crcl / (dxlat_grid[k]^2 / κ)))
     dtdff2 = Δt_crcl / dd
@@ -166,7 +147,7 @@ function _polar_adv_step(k)
     return (time2=time2, ccx2=dtdff2 / dxlat_grid[k] / 2.0f0)
 end
 
-const POLAR_DIFF_TIME2 = [_polar_diff_step(k).time2 for k in 1:ydim]
-const POLAR_DIFF_CCX2 = Float32[_polar_diff_step(k).ccx2 for k in 1:ydim]
-const POLAR_ADV_TIME2 = [_polar_adv_step(k).time2 for k in 1:ydim]
-const POLAR_ADV_CCX2 = Float32[_polar_adv_step(k).ccx2 for k in 1:ydim]
+const polar_diff_time2 = [_polar_diff_step(k).time2 for k in 1:ydim]
+const polar_diff_ccx2 = Float32[_polar_diff_step(k).ccx2 for k in 1:ydim]
+const polar_adv_time2 = [_polar_adv_step(k).time2 for k in 1:ydim]
+const polar_adv_ccx2 = Float32[_polar_adv_step(k).ccx2 for k in 1:ydim]
