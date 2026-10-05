@@ -15,6 +15,9 @@ era5_raw/
 /greb_input_data/
 /greb_input_data-*.tar.gz
 
+# Profiler reports (benchmark/profile.jl)
+/benchmark/profiles/
+
 # Generated plots
 /examples/*.png
 /demo_out/

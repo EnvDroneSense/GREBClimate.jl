@@ -1,6 +1,6 @@
 ---
 name: benchmark
-description: Run GREBClimate.jl's timing/allocation benchmarks (benchmark/run_benchmarks.jl) and report results honestly, accounting for machine noise. Use when the user asks to benchmark, time, profile, or check performance/allocations of the model, or to compare thread counts.
+description: Run GREBClimate.jl's timing/allocation benchmarks (benchmark/run_benchmarks.jl) and its profiler (benchmark/profile.jl) and report results honestly, accounting for machine noise. Use when the user asks to benchmark, time, profile, or check performance/allocations of the model, or to compare thread counts.
 ---
 
 # GREB benchmark
@@ -47,6 +47,30 @@ Check which regime the machine is in (`tasklist`) before judging a `year` readin
    `stages` and `alloc` are far less noise-prone; a single reading there is more trustworthy.
 3. For thread counts use `threads`, and run it several times: the threaded paths carry most of the variance (`-t 1` is stable). Compare relative speedups, not absolute times.
 4. Report mean/min/max (`year`, `threads`), the per-stage table (`stages`) or the byte count (`alloc`). Say plainly when noise makes a reading untrustworthy.
+
+## Profiling
+
+`benchmark/profile.jl` shows where the time goes; the harness above shows how much there is. Reports land in `benchmark/profiles/<date>-<commit>-<mode>/` (gitignored).
+
+| Mode | Answers | Command |
+|---|---|---|
+| `step` (default) | Which function and line of the time loop owns the time | `julia --project=. -t 1 benchmark/profile.jl step` |
+| `setup` | What one `greb_model!` call costs besides the time loop, in ms | `julia --project=. -t 1 benchmark/profile.jl setup` |
+| `allocs` | Which lines allocate, and how many bytes | `julia --project=. -t 1 benchmark/profile.jl allocs` |
+| `dispatch` | Whether a call in the step is dispatched at run time (static; needs JET.jl in the default environment) | `julia --project=. benchmark/profile.jl dispatch` |
+| `compare` | What changed in the shares between two `step` or `setup` runs | `julia --project=. benchmark/profile.jl compare <before> <after>` |
+
+| Rule | Why |
+|---|---|
+| Run at `-t 1` | On Windows the sampler records the first thread only |
+| Check `header.txt` first: 10000 samples or more | The sampler's rate varies (2 to 13 ms per sample); the script repeats the run up to a target and warns below 5000 |
+| Read `category.txt`, then `owned.txt`, then `tree.txt` | Kind of cost, then the owning line, then the call path |
+| Treat a row below three standard errors (`+/-`) as noise | Also for the `diff` column of `compare` |
+| A `@turbo` loop is one row at its `@turbo for` line | Lines inside it are not resolved |
+| In `compare`, read the row that rose | The other rows fall by dilution without having changed |
+| A share is a ceiling, not a gain | Prove a gain with the same-process comparison at the end of this file |
+
+Reference shape of `step` (2026-10-05, release 2.0.1, `-t 1`): `circulation!` 89.5% on the stack (`_diffusion!` 40%, `_advection!` 35% self), 87% of samples inside `@turbo` code, no runtime dispatch, allocation only in `output!`.
 
 ## Other checks
 
