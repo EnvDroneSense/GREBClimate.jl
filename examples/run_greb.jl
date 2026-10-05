@@ -40,7 +40,7 @@ function run_greb(jld2_dir::AbstractString;
     end
 
     println("Loading GREB dataset from: ", jld2_dir)
-    fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
+    fields = load_climatology(jld2_dir; dataset=:ncep)
 
     # ── 2. configure the experiment (replaces the interactive widgets) ──────
     cfg = preset(:full_model; corrections=SpinUp(time_spinup))

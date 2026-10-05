@@ -1,4 +1,8 @@
 using GREBClimate
+# The kernels and loop functions are internal: not exported, reached by name
+using GREBClimate: SWradiation!, LWradiation!, hydro!, convergence!, seaice!, deep_ocean!,
+    diffusion!, advection!, circulation!, tendencies!, time_loop!, output!, diagnostics!,
+    qflux_correction!, init_model!
 using Test
 
 include(joinpath("support", "testutils.jl"))

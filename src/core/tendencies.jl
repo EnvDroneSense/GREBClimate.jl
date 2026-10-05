@@ -20,7 +20,7 @@ function tendencies!(CO2, Ts, Ta, To, q, fields::ClimateFields, state::ModelStat
     p = r.config.processes
     parallel = Threads.nthreads() > 1 && ws_a !== ws_q
 
-    # Atmospheric circulation - temperature/water-vapour diffusion/advection.
+    # Atmospheric circulation - temperature/water-vapor diffusion/advection.
     if parallel
         t_a = Threads.@spawn circulation!(Ta, z_air, ws_a.dTa_crcl, fields, ws_a, timestate, p)
         t_q = Threads.@spawn circulation!(q, z_vapor, ws_q.dq_crcl, fields, ws_q, timestate, p)
@@ -36,7 +36,7 @@ function tendencies!(CO2, Ts, Ta, To, q, fields::ClimateFields, state::ModelStat
     lw_out = LWradiation!(Ts, Ta, q, CO2, fields, timestate, p, ws)
 
     # Sensible heat flux
-    Q_sens = ws.Q_sens_buf
+    Q_sens = ws.Q_sens
     if p.atmosphere
         @. Q_sens = ct_sens * (Ta - Ts)
     else

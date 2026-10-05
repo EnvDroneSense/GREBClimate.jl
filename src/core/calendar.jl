@@ -19,7 +19,7 @@ const nstep_yr = Int(ndays_yr * ndt_days)
 
 const cjday_mon = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]  # days per month
 const jday_mon_cumsum = cumsum(cjday_mon)                           # last day of each month
-const MONTHS_PER_YEAR = length(cjday_mon)
+const months_per_year = length(cjday_mon)
 
 """
     step_of_year(it) -> Int
@@ -83,8 +83,8 @@ steps_in_month(month::Integer) = cjday_mon[month] * ndt_days
 
 "Step of the year of the first step of day `day` of `month`: `first_step_of(10, 1)` is 547."
 function first_step_of(month::Integer, day::Integer)
-    1 <= month <= MONTHS_PER_YEAR ||
-        throw(ArgumentError("month must be 1 to $MONTHS_PER_YEAR, got $month"))
+    1 <= month <= months_per_year ||
+        throw(ArgumentError("month must be 1 to $months_per_year, got $month"))
     1 <= day <= cjday_mon[month] ||
         throw(ArgumentError("month $month has days 1 to $(cjday_mon[month]), got $day"))
     days_before = month == 1 ? 0 : jday_mon_cumsum[month-1]

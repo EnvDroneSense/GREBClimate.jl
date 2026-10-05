@@ -18,46 +18,46 @@ Base.@kwdef mutable struct CirculationWorkspace
     dX_conv::Matrix{Float32} = zeros(Float32, xdim, ydim)  # convection output
 
     # Tendency buffers
-    Q_sens_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Sensible heat flux buffer
+    Q_sens::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Sensible heat flux buffer
 
     # State buffers
-    Ts0_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface temperature output
-    Ta0_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Air temperature output
-    To0_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Ocean temperature output
-    q0_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Humidity output
+    Ts0::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface temperature output
+    Ta0::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Air temperature output
+    To0::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Ocean temperature output
+    q0::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Humidity output
 
     # LW radiation buffers
-    e_co2_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial CO2 buffer
-    e_vapor_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial water vapor buffer
-    em_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial emissivity buffer
-    LW_surf_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface longwave
-    LW_down_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Downwelling longwave
-    LW_up_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Upwelling longwave
+    e_co2::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial CO2 buffer
+    e_vapor::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial water vapor buffer
+    em::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial emissivity buffer
+    LW_surf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface longwave
+    LW_down::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Downwelling longwave
+    LW_up::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Upwelling longwave
 
     # Hydrology
-    Q_lat_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
-    Q_lat_air_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
-    dq_eva_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
-    dq_rain_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
+    Q_lat::Matrix{Float32} = zeros(Float32, xdim, ydim)
+    Q_lat_air::Matrix{Float32} = zeros(Float32, xdim, ydim)
+    dq_eva::Matrix{Float32} = zeros(Float32, xdim, ydim)
+    dq_rain::Matrix{Float32} = zeros(Float32, xdim, ydim)
 
     # Deep_ocean
-    dT_ocean_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
-    dTo_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)
+    dT_ocean::Matrix{Float32} = zeros(Float32, xdim, ydim)
+    dTo::Matrix{Float32} = zeros(Float32, xdim, ydim)
 
     # Dedicated circulation output
     dTa_crcl::Matrix{Float32} = zeros(Float32, xdim, ydim)  # temperature tendency
     dq_crcl::Matrix{Float32} = zeros(Float32, xdim, ydim)  # humidity tendency
 
     # SWradiation
-    ice_cover_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # ice fraction
-    a_surf_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # surface albedo
-    albedo_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # combined albedo (surface + atmosphere)
-    sw_buf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # net shortwave flux
+    ice_cover::Matrix{Float32} = zeros(Float32, xdim, ydim)  # ice fraction
+    a_surf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # surface albedo
+    albedo::Matrix{Float32} = zeros(Float32, xdim, ydim)  # combined albedo (surface + atmosphere)
+    sw::Matrix{Float32} = zeros(Float32, xdim, ydim)  # net shortwave flux
 
     # time_loop
-    precip_out::Matrix{Float32} = zeros(Float32, xdim, ydim)  # precipitation output
-    evap_out::Matrix{Float32} = zeros(Float32, xdim, ydim)  # evaporation output
-    qcrcl_out::Matrix{Float32} = zeros(Float32, xdim, ydim)  # circulation moisture output
+    precip::Matrix{Float32} = zeros(Float32, xdim, ydim)  # precipitation output
+    evap::Matrix{Float32} = zeros(Float32, xdim, ydim)  # evaporation output
+    qcrcl::Matrix{Float32} = zeros(Float32, xdim, ydim)  # circulation moisture output
     term_north::Vector{Float32} = zeros(Float32, xdim)  # diffusion term of the northernmost row
     term_south::Vector{Float32} = zeros(Float32, xdim)  # diffusion term of the southernmost row
 end
@@ -155,14 +155,14 @@ end
     ClimateFields
 
 Loaded climatology, derived grid fields, flux corrections, the CO2 mask and
-the insolation table: what `load_greb_jld2!` fills in and every physics
+the insolation table: what `load_climatology` fills in and every physics
 function reads. It is passed as an argument, never held as global state. One
 loaded instance can serve several runs one after another: [`greb_model!`](@ref)
 restores the input fields it changes and derives the others again at the
 start of each run.
 
 `ClimateFields()` builds an all-zero instance with `loaded = false`;
-`load_greb_jld2!` sets `loaded = true`. [`greb_model!`](@ref) refuses unloaded
+`load_climatology` sets `loaded = true`. [`greb_model!`](@ref) refuses unloaded
 fields unless `allow_uninitialized=true`: an all-zero climatology raises no
 error, it runs and returns NaN in every output field.
 """
@@ -224,7 +224,7 @@ Base.@kwdef mutable struct ClimateFields
     anom_cc_source::String = ""
     anom_enso_source::Tuple{String,Symbol} = ("", :none)
 
-    # false for a bare `ClimateFields()`; set by `load_greb_jld2!`. See the
+    # false for a bare `ClimateFields()`; set by `load_climatology`. See the
     # docstring above and `greb_model!`'s `allow_uninitialized` keyword.
     loaded::Bool = false
 end

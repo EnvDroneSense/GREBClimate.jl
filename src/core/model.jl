@@ -131,7 +131,7 @@ function qflux_correction!(CO2_ctrl, Ts, Ta, q, To, fields::ClimateFields, state
         qFc = @view fields.qF_correct[:, :, ityr]
 
         # Surface/air temperature, deep ocean, and humidity update.
-        Ts0_buf = ws.Ts0_buf; Ta0_buf = ws.Ta0_buf; To0_buf = ws.To0_buf; q0_buf = ws.q0_buf
+        Ts0_buf = ws.Ts0; Ta0_buf = ws.Ta0; To0_buf = ws.To0; q0_buf = ws.q0
         dT_ocean = tend.dT_ocean; SW = tend.SW; LW_surf = tend.LW_surf; LW_down = tend.LW_down
         Q_lat = tend.Q_lat; Q_sens = tend.Q_sens; dTa_crcl = tend.dTa_crcl
         LW_up = tend.LW_up; em = tend.em; Q_lat_air = tend.Q_lat_air
@@ -145,7 +145,7 @@ function qflux_correction!(CO2_ctrl, Ts, Ta, q, To, fields::ClimateFields, state
                 TFc[i, j] = tfc
                 Ts0_buf[i, j] = ts0
 
-                Ta0_buf[i, j] = Ta[i, j] + dTa_crcl[i, j] + ΔT_AIR_FACTOR * @atmosphere_flux(i, j)
+                Ta0_buf[i, j] = Ta[i, j] + dTa_crcl[i, j] + ΔT_air_factor * @atmosphere_flux(i, j)
 
                 to0 = To[i, j] + dTo[i, j]
                 tofc = Toc[i, j] - to0
@@ -162,16 +162,16 @@ function qflux_correction!(CO2_ctrl, Ts, Ta, q, To, fields::ClimateFields, state
         end
 
         # Sea ice (updates cap_surf in place)
-        seaice!(ws.Ts0_buf, fields, timestate, r.config.processes)
+        seaice!(ws.Ts0, fields, timestate, r.config.processes)
 
-        surf = SurfaceState(ws.Ts0_buf, ws.Ta0_buf, ws.To0_buf, ws.q0_buf)
+        surf = SurfaceState(ws.Ts0, ws.Ta0, ws.To0, ws.q0)
         diagnostics!(it, _SpinUpYear((it - 1) ÷ nstep_yr + 1), CO2_ctrl, surf, tend, fields, state, timestate)
 
         # Advance state
-        @. Ts = ws.Ts0_buf
-        @. Ta = ws.Ta0_buf
-        @. q = ws.q0_buf
-        @. To = ws.To0_buf
+        @. Ts = ws.Ts0
+        @. Ta = ws.Ta0
+        @. q = ws.q0
+        @. To = ws.To0
     end
     return nothing
 end
@@ -190,7 +190,7 @@ ones, or none), a control run of `run.ctrl` years and a scenario run of
 | Keyword | Meaning |
 |:--------|:--------|
 | `jld2_dir` | The dataset directory. A `Config` is [`resolve`](@ref)d from it, and the run reads stored corrections and anomaly fields from it |
-| `fields` | The loaded [`ClimateFields`](@ref) (from [`load_greb_jld2!`](@ref)). The run restores the input fields it changes when it returns, so one instance can be passed to several runs |
+| `fields` | The loaded [`ClimateFields`](@ref) (from [`load_climatology`](@ref)). The run restores the input fields it changes when it returns, so one instance can be passed to several runs |
 | `allow_uninitialized` | Accept all-zero `fields`; for precompilation and tests |
 | `observer` | A function `observer(point, view)`, called twice per control and scenario step |
 
@@ -213,7 +213,7 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
               greb_model! was given an uninitialized ClimateFields (all-zero climatology).
 
               Load the data and pass it through:
-                  fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
+                  fields = load_climatology(jld2_dir; dataset=:ncep)
                   greb_model!(run, config; jld2_dir=jld2_dir, fields=fields)
 
               If a data-free run is intended (precompilation, config/scenario-plumbing
@@ -237,11 +237,9 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     # The anomaly files are read once per `fields`, directory and source
     if is_forced_boundary
         dir, source = String(jld2_dir), s.surface.source
-        if source === :cmip5_rcp85
-            fields.anom_cc_source == dir || load_cc_anomaly_jld2!(dir, fields)
-        else
-            fields.anom_enso_source == (dir, source) || load_enso_anomaly_jld2!(dir, fields, source)
-        end
+        loaded = source === :cmip5_rcp85 ? fields.anom_cc_source == dir :
+                 fields.anom_enso_source == (dir, source)
+        loaded || load_boundary_anomaly!(dir, fields, source)
     end
 
     ini = init_model!(r, fields)
@@ -265,12 +263,12 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     corrections = config.corrections
     if corrections isa Stored
         # Without a directory the corrections already in `fields` are used
-        # (`load_greb_jld2!` loads them)
+        # (`load_climatology` loads them)
         if !isempty(jld2_dir)
             file = joinpath(jld2_dir, "climatology", "flux_corrections.jld2")
             isfile(file) || throw(ArgumentError("Stored() found no flux corrections at $file"))
             @info "Loading the stored flux corrections"
-            load_flux_corrections_jld2!(String(jld2_dir), fields)
+            load_flux_corrections!(String(jld2_dir), fields)
         end
     elseif corrections isa SpinUp
         @info "Flux-correction spin-up: CO2 = $CO2_ctrl ppm, $(corrections.years) yr"

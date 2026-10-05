@@ -54,8 +54,8 @@ unless `p.ocean` is `:full`.
 """
 function deep_ocean!(Ts, To, fields::ClimateFields, timestate, p::Processes, ws::CirculationWorkspace)
     # Use pre-allocated zero buffers
-    dT_ocean = ws.dT_ocean_buf
-    dTo = ws.dTo_buf
+    dT_ocean = ws.dT_ocean
+    dTo = ws.dTo
 
     # no deep-ocean coupling
     if p.ocean !== :full

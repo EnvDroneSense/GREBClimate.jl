@@ -10,7 +10,7 @@ keeps stays in memory; without `reduce` it is the whole result.
 Every member gives exactly the result of running it alone.
 
 ```julia
-fields = load_greb_jld2!(dir)
+fields = load_climatology(dir)
 configs = [preset(:co2_double; hydrology=(evaporation=e,)) for e in (:original, :skin, :skin_gust)]
 warming = run_ensemble(RunSpec(ctrl=1, scnr=30), configs; fields, jld2_dir=dir) do result
     sum(global_mean(rec.Ts) for rec in result.scnr[end-11:end]) / 12

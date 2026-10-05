@@ -92,9 +92,9 @@ end
         Q_lat=fill(-20.0, GREBClimate.xdim, GREBClimate.ydim), Q_sens=fill(-5.0, GREBClimate.xdim, GREBClimate.ydim),
         LW_up=fill(-200.0, GREBClimate.xdim, GREBClimate.ydim), LW_down=fill(-210.0, GREBClimate.xdim, GREBClimate.ydim),
         em=fill(0.75, GREBClimate.xdim, GREBClimate.ydim))
-    ws.precip_out .= 2.0
-    ws.evap_out .= 1.0
-    ws.qcrcl_out .= 0.5
+    ws.precip .= 2.0
+    ws.evap .= 1.0
+    ws.qcrcl .= 0.5
 
     output_buf = MonthlyRecord[]
     irec, mon = 0, 1

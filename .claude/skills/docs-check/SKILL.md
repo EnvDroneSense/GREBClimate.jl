@@ -8,7 +8,7 @@ description: Verify GREBClimate.jl's documentation matches the code — run ever
 Documentation in this repo has produced a silent scientific error, not just
 confusion. The README's headline quick-start once ran the model on an all-zero
 climatology and reported a −40 °C world as success, because the snippet
-discarded `load_greb_jld2!`'s return value. It printed a ✅ and finished with
+discarded `load_climatology`'s return value. It printed a ✅ and finished with
 `all(isfinite, Ts) == true`. Nobody following the README could have known.
 
 Reading a snippet is not checking it. **Run it.**

@@ -49,16 +49,16 @@ end
 Accumulates the current timestep into `acc`; on the last timestep of `mon`,
 pushes a monthly-mean [`MonthlyRecord`](@ref) onto `output_buf`, resets `acc`,
 and advances to the next month. Returns `(mon, irec)`. `tend` is the
-`NamedTuple` [`tendencies!`](@ref) returns; `ws.precip_out`/`evap_out`/
-`qcrcl_out` hold this step's converted precipitation/evaporation/moisture-
+`NamedTuple` [`tendencies!`](@ref) returns; `ws.precip`/`evap`/
+`qcrcl` hold this step's converted precipitation/evaporation/moisture-
 circulation output.
 """
 function output!(it, irec, mon, surf::SurfaceState, tend, ws::CirculationWorkspace,
     output_buf::Vector{MonthlyRecord}, acc::MonthlyAccumulator, timestate)
-    mon = clamp(mon, 1, MONTHS_PER_YEAR)
+    mon = clamp(mon, 1, months_per_year)
 
     accumulate!(acc, surf.Ts, surf.Ta, surf.To, surf.q, tend.albedo, tend.ice_cover,
-        ws.precip_out, ws.evap_out, ws.qcrcl_out, tend.SW, tend.LW_surf, tend.Q_lat, tend.Q_sens,
+        ws.precip, ws.evap, ws.qcrcl, tend.SW, tend.LW_surf, tend.Q_lat, tend.Q_sens,
         tend.LW_up, tend.LW_down, tend.em)
 
     # ----- Check end of month -----
@@ -83,7 +83,7 @@ function output!(it, irec, mon, surf::SurfaceState, tend, ws::CirculationWorkspa
             lwdown=acc.lwdownmm ./ ndm
         ))
         reset!(acc)
-        mon = mod(mon, MONTHS_PER_YEAR) + 1
+        mon = mod(mon, months_per_year) + 1
     end
     return (mon=mon, irec=irec)
 end
@@ -131,8 +131,7 @@ function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
     Q_lat = tend.Q_lat; Q_sens = tend.Q_sens; dTa_crcl = tend.dTa_crcl
     LW_up = tend.LW_up; em = tend.em; Q_lat_air = tend.Q_lat_air
     dTo = tend.dTo; dT_ocean = tend.dT_ocean
-    precip_out = ws.precip_out
-    evap_out = ws.evap_out; qcrcl_out = ws.qcrcl_out
+    precip = ws.precip; evap = ws.evap; qcrcl = ws.qcrcl
 
     # Surface/air temperature, deep ocean, and humidity update
     @turbo for j in 1:ydim
@@ -151,9 +150,9 @@ function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
             tb = hydro_on * tb
             q[i, j] = q[i, j] + tb
 
-            precip_out[i, j] = (-dq_rain_use[i, j]) * wz_vapor[i, j] * conv_factor
-            evap_out[i, j] = dq_eva_use[i, j] * wz_vapor[i, j] * conv_factor
-            qcrcl_out[i, j] = dq_crcl_use[i, j]
+            precip[i, j] = (-dq_rain_use[i, j]) * wz_vapor[i, j] * conv_factor
+            evap[i, j] = dq_eva_use[i, j] * wz_vapor[i, j] * conv_factor
+            qcrcl[i, j] = dq_crcl_use[i, j]
         end
     end
 

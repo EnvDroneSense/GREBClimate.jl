@@ -34,7 +34,7 @@ end
     CO2File(path)
 
 CO2 per year from a text file of `year ppm` lines (see
-[`load_custom_co2_scenario`](@ref)).
+[`load_co2_custom`](@ref)).
 """
 struct CO2File <: CO2Path
     path::String

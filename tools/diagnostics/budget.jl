@@ -41,7 +41,7 @@ function main(args)
     years = parse(Int, get(args, 2, "1"))
     dir = greb_data_dir(; allow_download=false)
     dir === nothing && error("no local dataset found")
-    fields = load_greb_jld2!(dir; dataset=:ncep)
+    fields = load_climatology(dir; dataset=:ncep)
     phases = Dict(:ctrl => Phase(), :scnr => Phase())
     function observer(point, view)
         ph = phases[view.phase]

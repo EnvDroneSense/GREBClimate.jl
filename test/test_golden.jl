@@ -14,7 +14,7 @@ include(joinpath("data", "golden_reference.jl"))
     elseif get(ENV, "RUN_GOLDEN", "1") == "0"
         @test_skip "RUN_GOLDEN=0"
     else
-        fields = load_greb_jld2!(DATA_DIR; dataset = :ncep)
+        fields = load_climatology(DATA_DIR; dataset = :ncep)
         result = quiet() do
             greb_model!(RunSpec(), preset(:full_model; corrections = Stored()); jld2_dir = DATA_DIR, fields = fields)
         end
@@ -68,7 +68,7 @@ end
         cfg = preset(:co2_double; processes = (moisture_convergence = false,), hydrology = mscm_hydrology())
         result = quiet() do
             greb_model!(RunSpec(ctrl = 1, scnr = 1), cfg; jld2_dir = DATA_DIR,
-                        fields = load_greb_jld2!(DATA_DIR; dataset = :ncep))
+                        fields = load_climatology(DATA_DIR; dataset = :ncep))
         end
         @test isapprox(area_mean(result.scnr), MSCM_YEAR1; atol = 1e-3)
     end
@@ -80,7 +80,7 @@ end
     if !isdir(DATA_DIR)
         @test_skip "greb_input_data/ not present"
     else
-        fields = load_greb_jld2!(DATA_DIR; dataset = :ncep)
+        fields = load_climatology(DATA_DIR; dataset = :ncep)
         control(processes) = quiet() do
             greb_model!(RunSpec(ctrl = 1, scnr = 0), preset(:decon_mean_climate; processes);
                         jld2_dir = DATA_DIR, fields)
@@ -98,7 +98,7 @@ end
     else
         result = quiet() do
             greb_model!(RunSpec(ctrl = 1, scnr = 1), preset(:decon_2xco2; processes = (humidity = :uniform,));
-                        jld2_dir = DATA_DIR, fields = load_greb_jld2!(DATA_DIR; dataset = :ncep))
+                        jld2_dir = DATA_DIR, fields = load_climatology(DATA_DIR; dataset = :ncep))
         end
         @test all(r -> all(isfinite, r.Ts), result.ctrl)
         @test isapprox(area_mean(result.scnr), 0.675; atol = 1e-2)
@@ -109,7 +109,7 @@ end
     if !isdir(DATA_DIR)
         @test_skip "greb_input_data/ not present"
     else
-        modern = quiet(() -> load_greb_jld2!(DATA_DIR; dataset = :ncep)).sw_solar
+        modern = quiet(() -> load_climatology(DATA_DIR; dataset = :ncep)).sw_solar
         rms(a) = sqrt(sum(abs2, a .- modern) / length(a))
         for p in (:eccentricity, :obliquity)
             @test rms(resolve(preset(p); jld2_dir = DATA_DIR).solar_table) < 10   # W/m2; row 0 is over 200

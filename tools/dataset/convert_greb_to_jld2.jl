@@ -4,7 +4,7 @@
 # README.md).
 #
 # Converts the raw GREB `.bin` files (layout in DATA_README.md) into the
-# `.jld2` dataset read by `load_greb_jld2!`/`GREBClimate.read_jld2`.
+# `.jld2` dataset read by `load_climatology`/`GREBClimate.read_field`.
 #
 # Each field becomes its own `.jld2` file with keys "data" (Array{Float32})
 # and "dim_names", plus optional "coords" and "ctl".
@@ -181,7 +181,7 @@ function convert_flux_corrections(input_path::String, output_dir::String)
                 file[name] = arr
                 println("  ✓ $name → combined")
             else
-                println("  ⚠ $name.bin not found - omitted; load_greb_jld2! needs it")
+                println("  ⚠ $name.bin not found - omitted; load_climatology needs it")
             end
         end
     end

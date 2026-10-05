@@ -58,12 +58,12 @@ end
 # Fill the arrays of `fields` named in `files` from the files in `dir`
 function _load_fields!(fields::ClimateFields, dir::String, files::NamedTuple)
     for (field, name) in pairs(files)
-        getfield(fields, field) .= read_jld2(joinpath(dir, name * ".jld2")).data
+        getfield(fields, field) .= read_field(joinpath(dir, name * ".jld2")).data
     end
 end
 
 """
-    read_jld2(filepath::String)
+    read_field(filepath::String)
 
 Read a `.jld2` field file written by `tools/dataset/convert_greb_to_jld2.jl`.
 
@@ -75,7 +75,7 @@ Read a `.jld2` field file written by `tools/dataset/convert_greb_to_jld2.jl`.
     dimension index, or `nothing` if the file has none
   - `ctl`: raw GrADS `.ctl` metadata text, or `nothing` if the file has none
 """
-function read_jld2(filepath::String)
+function read_field(filepath::String)
     @lock _JLD2_LOCK jldopen(filepath, "r") do file
         return (
             data=file["data"],
@@ -87,7 +87,7 @@ function read_jld2(filepath::String)
 end
 
 """
-    load_solar_forcing_jld2(jld2_dir::String, forcing_type::Symbol, index::Int=0)
+    load_solar_forcing(jld2_dir::String, forcing_type::Symbol, index::Int=0)
 
 Loads an alternate solar-forcing table for paleo/orbital experiments.
 `forcing_type` is `:paleo`, `:eccentricity`, or `:obliquity`; for the latter
@@ -95,16 +95,16 @@ two, `index` selects the matching row by coordinate value. Used by
 [`resolve`](@ref) for a [`SolarTable`](@ref) scenario; `greb_model!` swaps it
 into `fields.sw_solar` for the scenario run.
 """
-function load_solar_forcing_jld2(jld2_dir::String, forcing_type::Symbol, index::Int=0)
+function load_solar_forcing(jld2_dir::String, forcing_type::Symbol, index::Int=0)
 
     if forcing_type == :paleo
         filepath = joinpath(jld2_dir, "solar_scenarios", "solar_paleo.jld2")
-        result = read_jld2(filepath)
+        result = read_field(filepath)
         return result.data
 
     elseif forcing_type == :eccentricity
         filepath = joinpath(jld2_dir, "solar_scenarios", "solar_eccentricity.jld2")
-        result = read_jld2(filepath)
+        result = read_field(filepath)
         values = Int.(result.coords[1])
         pos = findfirst(==(index), values)
         pos === nothing && throw(ArgumentError("eccentricity index $index is not in the table; available: $(values)"))
@@ -112,7 +112,7 @@ function load_solar_forcing_jld2(jld2_dir::String, forcing_type::Symbol, index::
 
     elseif forcing_type == :obliquity
         filepath = joinpath(jld2_dir, "solar_scenarios", "solar_obliquity.jld2")
-        result = read_jld2(filepath)
+        result = read_field(filepath)
         values = Int.(result.coords[1])
         pos = findfirst(==(index), values)
         pos === nothing && throw(ArgumentError("obliquity index $index is not in the table; available: $(values)"))
@@ -124,13 +124,13 @@ function load_solar_forcing_jld2(jld2_dir::String, forcing_type::Symbol, index::
 end
 
 """
-    load_co2_scenario_jld2(jld2_dir::String, scenario::Symbol) -> Dict{Int,Float32}
+    load_co2_scenario(jld2_dir::String, scenario::Symbol) -> Dict{Int,Float32}
 
 Loads a `year => CO2` (ppm-equivalent) lookup table for an IPCC scenario
 (e.g. `:ssp585`, `:rcp85`) from the combined `scenario/ipcc_scenarios.jld2`.
 The RCP6.0 table is `:rcp60`.
 """
-function load_co2_scenario_jld2(jld2_dir::String, scenario::Symbol)
+function load_co2_scenario(jld2_dir::String, scenario::Symbol)
     filepath = joinpath(jld2_dir, "scenario", "ipcc_scenarios.jld2")
     isfile(filepath) ||
         error("Scenario file not found: $filepath (run tools/dataset/convert_greb_to_jld2.jl)")
@@ -146,13 +146,13 @@ function load_co2_scenario_jld2(jld2_dir::String, scenario::Symbol)
 end
 
 """
-    load_custom_co2_scenario(path::String) -> Dict{Int,Float32}
+    load_co2_custom(path::String) -> Dict{Int,Float32}
 
 Loads a `year => CO2` lookup table for the `:custom_co2` experiment from a
 plain-text file, one `year CO2` pair per line. Blank lines
 and lines starting with `#` are skipped.
 """
-function load_custom_co2_scenario(path::String)
+function load_co2_custom(path::String)
     isfile(path) || error("Custom CO2 scenario file not found: $path")
     table = Dict{Int,Float32}()
     open(path) do io
@@ -169,12 +169,12 @@ function load_custom_co2_scenario(path::String)
 end
 
 """
-    load_flux_corrections_jld2!(jld2_dir::String, fields::ClimateFields)
+    load_flux_corrections!(jld2_dir::String, fields::ClimateFields)
 
 Load the flux corrections from the combined `climatology/flux_corrections.jld2`
 into `fields`. A missing file or a missing table in it is an `ArgumentError`.
 """
-function load_flux_corrections_jld2!(jld2_dir::String, fields::ClimateFields)
+function load_flux_corrections!(jld2_dir::String, fields::ClimateFields)
     filepath = joinpath(jld2_dir, "climatology", "flux_corrections.jld2")
     isfile(filepath) || throw(ArgumentError("flux corrections file not found: $filepath"))
     @lock _JLD2_LOCK jldopen(filepath, "r") do file
@@ -192,46 +192,41 @@ function _load_anomaly_fields!(fields::ClimateFields, jld2_dir::String, files::N
         filepath = joinpath(jld2_dir, "climatology", name * ".jld2")
         isfile(filepath) ||
             error("Anomaly forcing file not found: $filepath (run tools/dataset/convert_greb_to_jld2.jl)")
-        getfield(fields, field) .= read_jld2(filepath).data
+        getfield(fields, field) .= read_field(filepath).data
     end
 end
 
 """
-    load_cc_anomaly_jld2!(jld2_dir::String, fields::ClimateFields)
+    load_boundary_anomaly!(jld2_dir::String, fields::ClimateFields, source::Symbol)
 
-Loads the CMIP5 RCP8.5 ensemble-mean climate-change anomaly fields into
+Loads the anomaly fields of a [`BoundaryAnomaly`](@ref) scenario into `fields`.
+`source` is `:cmip5_rcp85` (the CMIP5 RCP8.5 ensemble mean, into
 `fields.Tclim_anom_cc`/`uclim_anom_cc`/`vclim_anom_cc`/`omegaclim_anom_cc`/
-`wsclim_anom_cc`: the forcing of a `BoundaryAnomaly(:cmip5_rcp85)` scenario.
-Errors on a missing file rather than defaulting to zero.
+`wsclim_anom_cc`), or `:elnino` or `:lanina` (the ERA-Interim composite mean,
+into `fields.*_anom_enso`). Errors on a missing file rather than defaulting to
+zero.
 
-`fields` remembers the directory, and [`greb_model!`](@ref) does not read the
-files again for a later run on the same `fields` and directory.
+`fields` remembers the directory and the source, and [`greb_model!`](@ref)
+does not read the files again for a later run on the same `fields`, directory
+and source.
 """
-function load_cc_anomaly_jld2!(jld2_dir::String, fields::ClimateFields)
-    fields.anom_cc_source = ""
-    _load_anomaly_fields!(fields, jld2_dir, _CC_ANOMALY_FILES)
-    fields.anom_cc_source = jld2_dir
+function load_boundary_anomaly!(jld2_dir::String, fields::ClimateFields, source::Symbol)
+    if source === :cmip5_rcp85
+        fields.anom_cc_source = ""
+        _load_anomaly_fields!(fields, jld2_dir, _CC_ANOMALY_FILES)
+        fields.anom_cc_source = jld2_dir
+    elseif source in _ENSO_EVENTS
+        fields.anom_enso_source = ("", :none)
+        _load_anomaly_fields!(fields, jld2_dir, _enso_anomaly_files(source))
+        fields.anom_enso_source = (jld2_dir, source)
+    else
+        throw(ArgumentError("source must be :cmip5_rcp85, :elnino or :lanina, got :$source"))
+    end
     return nothing
 end
 
 """
-    load_enso_anomaly_jld2!(jld2_dir::String, fields::ClimateFields, which::Symbol)
-
-Loads the ERA-Interim composite-mean El Niño (`which=:elnino`) or La Niña
-(`:lanina`) anomaly fields into `fields.*_anom_enso`, as
-[`load_cc_anomaly_jld2!`](@ref) does for RCP8.5; `fields` remembers the
-directory and the event.
-"""
-function load_enso_anomaly_jld2!(jld2_dir::String, fields::ClimateFields, which::Symbol)
-    which in _ENSO_EVENTS || error("which must be :elnino or :lanina, got $which")
-    fields.anom_enso_source = ("", :none)
-    _load_anomaly_fields!(fields, jld2_dir, _enso_anomaly_files(which))
-    fields.anom_enso_source = (jld2_dir, which)
-    return nothing
-end
-
-"""
-    load_greb_jld2!(jld2_dir::String; dataset::Symbol=:ncep, corrections::Bool=true)
+    load_climatology(jld2_dir::String; dataset::Symbol=:ncep, corrections::Bool=true)
 
 Load all GREB input data from JLD2 formatted files, returning a fresh
 [`ClimateFields`](@ref). `dataset` (`:ncep`/`:era`) selects which
@@ -245,7 +240,7 @@ for a dataset that has none: the three correction arrays stay zero, and a run
 computes its own with [`SpinUp`](@ref) or runs without, with
 [`NoCorrections`](@ref).
 """
-function load_greb_jld2!(jld2_dir::String; dataset::Symbol=:ncep, corrections::Bool=true)
+function load_climatology(jld2_dir::String; dataset::Symbol=:ncep, corrections::Bool=true)
     if !isdir(jld2_dir)
         error("JLD2 directory not found: $jld2_dir")
     end
@@ -269,7 +264,7 @@ function load_greb_jld2!(jld2_dir::String; dataset::Symbol=:ncep, corrections::B
     @info "Loading the solar radiation table"
     solar_path = joinpath(jld2_dir, "solar", _SOLAR_FILE * ".jld2")
     if isfile(solar_path)
-        solar_result = read_jld2(solar_path)
+        solar_result = read_field(solar_path)
         size(solar_result.data) == (ydim, nstep_yr) ||
             error("$solar_path holds a $(size(solar_result.data)) table, expected ($ydim, $nstep_yr)")
         fields.sw_solar .= solar_result.data
@@ -279,7 +274,7 @@ function load_greb_jld2!(jld2_dir::String; dataset::Symbol=:ncep, corrections::B
 
     if corrections
         @info "Loading the flux corrections"
-        load_flux_corrections_jld2!(jld2_dir, fields)
+        load_flux_corrections!(jld2_dir, fields)
     end
 
     split_winds!(fields)

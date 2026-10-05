@@ -11,6 +11,8 @@
 #             --ctrl=N, --scnr=N (default 10/10), --experiment=NAME (default full_model)
 
 using GREBClimate
+using GREBClimate: SWradiation!, LWradiation!, hydro!, convergence!, seaice!, deep_ocean!,
+    circulation!, tendencies!, output!, diagnostics!, init_model!
 
 include("common.jl")
 
@@ -28,7 +30,7 @@ function time_1yr(jld2_dir::AbstractString; cfg=preset(:full_model; corrections=
 
     println("Threads.nthreads() = ", Threads.nthreads())
     calibration = machine_header()
-    fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
+    fields = load_climatology(jld2_dir; dataset=:ncep)
 
     # Warm-up, so compilation is not timed.
     Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
@@ -72,7 +74,7 @@ function time_years(jld2_dir::AbstractString; experiment::Symbol=:full_model,
     println("ctrl=$ctrl scnr=$scnr ($total_years simulated years/rep), experiment=$experiment")
     calibration = machine_header()
     cfg = preset(experiment; corrections=Stored())  # no spin-up, as in time_1yr
-    fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
+    fields = load_climatology(jld2_dir; dataset=:ncep)
 
     # Warm-up with a minimal run.
     Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
@@ -103,7 +105,7 @@ function time_stages(jld2_dir::AbstractString; cfg=preset(:full_model), reps::In
     _require_data(jld2_dir) || return nothing
     reps >= 1 || throw(ArgumentError("reps must be at least 1, got $reps"))
 
-    fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
+    fields = load_climatology(jld2_dir; dataset=:ncep)
     r = resolve(cfg; jld2_dir)
     p = r.config.processes
     CO2 = init_model!(r, fields).CO2_ctrl
@@ -198,7 +200,7 @@ function check_allocations(jld2_dir::AbstractString)
     _require_data(jld2_dir) || return nothing
 
     r = resolve(preset(:full_model))
-    fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
+    fields = load_climatology(jld2_dir; dataset=:ncep)
     CO2 = init_model!(r, fields).CO2_ctrl
     state = ModelState()
     ws = CirculationWorkspace()

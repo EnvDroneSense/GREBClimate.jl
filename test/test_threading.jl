@@ -54,7 +54,7 @@ end
         script = """
             using GREBClimate
             result = Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
-                fields = load_greb_jld2!(raw"$(DATA_DIR)"; dataset = :ncep)
+                fields = load_climatology(raw"$(DATA_DIR)"; dataset = :ncep)
                 greb_model!(RunSpec(ctrl = 1, scnr = 0), preset(:full_model; corrections = SpinUp(1));
                             jld2_dir = raw"$(DATA_DIR)", fields = fields)
             end

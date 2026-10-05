@@ -40,7 +40,7 @@ md"""## 1. Run"""
 # ╔═╡ 34ed8352-d79c-418d-ae5b-014b09a8ff30
 begin
     data_dir = greb_data_dir(allow_download=false)
-    fields = load_greb_jld2!(data_dir; dataset=:ncep)
+    fields = load_climatology(data_dir; dataset=:ncep)
 end;
 
 # ╔═╡ 81e2898f-92b5-4bfa-837d-82319d446a7b

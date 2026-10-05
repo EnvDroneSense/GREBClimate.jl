@@ -51,7 +51,7 @@ function _cases()
 end
 
 function run_cases()
-    fields = load_greb_jld2!(DATA_DIR; dataset=:ncep)
+    fields = load_climatology(DATA_DIR; dataset=:ncep)
     snap = Dict{String,Array{Float32,3}}()
     for (name, mkcfg) in _cases()
         result = Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do

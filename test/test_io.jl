@@ -1,6 +1,6 @@
 # JLD2 loading, dataset resolution, and converter/archive consistency.
 
-@testset "load_greb_jld2!: every file is read; a missing flux-corrections file or table is an error" begin
+@testset "load_climatology: every file is read; a missing flux-corrections file or table is an error" begin
     write2(path, v) = (mkpath(dirname(path)); GREBClimate.jldopen(path, "w") do f
         f["data"] = fill(v, GREBClimate.xdim, GREBClimate.ydim); f["dim_names"] = ["lon", "lat"]
     end)
@@ -29,22 +29,22 @@
         write_solar(joinpath(tmpdir, "solar", "solar_radiation.clim.jld2"), 14.0)
 
         # No flux-corrections file yet: an error that names it, not zeros
-        @test_throws "flux_corrections.jld2" load_greb_jld2!(tmpdir; dataset = :ncep)
-        @test_throws ArgumentError load_flux_corrections_jld2!(tmpdir, ClimateFields())
+        @test_throws "flux_corrections.jld2" load_climatology(tmpdir; dataset = :ncep)
+        @test_throws ArgumentError load_flux_corrections!(tmpdir, ClimateFields())
         # `corrections = false` loads the rest and leaves the corrections at zero
-        without = load_greb_jld2!(tmpdir; dataset = :ncep, corrections = false)
+        without = load_climatology(tmpdir; dataset = :ncep, corrections = false)
         @test without.loaded && all(==(3.0), without.Tclim)
         @test all(iszero, without.TF_correct) && all(iszero, without.qF_correct) && all(iszero, without.ToF_correct)
 
         # A dataset name the loader does not know is an error, not NCEP
-        @test_throws ArgumentError load_greb_jld2!(tmpdir; dataset = :era5)
+        @test_throws ArgumentError load_climatology(tmpdir; dataset = :era5)
 
         # A file that lacks one of the three tables is an error too
         corrections = joinpath(tmpdir, "climatology", "flux_corrections.jld2")
         GREBClimate.jldopen(corrections, "w") do f
             f["Tsurf_flux_correction"] = fill(15.0, GREBClimate.xdim, GREBClimate.ydim, GREBClimate.nstep_yr)
         end
-        @test_throws "vapour_flux_correction" load_greb_jld2!(tmpdir; dataset = :ncep)
+        @test_throws "vapour_flux_correction" load_climatology(tmpdir; dataset = :ncep)
 
         GREBClimate.jldopen(corrections, "w") do f
             f["Tsurf_flux_correction"] = fill(15.0, GREBClimate.xdim, GREBClimate.ydim, GREBClimate.nstep_yr)
@@ -52,7 +52,7 @@
             f["Tocean_flux_correction"] = fill(17.0, GREBClimate.xdim, GREBClimate.ydim, GREBClimate.nstep_yr)
         end
 
-        fields = load_greb_jld2!(tmpdir; dataset = :ncep)
+        fields = load_climatology(tmpdir; dataset = :ncep)
         @test all(==(1.0), fields.z_topo)
         @test all(==(2.0), fields.glacier)
         @test all(==(3.0), fields.Tclim)
@@ -64,20 +64,20 @@
 
         # Tasks reading the same file at once all get its content
         path = joinpath(tmpdir, "climatology", "Tocean.clim.jld2")
-        reads = [Threads.@spawn read_jld2(path).data for _ in 1:8]
+        reads = [Threads.@spawn read_field(path).data for _ in 1:8]
         @test all(t -> all(==(10.0), fetch(t)), reads)
 
         # A solar table of the wrong shape is reported, with the file's name
         GREBClimate.jldopen(joinpath(tmpdir, "solar", "solar_radiation.clim.jld2"), "w") do f
             f["data"] = zeros(GREBClimate.ydim, 2); f["dim_names"] = ["lat", "time"]
         end
-        @test_throws "solar_radiation.clim.jld2" load_greb_jld2!(tmpdir; dataset = :ncep)
+        @test_throws "solar_radiation.clim.jld2" load_climatology(tmpdir; dataset = :ncep)
     finally
         rm(tmpdir; recursive = true, force = true)
     end
 
     missing_parent = mktempdir()
-    @test_throws ErrorException load_greb_jld2!(joinpath(missing_parent, "nonexistent"))
+    @test_throws ErrorException load_climatology(joinpath(missing_parent, "nonexistent"))
     rm(missing_parent; recursive = true, force = true)
 end
 

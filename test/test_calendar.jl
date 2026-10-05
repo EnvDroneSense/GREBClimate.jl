@@ -3,7 +3,7 @@ using Test
 using GREBClimate
 using GREBClimate: step_of_year, day_of_year, month_of_day, month_of_step,
     is_day_end, is_month_end, is_year_end, steps_in_month, first_step_of,
-    decimal_year, MONTHS_PER_YEAR
+    decimal_year, months_per_year
 
 @testset "calendar" begin
     @testset "step and day of the year" begin
@@ -21,7 +21,7 @@ using GREBClimate: step_of_year, day_of_year, month_of_day, month_of_step,
     end
 
     @testset "months" begin
-        @test MONTHS_PER_YEAR == 12
+        @test months_per_year == 12
         @test month_of_day.([1, 31, 32, 59, 60, 90, 91, 365]) == [1, 1, 2, 2, 3, 3, 4, 12]
         @test month_of_step(62) == 1
         @test month_of_step(63) == 2

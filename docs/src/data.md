@@ -15,7 +15,7 @@ At ~439 MB unpacked the dataset is not committed to the repository.
 ```julia
 using GREBClimate
 dir    = greb_data_dir()        # prompts, downloads (~353 MB) and caches on first use
-fields = load_greb_jld2!(dir; dataset = :ncep)   # or :era
+fields = load_climatology(dir; dataset = :ncep)   # or :era
 ```
 
 It resolves in this order; only the last step touches the network:
@@ -40,7 +40,7 @@ The tests and benchmarks never download: they resolve with
 
 ## Loading
 
-[`load_greb_jld2!`](@ref) *returns* a [`ClimateFields`](@ref) holding the
+[`load_climatology`](@ref) *returns* a [`ClimateFields`](@ref) holding the
 climatology, grid geometry, flux corrections and solar table. It does not set
 global state: pass the value to [`greb_model!`](@ref) with `fields = ...`. You
 can hold several independent instances in one session, e.g. for parameter
@@ -76,7 +76,7 @@ greb_input_data/                    # 39 files, ~439 MB
 │   ├── erainterim.omega.vertmean.clim.jld2
 │   ├── erainterim.omega_std.vertmean.clim.jld2
 │   ├── erainterim.windspeed.850hpa.clim.jld2
-│   ├── flux_corrections.jld2       # Tsurf/vapour/Tocean corrections
+│   ├── flux_corrections.jld2       # Tsurf/vapor/Tocean corrections
 │   │   # CMIP5 RCP8.5 anomalies - climate-change experiments only
 │   ├── cmip5.{tsurf,zonal.wind,meridional.wind,windspeed,omega}.rcp85.ensmean.forcing.jld2
 │   │   # ENSO anomalies - :elnino / :lanina only (10 files)

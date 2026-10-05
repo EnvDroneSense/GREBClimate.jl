@@ -36,7 +36,7 @@ const d_air = 5000.0f0                      # air column
 const cap_ocean = cp_ocean * ρ_ocean        # 1m ocean
 const cap_land = cp_land * ρ_land * d_land  # land column
 const cap_air = cp_air * ρ_air * d_air      # air column
-const ΔT_AIR_FACTOR = Δt / cap_air           # [K m²/W]: flux to air temperature change per step
+const ΔT_air_factor = Δt / cap_air           # [K m²/W]: flux to air temperature change per step
 
 # ── Sensible heat [W/K/m²] ──────────────────────────────────────
 const ct_sens = 22.5f0                       # sensible heat coupling
@@ -132,7 +132,7 @@ const xghost = xdim + 2 * nghost
 
 # ── Polar rows: sub-stepping of diffusion! and advection! ─────────
 const polar_threshold = 2.5f5  # 250 km in meters
-const IS_POLAR = [dxlat_grid[k] <= polar_threshold for k in 1:ydim]
+const is_polar = [dxlat_grid[k] <= polar_threshold for k in 1:ydim]
 
 function _polar_diff_step(k)
     dd = max(1, round(Int, Δt_crcl / (dxlat_grid[k]^2 / κ)))
@@ -147,7 +147,7 @@ function _polar_adv_step(k)
     return (time2=time2, ccx2=dtdff2 / dxlat_grid[k] / 2.0f0)
 end
 
-const POLAR_DIFF_TIME2 = [_polar_diff_step(k).time2 for k in 1:ydim]
-const POLAR_DIFF_CCX2 = Float32[_polar_diff_step(k).ccx2 for k in 1:ydim]
-const POLAR_ADV_TIME2 = [_polar_adv_step(k).time2 for k in 1:ydim]
-const POLAR_ADV_CCX2 = Float32[_polar_adv_step(k).ccx2 for k in 1:ydim]
+const polar_diff_time2 = [_polar_diff_step(k).time2 for k in 1:ydim]
+const polar_diff_ccx2 = Float32[_polar_diff_step(k).ccx2 for k in 1:ydim]
+const polar_adv_time2 = [_polar_adv_step(k).time2 for k in 1:ydim]
+const polar_adv_ccx2 = Float32[_polar_adv_step(k).ccx2 for k in 1:ydim]

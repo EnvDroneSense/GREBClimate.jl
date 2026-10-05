@@ -10,7 +10,7 @@ result.
 using GREBClimate
 
 jld2_dir = greb_data_dir()                            # see below
-fields = load_greb_jld2!(jld2_dir; dataset = :ncep)   # or :era
+fields = load_climatology(jld2_dir; dataset = :ncep)   # or :era
 ```
 
 [`greb_data_dir`](@ref) returns the dataset directory, downloading and caching
@@ -18,7 +18,7 @@ it (~353 MB) on first use if no local copy is found. It checks an explicit path,
 then `$GREB_DATA`, then `greb_input_data/` beside the package, and only then the
 network - so if you already have the data, nothing is fetched. Pass a path
 directly if you prefer: `greb_data_dir("/path/to/greb_input_data")`, or hand
-`load_greb_jld2!` the path itself. See [Input data](@ref).
+`load_climatology` the path itself. See [Input data](@ref).
 
 `fields` is a [`ClimateFields`](@ref) - climatology, grid geometry, flux
 corrections, and the regional-CO₂ mask/solar table. Every physics function
@@ -26,7 +26,7 @@ takes it as an explicit argument; nothing is shared as module-global state,
 so you can hold several independent `fields` instances (e.g. for parameter
 sweeps) in the same session.
 
-!!! warning "`load_greb_jld2!` returns the data - it does not set globals"
+!!! warning "`load_climatology` returns the data - it does not set globals"
     The returned `fields` must be passed to [`greb_model!`](@ref) explicitly
     (step 3). A bare [`ClimateFields`](@ref) is all zeros, and stepping the
     model on a zero climatology runs to completion and returns NaN in

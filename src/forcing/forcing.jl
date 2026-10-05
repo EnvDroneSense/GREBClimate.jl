@@ -45,12 +45,12 @@ _co2_at(c::CO2Step, it, year, r) = year >= c.year ? c.after : c.before
 
 # Boreal winter is half the year: from the first step of 1 October through the
 # first step of 1 April, as in the original code
-const _WINTER_FIRST_STEP = first_step_of(10, 1)
-const _WINTER_LAST_STEP = first_step_of(4, 1)
+const _winter_first_step = first_step_of(10, 1)
+const _winter_last_step = first_step_of(4, 1)
 
 function _co2_at(c::SeasonalCO2, it, year, r)
     step = step_of_year(it)
-    winter = step <= _WINTER_LAST_STEP || step >= _WINTER_FIRST_STEP
+    winter = step <= _winter_last_step || step >= _winter_first_step
     return winter == (c.season === :boreal_winter) ? c.inside : c.outside
 end
 
@@ -79,12 +79,12 @@ _latitude_mask!(co2_part, ::CO2Mask) = co2_part
 # The tropics band runs from 33.75 S to 30 N, as in the original code. In the
 # two rows at the band edge that are halved, every fourth longitude keeps the
 # full CO2.
-const _TROPICS_SOUTH = -33.75f0
-const _TROPICS_NORTH = 30.0f0
+const _tropics_south = -33.75f0
+const _tropics_north = 30.0f0
 
 function _latitude_mask!(co2_part, m::LatitudeMask)
     south = findall(<(0), lat_grid)
-    tropics = findall(lat -> _TROPICS_SOUTH < lat < _TROPICS_NORTH, lat_grid)
+    tropics = findall(lat -> _tropics_south < lat < _tropics_north, lat_grid)
     if m.band === :nh
         co2_part[:, south] .= 0.5f0
     elseif m.band === :sh

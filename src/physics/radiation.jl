@@ -7,10 +7,10 @@ flux from `Ts` and the current cloud climatology. Returns
 """
 function SWradiation!(Ts, fields::ClimateFields, state::ModelState, timestate, p::Processes, ws::CirculationWorkspace)
     # Reuse workspace buffers
-    ice_cover = ws.ice_cover_buf # output: ice fraction
-    a_surf = ws.a_surf_buf       # surface albedo
-    albedo = ws.albedo_buf       # output: combined albedo (surface + atmosphere)
-    sw = ws.sw_buf               # output: net shortwave flux
+    ice_cover = ws.ice_cover # output: ice fraction
+    a_surf = ws.a_surf       # surface albedo
+    albedo = ws.albedo       # output: combined albedo (surface + atmosphere)
+    sw = ws.sw               # output: net shortwave flux
 
     z_topo = fields.z_topo
     glacier = fields.glacier
@@ -71,12 +71,12 @@ touching the atmosphere's own emission term). Returns
 """
 function LWradiation!(Ts, Ta, q, CO2, fields::ClimateFields, timestate, p::Processes, ws::CirculationWorkspace)
     # Extract workspace buffers
-    e_co2 = ws.e_co2_buf      # CO2 [ppm scaled by pressure]
-    e_vapor = ws.e_vapor_buf  # water vapour [kg/m²]
-    em = ws.em_buf            # emissivity ε_atmos
-    LW_surf = ws.LW_surf_buf  # surface long-wave flux [W/m²]
-    LW_down = ws.LW_down_buf  # downward long-wave flux [W/m²]
-    LW_up = ws.LW_up_buf      # upward long-wave flux [W/m²]
+    e_co2 = ws.e_co2      # CO2 [ppm scaled by pressure]
+    e_vapor = ws.e_vapor  # water vapor [kg/m²]
+    em = ws.em            # emissivity ε_atmos
+    LW_surf = ws.LW_surf  # surface long-wave flux [W/m²]
+    LW_down = ws.LW_down  # downward long-wave flux [W/m²]
+    LW_up = ws.LW_up      # upward long-wave flux [W/m²]
 
     wz_air = fields.wz_air
     co2_part = fields.co2_part

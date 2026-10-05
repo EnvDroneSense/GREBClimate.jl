@@ -68,11 +68,11 @@ function resolve(h::Hydrology)
 end
 
 _co2_table(::CO2Path, jld2_dir) = Dict{Int,Float32}()
-_co2_table(c::CO2Table, jld2_dir) = load_co2_scenario_jld2(String(jld2_dir), c.key)
+_co2_table(c::CO2Table, jld2_dir) = load_co2_scenario(String(jld2_dir), c.key)
 function _co2_table(c::CO2File, jld2_dir)
     isempty(c.path) && throw(ArgumentError("CO2File needs the path of a CO2 file"))
-    return load_custom_co2_scenario(c.path)
+    return load_co2_custom(c.path)
 end
 
 _solar_table(::Solar, jld2_dir) = nothing
-_solar_table(s::SolarTable, jld2_dir) = Matrix{Float32}(load_solar_forcing_jld2(String(jld2_dir), s.kind, s.index))
+_solar_table(s::SolarTable, jld2_dir) = Matrix{Float32}(load_solar_forcing(String(jld2_dir), s.kind, s.index))

@@ -99,7 +99,6 @@ function _diffusion!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, ws::CirculationW
     # Precomputed geometry/coefficients
     ccy = ccy_diff
     ccx = ccx_diff
-    is_polar = IS_POLAR
 
     term_south = ws.term_south
     term_north = ws.term_north
@@ -158,8 +157,8 @@ function _diffusion!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, ws::CirculationW
             end
         else   # polar regions - sub-timestepping
             # Number of sub-steps for stability (precomputed, depends only on k)
-            time2 = POLAR_DIFF_TIME2[k]
-            cc2 = POLAR_DIFF_CCX2[k] * 0.05f0
+            time2 = polar_diff_time2[k]
+            cc2 = polar_diff_ccx2[k] * 0.05f0
 
             # Copy current row (ghosts included) into the temporary buffer
             @simd for i in 1:xghost
@@ -205,12 +204,12 @@ end
     advection!(T1, h_scl, fields::ClimateFields, ws::CirculationWorkspace, timestate, p::Processes)
 
 Meridional + zonal advection of `T1` (temperature or humidity), writing the
-tendency into `ws.dX_adv`. Gated by `p.heat_advection`/`p.vapour_advection`
+tendency into `ws.dX_adv`. Gated by `p.heat_advection`/`p.vapor_advection`
 depending on `h_scl`.
 """
 function advection!(T1, h_scl, fields::ClimateFields, ws::CirculationWorkspace, timestate, p::Processes)
-    # Disable advection for water vapour or heat according to switches
-    if (h_scl == z_vapor && !p.vapour_advection) || (h_scl == z_air && !p.heat_advection)
+    # Disable advection for water vapor or heat according to switches
+    if (h_scl == z_vapor && !p.vapor_advection) || (h_scl == z_air && !p.heat_advection)
         fill!(ws.dX_adv, 0.0f0)
         return nothing
     end
@@ -235,7 +234,6 @@ function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateF
     # Precomputed constants
     ccy = ccy_adv
     ccx = ccx_adv
-    is_polar = IS_POLAR
 
     T1h = ws.T1h
     dTxh = ws.dTxh
@@ -314,8 +312,8 @@ function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateF
             end
         else # polar regions - sub-timestepping
             # Number of sub-steps (CFL stability. Precomputed, depends only on k)
-            time2 = POLAR_ADV_TIME2[k]
-            ccx2 = POLAR_ADV_CCX2[k]
+            time2 = polar_adv_time2[k]
+            ccx2 = polar_adv_ccx2[k]
 
             # Copy current row (ghosts included) into the temporary buffer
             @simd for i in 1:xghost
@@ -343,7 +341,7 @@ function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateF
                     ) / 20.0f0
                 end
                 @turbo for j in 1:xdim
-                    # Stability clamp (avoid negative water vapour)
+                    # Stability clamp (avoid negative water vapor)
                     t0 = T1h[j+3]
                     dq = ifelse(dTxh[j] <= -t0, -0.9f0 * t0, dTxh[j])
                     T1h[j+3] = t0 + dq
@@ -378,9 +376,9 @@ function circulation!(X_in, h_scl, dX_out, fields::ClimateFields, ws::Circulatio
     end
 
     # Precompute flags
-    do_diff_v = p.vapour_diffusion && h_scl == z_vapor
+    do_diff_v = p.vapor_diffusion && h_scl == z_vapor
     do_diff_h = p.heat_diffusion && h_scl == z_air
-    do_adv_v = p.vapour_advection && h_scl == z_vapor
+    do_adv_v = p.vapor_advection && h_scl == z_vapor
     do_adv_h = p.heat_advection && h_scl == z_air
     do_conv = p.moisture_convergence && h_scl == z_vapor
 

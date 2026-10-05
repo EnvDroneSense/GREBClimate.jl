@@ -1,11 +1,11 @@
-const _HYDRO_CONST_FACTOR1 = 3.75f-3
-const _HYDRO_CONST_FACTOR2 = 17.08085f0
-const _HYDRO_CONST_FACTOR3 = 234.175f0
-const _HYDRO_GUST_LAND = 4.0f0
-const _HYDRO_GUST_OCEAN = 9.0f0
-const _HYDRO_CE_LAND = 0.25f0 * ce
-const _HYDRO_CE_OCEAN = 0.58f0 * ce
-const _HYDRO_CONST_LATENT = cq_latent * ρ_air * ce
+const _hydro_const_factor1 = 3.75f-3
+const _hydro_const_factor2 = 17.08085f0
+const _hydro_const_factor3 = 234.175f0
+const _hydro_gust_land = 4.0f0
+const _hydro_gust_ocean = 9.0f0
+const _hydro_ce_land = 0.25f0 * ce
+const _hydro_ce_ocean = 0.58f0 * ce
+const _hydro_const_latent = cq_latent * ρ_air * ce
 
 """
     hydro!(Ts, q, fields::ClimateFields, timestate, p::Processes, h::ResolvedHydrology, ws::CirculationWorkspace)
@@ -24,14 +24,14 @@ function hydro!(Ts, q, fields::ClimateFields, timestate, p::Processes, h::Resolv
     c_omega = h.c_omega
     c_omegastd = h.c_omegastd
 
-    fill!(ws.Q_lat_buf, 0.0f0)
-    fill!(ws.Q_lat_air_buf, 0.0f0)
-    fill!(ws.dq_eva_buf, 0.0f0)
-    fill!(ws.dq_rain_buf, 0.0f0)
+    fill!(ws.Q_lat, 0.0f0)
+    fill!(ws.Q_lat_air, 0.0f0)
+    fill!(ws.dq_eva, 0.0f0)
+    fill!(ws.dq_rain, 0.0f0)
 
     if !p.atmosphere || p.hydrology !== :full
-        return (Q_lat=ws.Q_lat_buf, Q_lat_air=ws.Q_lat_air_buf,
-            dq_eva=ws.dq_eva_buf, dq_rain=ws.dq_rain_buf)
+        return (Q_lat=ws.Q_lat, Q_lat_air=ws.Q_lat_air,
+            dq_eva=ws.dq_eva, dq_rain=ws.dq_rain)
     end
 
     z_topo = fields.z_topo
@@ -44,19 +44,19 @@ function hydro!(Ts, q, fields::ClimateFields, timestate, p::Processes, h::Resolv
     rain_limit = fields.rain_limit
     apply_rain_limit = h.rain === :rh
 
-    const_factor1 = _HYDRO_CONST_FACTOR1
-    const_factor2 = _HYDRO_CONST_FACTOR2
-    const_factor3 = _HYDRO_CONST_FACTOR3
-    gust_land = _HYDRO_GUST_LAND
-    gust_ocean = _HYDRO_GUST_OCEAN
-    cE_land = _HYDRO_CE_LAND
-    cE_ocean = _HYDRO_CE_OCEAN
-    const_latent = _HYDRO_CONST_LATENT
+    const_factor1 = _hydro_const_factor1
+    const_factor2 = _hydro_const_factor2
+    const_factor3 = _hydro_const_factor3
+    gust_land = _hydro_gust_land
+    gust_ocean = _hydro_gust_ocean
+    cE_land = _hydro_ce_land
+    cE_ocean = _hydro_ce_ocean
+    const_latent = _hydro_const_latent
 
-    Q_lat = ws.Q_lat_buf
-    Q_lat_air = ws.Q_lat_air_buf
-    dq_eva = ws.dq_eva_buf
-    dq_rain = ws.dq_rain_buf
+    Q_lat = ws.Q_lat
+    Q_lat_air = ws.Q_lat_air
+    dq_eva = ws.dq_eva
+    dq_rain = ws.dq_rain
 
     # Saturation humidity, relative humidity, evaporation, precipitation, the
     # optional rain-limit clamp, and water-vapor tendencies

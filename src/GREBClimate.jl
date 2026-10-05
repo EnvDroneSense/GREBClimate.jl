@@ -31,14 +31,11 @@ export SurfaceForcing, NoSurfaceForcing, BoundaryAnomaly, SSTOffset
 export RunSpec, CirculationWorkspace, MonthlyAccumulator, TimeState, MonthlyRecord
 export ClimateFields, ModelState, SurfaceState
 export greb_data_dir
-export read_jld2, load_solar_forcing_jld2, load_flux_corrections_jld2!, load_greb_jld2!
-export load_co2_scenario_jld2, load_custom_co2_scenario, load_cc_anomaly_jld2!, load_enso_anomaly_jld2!
-export init_model!, apply_co2_mask!, apply_dynamic_co2_mask!
-export SWradiation!, LWradiation!, hydro!, convergence!, seaice!, deep_ocean!
-export diffusion!, advection!, circulation!, tendencies!, forcing
-export diagnostics!, output!, time_loop!
+export load_climatology, load_flux_corrections!, load_boundary_anomaly!, read_field
+export load_co2_scenario, load_co2_custom, load_solar_forcing
+export apply_co2_mask!, apply_dynamic_co2_mask!, forcing
 export build_monthly_climatology, apply_scenario_anomalies, compute_annual_ice_climatology, global_mean
-export qflux_correction!, greb_model!, run_ensemble
+export greb_model!, run_ensemble
 export xdim, ydim, nstep_yr
 export step_of_year, day_of_year, month_of_step, decimal_year
 

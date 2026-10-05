@@ -19,11 +19,40 @@ Notable changes to GREBClimate.jl, following
 - `GREBClimate.RangeCheck()`: an observer that records the first step at which
   `Ts`, `Ta`, `To` or `q` leaves a physical range, for a run that diverges
   without going non-finite.
-- `load_greb_jld2!(dir; corrections = false)` loads a dataset without the
+- `load_climatology(dir; corrections = false)` loads a dataset without the
   stored flux corrections; the correction arrays stay zero.
 
 ### Changed
 
+- **Breaking:** the loaders no longer carry the file format in their names,
+  and the two anomaly loaders are one function that takes the source:
+
+  | Before | Now |
+  |---|---|
+  | `load_greb_jld2!(dir)` | `load_climatology(dir)` |
+  | `load_flux_corrections_jld2!(dir, fields)` | `load_flux_corrections!(dir, fields)` |
+  | `load_co2_scenario_jld2(dir, key)` | `load_co2_scenario(dir, key)` |
+  | `load_custom_co2_scenario(path)` | `load_co2_custom(path)` |
+  | `load_solar_forcing_jld2(dir, kind, index)` | `load_solar_forcing(dir, kind, index)` |
+  | `load_cc_anomaly_jld2!(dir, fields)` | `load_boundary_anomaly!(dir, fields, :cmip5_rcp85)` |
+  | `load_enso_anomaly_jld2!(dir, fields, event)` | `load_boundary_anomaly!(dir, fields, event)` |
+  | `read_jld2(path)` | `read_field(path)` |
+
+- **Breaking:** the `Processes` switches `vapour_diffusion` and
+  `vapour_advection` are `vapor_diffusion` and `vapor_advection`, the
+  spelling of every other name in the package.
+- **Breaking:** the fields of `CirculationWorkspace` have no `_buf` or `_out`
+  suffix: `ws.Q_lat_buf` is `ws.Q_lat`, `ws.precip_out` is `ws.precip`, and
+  so on for all 24.
+- **Breaking:** the kernels and loop functions are no longer exported, only
+  what a user calls is. `SWradiation!`, `LWradiation!`, `hydro!`,
+  `convergence!`, `seaice!`, `deep_ocean!`, `diffusion!`, `advection!`,
+  `circulation!`, `tendencies!`, `time_loop!`, `output!`, `diagnostics!`,
+  `qflux_correction!` and `init_model!` are reached as `GREBClimate.name`
+  or with `using GREBClimate: name`. Their names and behaviour are unchanged.
+- Internal constants that take part in the model's formulas are lower case
+  (`is_polar`, `polar_diff_time2`, `ΔT_air_factor`); capitals are kept for
+  the package's own settings and tables. No exported name is affected.
 - What a run and the loaders report goes through the logger (`@info`) and no
   longer through `println`: the lines carry an `[ Info:` prefix, go to
   standard error, and are silenced with
@@ -35,9 +64,9 @@ Notable changes to GREBClimate.jl, following
   year reads `spin-up year 1: ...`, and a run without a scenario no longer
   reports a scenario of 0 years.
 - **Breaking:** the RCP6.0 CO2 table is `CO2Table(:rcp60)`, the name of its
-  preset. `load_co2_scenario_jld2(dir, :rcp6)`, and so a `CO2Table(:rcp6)` run, raise an
+  preset. `load_co2_scenario(dir, :rcp6)`, and so a `CO2Table(:rcp6)` run, raise an
   `ArgumentError`. The `:rcp60` preset is unchanged.
-- `load_greb_jld2!` and `load_flux_corrections_jld2!` raise an `ArgumentError`
+- `load_climatology` and `load_flux_corrections!` raise an `ArgumentError`
   when `climatology/flux_corrections.jld2` or one of its three tables is
   missing. They used to fill the corrections with zeros and warn. For a
   dataset without the file, pass `corrections = false`.

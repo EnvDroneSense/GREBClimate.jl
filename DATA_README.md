@@ -84,7 +84,7 @@ All 3D fields are 96×48×730 (one year at 12-hour steps).
 | File | Content |
 |------|---------|
 | `Tsurf_flux_correction.bin` | Surface temperature correction (W/m²) |
-| `vapour_flux_correction.bin` | Water vapour correction (kg/m²/s) |
+| `vapour_flux_correction.bin` | Water vapor correction (kg/m²/s) |
 | `Tocean_flux_correction.bin` | Deep-ocean correction (W/m²) |
 
 **Anomaly forcing** (only for the experiments named)

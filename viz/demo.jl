@@ -9,7 +9,7 @@ using .GREBViz
 
 outdir = mkpath(get(ARGS, 1, joinpath(tempdir(), "greb_viz_demo")))
 dir = greb_data_dir(allow_download=false)
-fields = load_greb_jld2!(dir; dataset=:ncep)
+fields = load_climatology(dir; dataset=:ncep)
 
 @info "running GREB (3 yr flux spin-up, 5 yr control, 15 yr 2xCO2 scenario)"
 res = Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do

@@ -24,6 +24,7 @@
 # dependency of the package.
 
 using GREBClimate
+using GREBClimate: tendencies!, time_loop!, init_model!
 using Dates
 using Printf
 using Profile
@@ -366,7 +367,7 @@ collector to clear inside the profiled run.
 function workload(jld2_dir::AbstractString)
     isdir(jld2_dir) || error("JLD2 data directory not found: $jld2_dir. Set GREB_DATA or pass a path.")
     cfg = preset(:full_model; corrections=Stored())
-    fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
+    fields = load_climatology(jld2_dir; dataset=:ncep)
     quiet() do
         greb_model!(RunSpec(ctrl=1, scnr=0), cfg; jld2_dir=jld2_dir, fields=fields)
     end

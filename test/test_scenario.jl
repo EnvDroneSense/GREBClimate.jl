@@ -70,8 +70,8 @@ end
 @testset "SeasonalCO2 season is half the year, from 1 October" begin
     r = resolve(Config(scenario=Scenario(co2=SeasonalCO2(680, 340, :boreal_winter))))
     co2(step) = GREBClimate.forcing(step, 1950, r).CO2
-    @test GREBClimate._WINTER_FIRST_STEP == GREBClimate.first_step_of(10, 1) == 547
-    @test GREBClimate._WINTER_LAST_STEP == GREBClimate.first_step_of(4, 1) == 181
+    @test GREBClimate._winter_first_step == GREBClimate.first_step_of(10, 1) == 547
+    @test GREBClimate._winter_last_step == GREBClimate.first_step_of(4, 1) == 181
     @test co2.([1, 181, 182, 546, 547, 730]) == Float32[680, 680, 340, 340, 680, 680]
     @test count(==(680.0f0), co2.(1:nstep_yr)) == nstep_yr ÷ 2
     @test co2(731) == 680.0f0     # the second year starts in winter again

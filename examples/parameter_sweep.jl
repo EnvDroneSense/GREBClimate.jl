@@ -42,7 +42,7 @@ function parameter_sweep(jld2_dir::AbstractString;
     end
 
     println("Loading GREB dataset from: ", jld2_dir)
-    fields_template = load_greb_jld2!(jld2_dir; dataset=:ncep)
+    fields_template = load_climatology(jld2_dir; dataset=:ncep)
 
     scnr >= 12 || throw(ArgumentError("scnr must be >= 12 to take a final-year mean, got $scnr"))
 

@@ -83,7 +83,7 @@ The model reads a ~439 MB JLD2 dataset of climatologies, flux corrections and fo
 using GREBClimate
 
 dir    = greb_data_dir()
-fields = load_greb_jld2!(dir; dataset=:ncep)            # returns the data; pass it on
+fields = load_climatology(dir; dataset=:ncep)            # returns the data; pass it on
 cfg    = preset(:co2_double)                            # preset_names() lists them all
 result = greb_model!(RunSpec(ctrl=5, scnr=15), cfg; jld2_dir=dir, fields=fields)
 ```
@@ -103,7 +103,7 @@ A run has three phases, in years:
 | Component | What it does |
 |:----------|:-------------|
 | Shortwave radiation | Absorbed sunlight, with ice-albedo feedback and climatological clouds |
-| Longwave radiation | Emission and back-radiation; emissivity from CO₂, water vapour and clouds (the greenhouse effect) |
+| Longwave radiation | Emission and back-radiation; emissivity from CO₂, water vapor and clouds (the greenhouse effect) |
 | Hydrology | Evaporation, precipitation and latent heat |
 | Atmospheric transport | Diffusion and advection of heat and moisture by climatological winds (~93% of run time) |
 | Ocean | Mixed-layer heat content, exchange with the deep ocean, and sea ice |

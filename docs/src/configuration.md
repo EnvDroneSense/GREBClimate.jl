@@ -62,7 +62,7 @@ recompute the corrections for each configuration and pull every one back to
 the observed climate. `:decon_2xco2` is the 2×CO₂-response deconstruction.
 Both run the MSCM physics (`mscm_hydrology()`, no moisture convergence), which
 the deconstruction switches were designed for: with the default hydrology some
-switches make the run diverge, for example `vapour_diffusion = false` on the
+switches make the run diverge, for example `vapor_diffusion = false` on the
 stored corrections or `humidity = :uniform`.
 
 ## Writing a scenario from parts

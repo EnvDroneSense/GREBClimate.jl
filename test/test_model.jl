@@ -171,12 +171,12 @@ end
     with_tempdir() do dir
         write_ipcc_scenarios(dir, Dict(on_disk(p) => Dict(1950 => co2) for (p, co2) in expected))
         for (p, co2) in expected
-            @test isapprox(load_co2_scenario_jld2(dir, key(p))[1950], co2; atol = 1e-3)
+            @test isapprox(load_co2_scenario(dir, key(p))[1950], co2; atol = 1e-3)
         end
 
         # The table's name is :rcp60; the dataset's own key is not accepted
         @test key(:rcp60) === :rcp60
-        @test_throws ArgumentError load_co2_scenario_jld2(dir, :rcp6)
+        @test_throws ArgumentError load_co2_scenario(dir, :rcp6)
 
         # The scenario runs on the table's value
         @test at_first_step(v -> v.CO2, RunSpec(ctrl = 0, scnr = 1),
@@ -190,13 +190,13 @@ end
         write(co2_path, "# comment line, should be skipped\n1950 300.0\n1951 301.0\n\n")
 
         # The parser is the thing under test - assert it directly.
-        @test load_custom_co2_scenario(co2_path) == Dict(1950 => 300.0, 1951 => 301.0)
+        @test load_co2_custom(co2_path) == Dict(1950 => 300.0, 1951 => 301.0)
 
         # A malformed line must raise without leaving the file open: on
         # Windows an open handle makes the rm below fail.
         bad_path = joinpath(dir, "bad_co2.txt")
         write(bad_path, "1950 300.0\n1951\n")
-        @test_throws ErrorException load_custom_co2_scenario(bad_path)
+        @test_throws ErrorException load_co2_custom(bad_path)
         rm(bad_path)
         @test !isfile(bad_path)
 
@@ -215,13 +215,13 @@ end
         write_solar_scenarios(dir)
         # The loader is the mechanism; assert all three tables directly.
         for kind in (:paleo, :obliquity, :eccentricity)
-            table = load_solar_forcing_jld2(dir, kind, 0)
+            table = load_solar_forcing(dir, kind, 0)
             @test size(table) == (Y, N)
             @test all(==(999.0f0), table)
         end
         # An orbital index that is not in the table
-        @test_throws ArgumentError load_solar_forcing_jld2(dir, :obliquity, 7)
-        @test_throws ArgumentError load_solar_forcing_jld2(dir, :eccentricity, 7)
+        @test_throws ArgumentError load_solar_forcing(dir, :obliquity, 7)
+        @test_throws ArgumentError load_solar_forcing(dir, :eccentricity, 7)
 
         cfg = preset(:obliquity; index = 0, corrections = NoCorrections())
         @test all(==(999.0f0), at_first_step(v -> copy(v.fields.sw_solar), RunSpec(ctrl = 0, scnr = 1), cfg; jld2_dir = dir))
@@ -300,7 +300,7 @@ end
         end
 
         fields = ClimateFields()
-        load_cc_anomaly_jld2!(tmpdir_anom, fields)
+        load_boundary_anomaly!(tmpdir_anom, fields, :cmip5_rcp85)
         @test all(==(2.0), fields.Tclim_anom_cc)
         @test all(==(3.0), fields.uclim_anom_cc)
         @test all(==(4.0), fields.vclim_anom_cc)
@@ -316,7 +316,7 @@ end
 
         for (sym, suffix) in ((:elnino, "elnino"), (:lanina, "lanina"))
             fields2 = ClimateFields()
-            load_enso_anomaly_jld2!(tmpdir_anom, fields2, sym)
+            load_boundary_anomaly!(tmpdir_anom, fields2, sym)
             @test all(==(7.0), fields2.Tclim_anom_enso)
             @test all(==(8.0), fields2.uclim_anom_enso)
             @test all(==(9.0), fields2.vclim_anom_enso)
@@ -362,7 +362,8 @@ end
 
         # A missing required file must error loudly, not silently zero.
         rm(joinpath(clim_dir, "cmip5.tsurf.rcp85.ensmean.forcing.jld2"))
-        @test_throws ErrorException load_cc_anomaly_jld2!(tmpdir_anom, ClimateFields())
+        @test_throws ErrorException load_boundary_anomaly!(tmpdir_anom, ClimateFields(), :cmip5_rcp85)
+        @test_throws ArgumentError load_boundary_anomaly!(tmpdir_anom, ClimateFields(), :neutral)
     finally
         rm(tmpdir_anom; recursive = true, force = true)
     end
