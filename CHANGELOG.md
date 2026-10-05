@@ -21,6 +21,8 @@ Notable changes to GREBClimate.jl, following
   longer through `println`: the lines carry an `[ Info:` prefix, go to
   standard error, and are silenced with
   `with_logger(NullLogger())` instead of `redirect_stdout(devnull)`.
+- The precompile workload runs a scenario year as well as a control year, so
+  the first scenario run of a session compiles less.
 - The yearly line names what it shows:
   `1970: Ts global mean 13.82 °C; 178 E 9 N 26.79; 58 E 51 N 4.85`.
 - **Breaking:** the RCP6.0 CO2 table is `CO2Table(:rcp60)`, the name of its

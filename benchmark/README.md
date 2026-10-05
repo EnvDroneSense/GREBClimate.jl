@@ -28,6 +28,17 @@ Example: `julia --project=. -t 2,0 benchmark/run_benchmarks.jl years --ctrl=10 -
 | Compare variants in one process | Compile both, interleave the trials, shuffle the order each trial, and time a second copy of the baseline as a control. If the control is not about 1.00x, discard the run |
 | Do not record test-suite timings as benchmark results | Assertion counts are stable; wall-clock times are not |
 
+`year`, `years` and `stages` print the machine state before and after: the
+processor load, the power source, and a fixed calibration loop compared with
+the best time this machine has given for it (kept in
+`benchmark/profiles/calibration.txt`, which is gitignored). A run is marked
+NOISY when the calibration loop is more than 5 % off the best, or when the
+median of the runs is more than 5 % above their minimum; do not quote a
+noisy run.
+
+`stages` gives shares of its six calls, not of a step. For the shares of a
+whole run, including what `stages` leaves out, use the `step` profile below.
+
 This harness times one variant per run. It is a quick check and a source of
 per-stage shares, not a measurement protocol: a claimed speed-up needs the
 same-process comparison above.

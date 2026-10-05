@@ -31,7 +31,7 @@ The data directory is the next positional argument (default `../greb_input_data`
 | `-t 3`, `-t 4` | 0.87-1.00x; never help on this grid |
 | Allocations per `tendencies!` | 0 bytes |
 
-Check which regime the machine is in (`tasklist`) before judging a `year` reading: 0.6 s is normal under load, and 0.3 s is not a speedup if the load was simply lighter.
+`year`, `years` and `stages` print the machine state themselves: processor load, power source, and a calibration loop against the best time seen on this machine. A run they mark NOISY is not quoted. On battery a `year` reads about 1.4 s (2026-10-05), so check the power line first: 0.6 s is normal under load on mains, and 0.3 s is not a speedup if the load was simply lighter.
 
 ## Steps
 

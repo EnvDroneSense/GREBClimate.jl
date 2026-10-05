@@ -27,6 +27,7 @@ function time_1yr(jld2_dir::AbstractString; cfg=preset(:full_model; corrections=
     reps >= 1 || throw(ArgumentError("reps must be at least 1, got $reps"))
 
     println("Threads.nthreads() = ", Threads.nthreads())
+    calibration = machine_header()
     fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
 
     # Warm-up, so compilation is not timed.
@@ -46,6 +47,7 @@ function time_1yr(jld2_dir::AbstractString; cfg=preset(:full_model; corrections=
 
     println("mean: ", round(sum(times) / length(times), digits=3), " s  ",
         "(min ", round(minimum(times), digits=3), "s, max ", round(maximum(times), digits=3), "s)")
+    machine_footer(calibration, times)
     return times
 end
 
@@ -68,6 +70,7 @@ function time_years(jld2_dir::AbstractString; experiment::Symbol=:full_model,
 
     println("Threads.nthreads() = ", Threads.nthreads())
     println("ctrl=$ctrl scnr=$scnr ($total_years simulated years/rep), experiment=$experiment")
+    calibration = machine_header()
     cfg = preset(experiment; corrections=Stored())  # no spin-up, as in time_1yr
     fields = load_greb_jld2!(jld2_dir; dataset=:ncep)
 
@@ -91,6 +94,7 @@ function time_years(jld2_dir::AbstractString; experiment::Symbol=:full_model,
     println("mean: ", round(mean_t, digits=3), " s  ",
         "(min ", round(minimum(times), digits=3), "s, max ", round(maximum(times), digits=3), "s)  ",
         "= ", round(mean_t / total_years, digits=3), " s/simulated year over ", total_years, " years")
+    machine_footer(calibration, times)
     return times
 end
 
@@ -125,6 +129,7 @@ function time_stages(jld2_dir::AbstractString; cfg=preset(:full_model), reps::In
     for (_, f) in stages
         f()
     end
+    calibration = machine_header()
 
     println("Per-stage timing (", reps, " calls each, single workspace, ",
         Threads.nthreads(), " thread(s) available but unused here):")
@@ -143,8 +148,10 @@ function time_stages(jld2_dir::AbstractString; cfg=preset(:full_model), reps::In
             round(share, digits=1), "% of measured total)")
     end
     println("  measured total (sum of stages): ", round(total * 1e6, digits=1), " µs")
-    println("  (convergence! is inside circulation!(q); seaice!/output!/diagnostics!")
-    println("   and the tendency assembly are not measured - see time_1yr for whole-model cost)")
+    println("  (convergence! is inside circulation!(q). The shares are of these six calls, not of")
+    println("   a step: seaice!, the update loop, output! and diagnostics! are not timed. For shares")
+    println("   of a whole run use benchmark/profile.jl step)")
+    machine_footer(calibration)
     return results
 end
 
