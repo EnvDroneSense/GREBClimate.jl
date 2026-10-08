@@ -40,6 +40,8 @@ Notable changes to GREBClimate.jl, following
   arrays for one source at a time; `anom_cc_source` and `anom_enso_source`
   become `boundary_anomaly_source`. A `ClimateFields` is 135 MB smaller, also
   per ensemble member. Results are unchanged.
+- `run_ensemble` no longer keeps the copies of the fields alive after it returns:
+  a session held 2 to 3 GiB more than it needed. Results are unchanged.
 - Internal calendar constants are written out: `ndt_days`, `ndays_yr`,
   `cjday_mon` and `jday_mon_cumsum` are `steps_per_day`, `days_per_year`,
   `days_in_month` and `last_day_of_month`.

@@ -51,17 +51,26 @@ function run_ensemble(reduce, run::RunSpec, configs; fields::ClimateFields, jld2
     end
 
     results = Vector{Any}(undef, length(members))
-    @sync for (i, config) in enumerate(members)
-        Threads.@spawn begin
-            member_fields = take!(pool)
-            try
-                results[i] = with_logger(logger) do
-                    reduce(greb_model!(run, config; jld2_dir, fields=member_fields, kwargs...))
+    try
+        @sync for (i, config) in enumerate(members)
+            Threads.@spawn begin
+                member_fields = take!(pool)
+                try
+                    results[i] = with_logger(logger) do
+                        reduce(greb_model!(run, config; jld2_dir, fields=member_fields, kwargs...))
+                    end
+                finally
+                    put!(pool, member_fields)
                 end
-            finally
-                put!(pool, member_fields)
             end
         end
+    finally
+        # The finished tasks stay reachable for a while and hold the pool;
+        # emptying it lets the copies be collected when the call returns.
+        while isready(pool)
+            take!(pool)
+        end
+        close(pool)
     end
     return map(identity, results)   # narrows the element type
 end
