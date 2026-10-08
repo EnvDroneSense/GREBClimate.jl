@@ -19,9 +19,9 @@ end
 # ╔═╡ 5f08d8d1-c39d-4bb4-bead-7133854f0715
 begin
     import Pkg
-    Pkg.activate(joinpath(@__DIR__, "..", "viz"))
+    Pkg.activate(joinpath(@__DIR__, ".."))
     using Plots, PlutoUI, GREBClimate
-    include(joinpath(@__DIR__, "..", "viz", "GREBViz.jl"))
+    include(joinpath(@__DIR__, "..", "GREBViz.jl"))
     using .GREBViz
     gr()
     md"*environment ready*"

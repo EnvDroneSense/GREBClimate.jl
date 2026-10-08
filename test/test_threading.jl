@@ -10,11 +10,7 @@
         using Test
         include(raw"$(utils)")
         cfg = preset(:full_model; corrections = NoCorrections())
-        result = quiet() do
-            greb_model!(RunSpec(ctrl = 1, scnr = 0), cfg;
-                        jld2_dir = "", fields = synthetic_fields(),
-                        allow_uninitialized = true)
-        end
+        result = run_synthetic(RunSpec(ctrl = 1, scnr = 0), cfg)
         print(Threads.nthreads())
         for rec in result.ctrl
             print(" ", gmean(rec.Ts), " ", gmean(rec.Ta), " ", gmean(rec.q))

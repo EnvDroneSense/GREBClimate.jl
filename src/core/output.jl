@@ -1,21 +1,19 @@
-# What the annual summary line of a spin-up year shows in place of a calendar year
-struct _SpinUpYear
-    n::Int
-end
-Base.show(io::IO, y::_SpinUpYear) = print(io, "spin-up year ", y.n)
+# How the annual summary line names the year: the spin-up counts its years from 1
+_year_label(t::ModelTime) =
+    t.phase === spinup ? "spin-up year $(year(t) - t.start_year + 1)" : string(year(t))
 
 # The two cells of the annual summary line: label, longitude index, latitude index
 const _SAMPLE_CELLS = (("178 E 9 N", 48, 27), ("58 E 51 N", 16, 38))
 
 """
-    diagnostics!(year, surf::SurfaceState, state, timestate)
+    diagnostics!(t::ModelTime, surf::SurfaceState, state)
 
 Accumulates the current timestep into `state`'s annual-mean buffers; at the
 last timestep of the year, averages them, logs the annual summary line
 (the area-weighted global mean and two sample cells, in °C) with `@info`, and
 resets the accumulators for the next year.
 """
-function diagnostics!(year, surf::SurfaceState, state::ModelState, timestate)
+function diagnostics!(t::ModelTime, surf::SurfaceState, state::ModelState)
     # Accumulate
     Ts_annual_mean = state.Ts_annual_mean
     Ts = surf.Ts
@@ -26,7 +24,7 @@ function diagnostics!(year, surf::SurfaceState, state::ModelState, timestate)
         end
     end
 
-    if timestate.ityr == nstep_yr
+    if is_year_end(t)
         # Compute annual means
         n = nstep_yr
         state.Ts_annual_mean ./= n
@@ -34,7 +32,7 @@ function diagnostics!(year, surf::SurfaceState, state::ModelState, timestate)
         # Annual-mean surface temperature (°C): global mean and the two sample cells
         celsius(T) = round(T - 273.15; digits=2)
         cells = join(("$label $(celsius(state.Ts_annual_mean[i, j]))" for (label, i, j) in _SAMPLE_CELLS), "; ")
-        @info "$year: Ts global mean $(celsius(global_mean(state.Ts_annual_mean))) °C; $cells"
+        @info "$(_year_label(t)): Ts global mean $(celsius(global_mean(state.Ts_annual_mean))) °C; $cells"
 
         # Reset accumulators
         fill!(state.Ts_annual_mean, 0.0f0)
@@ -43,80 +41,55 @@ function diagnostics!(year, surf::SurfaceState, state::ModelState, timestate)
 end
 
 """
-    output!(it, irec, mon, surf::SurfaceState, tend, ws, output_buf, acc, timestate)
+    output!(t::ModelTime, surf::SurfaceState, tend, ws, output_buf, times, acc)
 
-Accumulates the current timestep into `acc`; on the last timestep of `mon`,
-pushes a monthly-mean [`MonthlyRecord`](@ref) onto `output_buf`, resets `acc`,
-and advances to the next month. Returns `(mon, irec)`. `tend` is the
+Accumulates the current timestep into `acc`; on the last timestep of a month,
+pushes the monthly-mean [`MonthlyRecord`](@ref) onto `output_buf` and its
+[`RecordTime`](@ref) onto `times`, and resets `acc`. `tend` is the
 `NamedTuple` [`tendencies!`](@ref) returns; `ws.precip`/`evap`/
 `qcrcl` hold this step's converted precipitation/evaporation/moisture-
 circulation output.
 """
-function output!(it, irec, mon, surf::SurfaceState, tend, ws::ModelWorkspace,
-    output_buf::Vector{MonthlyRecord}, acc::MonthlyAccumulator, timestate)
-    mon = clamp(mon, 1, months_per_year)
+function output!(t::ModelTime, surf::SurfaceState, tend, ws::ModelWorkspace,
+    output_buf::Vector{MonthlyRecord}, times::Vector{RecordTime}, acc::MonthlyAccumulator)
+    accumulate!(acc, surf, tend, ws)
 
-    accumulate!(acc, surf.Ts, surf.Ta, surf.To, surf.q, tend.albedo, tend.ice_cover,
-        ws.precip, ws.evap, ws.qcrcl, tend.SW, tend.LW_surf, tend.Q_lat, tend.Q_sens,
-        tend.LW_up, tend.LW_down, tend.em)
-
-    # ----- Check end of month -----
-    if timestate.jday == jday_mon_cumsum[mon] && is_day_end(it)
-        ndm = steps_in_month(mon)
-        irec += 1
-        push!(output_buf, (
-            Ts=acc.Tmm ./ ndm,
-            Ta=acc.Tamm ./ ndm,
-            To=acc.Tomm ./ ndm,
-            q=acc.qmm ./ ndm,
-            albedo=acc.apmm ./ ndm,
-            ice=acc.icemm ./ ndm,
-            precip=acc.precipmm ./ ndm,
-            evap=acc.evapmm ./ ndm,
-            qcrcl=acc.qcrclmm ./ ndm,
-            sw=acc.swmm ./ ndm,
-            lw=acc.lwmm ./ ndm,
-            qlat=acc.qlatmm ./ ndm,
-            qsens=acc.qsensmm ./ ndm,
-            olr=acc.olrmm ./ ndm,
-            lwdown=acc.lwdownmm ./ ndm
-        ))
+    if is_month_end(t)
+        push!(output_buf, monthly_means(acc, steps_in_month(month(t))))
+        push!(times, (year=year(t), month=month(t)))
         reset!(acc)
-        mon = mod(mon, months_per_year) + 1
     end
-    return (mon=mon, irec=irec)
+    return nothing
 end
 
 """
-    time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf, fields, state, ws, acc, timestate, r::ResolvedConfig;
-               ws_a=ws, ws_q=ws, observer=nothing, phase=:ctrl)
+    time_loop!(t::ModelTime, CO2, Ts, Ta, q, To, output_buf, times, fields, state, ws, acc, r::ResolvedConfig;
+               ws_a=ws, ws_q=ws, observer=nothing)
 
-One full model timestep: computes [`tendencies!`](@ref), integrates
-`Ts`/`Ta`/`To`/`q` forward with flux corrections applied, runs
+One full model timestep at time `t`: computes [`tendencies!`](@ref),
+integrates `Ts`/`Ta`/`To`/`q` forward with flux corrections applied, runs
 [`seaice!`](@ref), then dispatches to [`output!`](@ref) and
-[`diagnostics!`](@ref). Returns `(mon, irec)`. `ws_a`/`ws_q` are forwarded to
+[`diagnostics!`](@ref). `ws_a`/`ws_q` are forwarded to
 [`tendencies!`](@ref) - see its docstring for the opt-in threading they
 enable. `observer` is called before and after the update (see
-[`greb_model!`](@ref)); `phase` is passed on to it.
+[`greb_model!`](@ref)).
 """
-function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
+function time_loop!(t::ModelTime, CO2, Ts, Ta, q, To, output_buf, times,
     fields::ClimateFields, state::ModelState, ws::ModelWorkspace, acc::MonthlyAccumulator,
-    timestate, r::ResolvedConfig; ws_a::ModelWorkspace=ws, ws_q::ModelWorkspace=ws,
-    observer=nothing, phase::Symbol=:ctrl)
-    timestate.jday = day_of_year(it)
-    timestate.ityr = step_of_year(it)
-    ityr = timestate.ityr
+    r::ResolvedConfig; ws_a::ModelWorkspace=ws, ws_q::ModelWorkspace=ws,
+    observer=nothing)
+    slice = data_slice(t)
 
     # Compute tendencies
-    tend = tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, timestate, r; ws_a=ws_a, ws_q=ws_q)
+    tend = tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, slice, r; ws_a=ws_a, ws_q=ws_q)
 
     observer === nothing ||
-        observer(:after_tendencies, _step_view(phase, it, year, ityr, CO2, Ts, Ta, To, q, tend, fields, r))
+        observer(:after_tendencies, _step_view(t, CO2, Ts, Ta, To, q, tend, fields, r))
 
     # Correction views
-    TF_corr = @view fields.Ts_flux_correction[:, :, ityr]
-    qF_corr = @view fields.q_flux_correction[:, :, ityr]
-    ToF_corr = @view fields.To_flux_correction[:, :, ityr]
+    TF_corr = clim_slice(fields.Ts_flux_correction, slice)
+    qF_corr = clim_slice(fields.q_flux_correction, slice)
+    ToF_corr = clim_slice(fields.To_flux_correction, slice)
     cap_surf = fields.cap_surf
     wz_vapor = fields.wz_vapor
 
@@ -156,15 +129,15 @@ function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
     end
 
     # Sea ice heat capacity
-    seaice!(Ts, fields, timestate, r.config.processes)
+    seaice!(Ts, fields, slice, r.config.processes)
 
     observer === nothing ||
-        observer(:after_step, _step_view(phase, it, year, ityr, CO2, Ts, Ta, To, q, tend, fields, r))
+        observer(:after_step, _step_view(t, CO2, Ts, Ta, To, q, tend, fields, r))
 
     # Output and diagnostics
     surf = SurfaceState(Ts, Ta, To, q)
-    (; mon, irec) = output!(it, irec, mon, surf, tend, ws, output_buf, acc, timestate)
-    diagnostics!(year, surf, state, timestate)
+    output!(t, surf, tend, ws, output_buf, times, acc)
+    diagnostics!(t, surf, state)
 
-    return (mon=mon, irec=irec)
+    return nothing
 end

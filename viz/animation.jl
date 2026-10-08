@@ -33,12 +33,19 @@ Frames of `var` for each run of a `greb_model!` result (or a record vector), per
 month or per whole year (`step=:year`).
 """
 function evolution(x; var::Symbol=:Ts, step::Symbol=:month)
-    panels = map(runs(x)) do (t, recs, anom)
-        f = map_frames(recs, var; step=step)
+    panels = map(runs(x)) do (t, recs, anom, times, dated)
+        f = map_frames(recs, var; step=step, times=times)
         isempty(f) && error("run '$t' has no whole $step to show")
-        (title=t, frames=f, anom=anom, clims=Float64.(frame_limits(f, anom)))
+        when = step === :year ? [(year=times[first(b)].year, month=0) for b in yearblocks(times)] : times
+        (title=t, frames=f, anom=anom, clims=Float64.(frame_limits(f, anom)), labels=frame_label.(when, dated))
     end
     Evolution(var, step, panels)
+end
+
+# "Jul 1950" or "1950" for a dated run; "Jul, year 2" or "year 2" for records counted from year 1
+function frame_label(time, dated::Bool)
+    year = dated ? string(time.year) : "year $(time.year)"
+    time.month == 0 ? year : MONTH_ABBR[time.month] * (dated ? " " : ", ") * year
 end
 
 "Frames in the longest run."
@@ -54,9 +61,8 @@ function evolution_frame(ev::Evolution, i::Integer; fields=nothing)
     panels = map(ev.panels) do p
         n = length(p.frames)
         k = mod1(i, n)
-        when = ev.step === :year ? "year $k" : "$(MONTH_ABBR[mod1(k, 12)]), year $(cld(k, 12))"
         geomap(p.frames[k]; fields=fields, c=p.anom ? :balance : :viridis, clims=p.clims,
-               title=lstrip("$(p.title): $when  ($k/$n)", [':', ' ']), titlefontsize=10,
+               title=lstrip("$(p.title): $(p.labels[k])  ($k/$n)", [':', ' ']), titlefontsize=10,
                colorbar_title=unitlabel(ev.var))
     end
     length(panels) == 1 ? only(panels) :

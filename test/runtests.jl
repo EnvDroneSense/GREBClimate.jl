@@ -6,34 +6,23 @@ using GREBClimate: SWradiation!, LWradiation!, hydro!, convergence!, seaice!, de
 using Test
 
 include(joinpath("support", "testutils.jl"))
+include(joinpath("support", "selection.jl"))
 
-# One file per subject; `SHARD` decides which CI job runs each. Set
-# GREB_TEST_SHARD=light|heavy to run one group; unset (or "all") runs
-# everything. Shards are grouped by measured runtime: heavy is the greb_model!
-# integration suite, the golden regression and Aqua; light is the rest.
-const SHARD = [
-    ("test_config.jl",     "light"),
-    ("test_calendar.jl",   "light"),
-    ("test_presets.jl",    "light"),
-    ("test_processes.jl",  "light"),
-    ("test_scenario.jl",   "light"),
-    ("test_state.jl",      "light"),
-    ("test_output.jl",     "light"),
-    ("test_budgets.jl",    "light"),
-    ("test_physics.jl",    "light"),
-    ("test_io.jl",         "light"),
-    ("test_invariants.jl", "light"),
-    ("test_threading.jl",  "light"),
-    ("test_model.jl",      "heavy"),
-    ("test_ensemble.jl",   "heavy"),
-    ("test_golden.jl",     "heavy"),
-    ("test_aqua.jl",       "heavy"),
-]
+# One file per subject; `SHARD` (support/selection.jl) lists them. A file not
+# listed there is never run. Select a subset, most specific first:
+#   Pkg.test(test_args = ["state", "io"])  or  GREB_TEST_FILES=state,io
+#   GREB_TEST_TIER=smoke|standard|full     (cumulative)
+#   GREB_TEST_SHARD=light|heavy            (what CI runs)
+# Unset means everything, which is the pre-commit gate. A subset run proves
+# only the files it ran.
+selected = select_tests(;
+    names = isempty(ARGS) ? filter(!isempty, split(get(ENV, "GREB_TEST_FILES", ""), ',')) : ARGS,
+    tier = get(ENV, "GREB_TEST_TIER", ""),
+    shard = get(ENV, "GREB_TEST_SHARD", "all"),
+)
 
-shard = get(ENV, "GREB_TEST_SHARD", "all")
 @testset "GREBClimate.jl" begin
-    for (file, group) in SHARD
-        (shard == "all" || shard == group) || continue
+    for file in selected
         include(file)
     end
 end

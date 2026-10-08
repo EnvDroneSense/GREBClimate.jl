@@ -10,28 +10,28 @@ function _budget_run(; steps, setup! = (Ts, Ta, q, To, fields) -> nothing, confi
     Ts, Ta, q, To = copy(ini.Ts_ini), copy(ini.Ta_ini), copy(ini.q_ini), copy(ini.To_ini)
     setup!(Ts, Ta, q, To, fields)
     check = GREBClimate.BudgetCheck()
-    state, ws, acc, ts = ModelState(), ModelWorkspace(), MonthlyAccumulator(), TimeState(1, 1)
-    mon, irec = 1, 0
+    state, ws, acc = ModelState(), ModelWorkspace(), MonthlyAccumulator()
     quiet() do
-        for it in 1:steps
-            (mon, irec) = time_loop!(it, 1970, ini.CO2_ctrl, mon, irec, Ts, Ta, q, To, MonthlyRecord[],
-                                     fields, state, ws, acc, ts, r; observer = check)
+        for step in 1:steps
+            time_loop!(control_time(step), ini.CO2_ctrl, Ts, Ta, q, To, MonthlyRecord[], GREBClimate.RecordTime[],
+                       fields, state, ws, acc, r; observer = check)
         end
     end
     return check
 end
 
 @testset "greb_model! calls the observer before and after every step's update" begin
-    calls = Tuple{Symbol,Symbol}[]
+    calls = Tuple{GREBClimate.Phase,Symbol}[]
     its = Int[]
-    observer = (point, view) -> (push!(calls, (view.phase, point)); push!(its, view.it))
-    quiet() do
-        greb_model!(RunSpec(ctrl = 1, scnr = 1), preset(:full_model; corrections = NoCorrections());
-                    fields = synthetic_fields(), allow_uninitialized = true, observer = observer)
-    end
+    times = ModelTime[]
+    observer = (point, view) -> (push!(calls, (view.phase, point)); push!(its, view.step); push!(times, view.time))
+    run_synthetic(RunSpec(ctrl = 1, scnr = 1), preset(:full_model; corrections = NoCorrections()); observer)
     step = [:after_tendencies, :after_step]
-    @test calls == [(phase, point) for phase in (:ctrl, :scnr) for _ in 1:N for point in step]
+    @test calls == [(phase, point) for phase in (GREBClimate.control, GREBClimate.scenario) for _ in 1:N for point in step]
     @test its == [it for _ in 1:2 for it in 1:N for _ in 1:2]
+    # The view's time is the value the step ran at; the scenario starts in its own year
+    @test first(times) === ModelTime(GREBClimate.control, 1970, 1)
+    @test last(times) === ModelTime(GREBClimate.scenario, 1950, N)
 end
 
 @testset "the observer sees the state before the update, then after it" begin
@@ -41,9 +41,9 @@ end
     Ts = copy(ini.Ts_ini)
     seen = Dict{Symbol,Matrix{Float32}}()
     quiet() do
-        time_loop!(1, 1970, ini.CO2_ctrl, 1, 0, Ts, copy(ini.Ta_ini), copy(ini.q_ini), copy(ini.To_ini),
-                   MonthlyRecord[], fields, ModelState(), ModelWorkspace(), MonthlyAccumulator(),
-                   TimeState(1, 1), r; observer = (point, view) -> (seen[point] = copy(view.Ts)))
+        time_loop!(control_time(), ini.CO2_ctrl, Ts, copy(ini.Ta_ini), copy(ini.q_ini), copy(ini.To_ini),
+                   MonthlyRecord[], GREBClimate.RecordTime[], fields, ModelState(), ModelWorkspace(), MonthlyAccumulator(),
+                   r; observer = (point, view) -> (seen[point] = copy(view.Ts)))
     end
     @test seen[:after_tendencies] == ini.Ts_ini
     @test seen[:after_step] == Ts
@@ -92,8 +92,8 @@ end
 @testset "RangeCheck: the first step outside the physical range is recorded" begin
     G = GREBClimate
     field(v) = fill(Float32(v), X, Y)
-    view(it; Ts = 280, Ta = 270, To = 285, q = 0.005) =
-        (; phase = :ctrl, it, year = 1950, Ts = field(Ts), Ta = field(Ta), To = field(To), q = field(q))
+    view(step; Ts = 280, Ta = 270, To = 285, q = 0.005) =
+        (; phase = G.control, step, year = 1950, Ts = field(Ts), Ta = field(Ta), To = field(To), q = field(q))
 
     check = G.RangeCheck()
     check(:after_tendencies, view(1; Ts = 1e24))     # only the state after the step is checked
@@ -109,7 +109,7 @@ end
     check(:after_step, runaway)
     check(:after_step, view(4; q = -1))
     @test !G.in_range(check)
-    @test check.first == (phase = :ctrl, it = 3, year = 1950, field = :Ts, value = 1.0f24)
+    @test check.first == (phase = G.control, step = 3, year = 1950, field = :Ts, value = 1.0f24)
     @test check.seen.q[1] == -1.0f0
 
     # A NaN is outside; limits can be set
@@ -122,9 +122,6 @@ end
 
     # In a run it sees every step of the control and the scenario
     seen = G.RangeCheck(Ts = (-Inf, Inf), Ta = (-Inf, Inf), To = (-Inf, Inf), q = (-Inf, Inf))
-    quiet() do
-        greb_model!(RunSpec(ctrl = 1, scnr = 1), preset(:full_model; corrections = NoCorrections());
-                    fields = synthetic_fields(), allow_uninitialized = true, observer = seen)
-    end
+    run_synthetic(RunSpec(ctrl = 1, scnr = 1), preset(:full_model; corrections = NoCorrections()); observer = seen)
     @test seen.steps == 2N
 end

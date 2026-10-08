@@ -2,61 +2,62 @@
 # applies.
 
 """
-    forcing(it, year, r::ResolvedConfig) -> (CO2, sw_solar_forcing)
+    forcing(t::ModelTime, r::ResolvedConfig) -> (CO2, sw_solar_forcing)
 
-The scenario's CO2 (ppm) and solar multiplier at scenario step `it` in
-calendar `year`, from its [`CO2Path`](@ref) and [`Solar`](@ref) parts. CO2 is
+The scenario's CO2 (ppm) and solar multiplier at time `t`, from its
+[`CO2Path`](@ref) and [`Solar`](@ref) parts. CO2 is
 0 with `Processes(co2 = false)`. Pure: where the CO2 applies is set once, at
 the start of the scenario, by `apply_co2_mask!` and `apply_surface_mask!`.
 """
-function forcing(it, year, r::ResolvedConfig)
+function forcing(t::ModelTime, r::ResolvedConfig)
     s = r.config.scenario
-    co2 = r.config.processes.co2 ? _co2_at(s.co2, it, year, r) : 0.0f0
-    return (CO2=co2, sw_solar_forcing=_solar_factor(s.solar, year))
+    co2 = r.config.processes.co2 ? _co2_at(s.co2, t, r) : 0.0f0
+    return (CO2=co2, sw_solar_forcing=_solar_factor(s.solar, t))
 end
 
-_co2_at(c::ConstantCO2, it, year, r) = c.ppm
+_co2_at(c::ConstantCO2, t, r) = c.ppm
 
-function _co2_at(::Union{CO2Table,CO2File}, it, year, r)
-    haskey(r.co2_table, year) ||
-        error("No CO2 data for year $year in the scenario's CO2 table (loaded $(length(r.co2_table)) years)")
-    return r.co2_table[year]
+function _co2_at(::Union{CO2Table,CO2File}, t, r)
+    haskey(r.co2_table, year(t)) ||
+        error("No CO2 data for year $(year(t)) in the scenario's CO2 table (loaded $(length(r.co2_table)) years)")
+    return r.co2_table[year(t)]
 end
 
 # After 2100 the ramp holds its last value
-function _co2_at(::A1BRamp, it, year, r)
+function _co2_at(::A1BRamp, t, r)
+    y = year(t)
     CO2_1950 = 310.0f0
     CO2_2000 = 370.0f0
     CO2_2050 = 520.0f0
-    if year <= 2000
-        return CO2_1950 + 60.0f0 / 50.0f0 * (year - 1950)
-    elseif year <= 2050
-        return CO2_2000 + 150.0f0 / 50.0f0 * (year - 2000)
-    elseif year <= 2100
-        return CO2_2050 + 180.0f0 / 50.0f0 * (year - 2050)
+    if y <= 2000
+        return CO2_1950 + 60.0f0 / 50.0f0 * (y - 1950)
+    elseif y <= 2050
+        return CO2_2000 + 150.0f0 / 50.0f0 * (y - 2000)
+    elseif y <= 2100
+        return CO2_2050 + 180.0f0 / 50.0f0 * (y - 2050)
     end
     return 700.0f0
 end
 
-_co2_at(::CO2SineWave, it, year, r) = 510.0f0 + 170.0f0 * cos(2f0*Float32(π) * (year - 13.0f0) / 30.0f0)
+_co2_at(::CO2SineWave, t, r) = 510.0f0 + 170.0f0 * cos(2f0*Float32(π) * (year(t) - 13.0f0) / 30.0f0)
 
-_co2_at(c::CO2Step, it, year, r) = year >= c.year ? c.after : c.before
+_co2_at(c::CO2Step, t, r) = year(t) >= c.year ? c.after : c.before
 
 # Boreal winter is half the year: from the first step of 1 October through the
 # first step of 1 April, as in the original code
 const _winter_first_step = first_step_of(10, 1)
 const _winter_last_step = first_step_of(4, 1)
 
-function _co2_at(c::SeasonalCO2, it, year, r)
-    step = step_of_year(it)
+function _co2_at(c::SeasonalCO2, t, r)
+    step = step_of_year(t)
     winter = step <= _winter_last_step || step >= _winter_first_step
     return winter == (c.season === :boreal_winter) ? c.in_season : c.out_of_season
 end
 
-_solar_factor(::Union{ModernSolar,SolarTable}, year) = 1.0f0
-_solar_factor(s::SolarConstant, year) = (1365.0f0 + s.offset) / 1365.0f0
-_solar_factor(s::SolarCycle, year) = (1365.0f0 + s.amplitude * sin(2f0*Float32(π) * year / s.period)) / 1365.0f0
-_solar_factor(s::EarthSunDistance, year) = (1.0f0 / (1.0f0 + 0.01f0 * s.percent))^2
+_solar_factor(::Union{ModernSolar,SolarTable}, t) = 1.0f0
+_solar_factor(s::SolarConstant, t) = (1365.0f0 + s.offset) / 1365.0f0
+_solar_factor(s::SolarCycle, t) = (1365.0f0 + s.amplitude * sin(2f0*Float32(π) * year(t) / s.period)) / 1365.0f0
+_solar_factor(s::EarthSunDistance, t) = (1.0f0 / (1.0f0 + 0.01f0 * s.percent))^2
 
 """
     apply_co2_mask!(mask::CO2Mask, fields::ClimateFields)

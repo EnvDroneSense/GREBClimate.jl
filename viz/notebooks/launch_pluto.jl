@@ -1,9 +1,9 @@
 # Open the GREB explorer notebook in Pluto. Run from the repository root:
 #
-#   julia notebooks/launch_pluto.jl
+#   julia viz/notebooks/launch_pluto.jl
 
 using Pkg
-viz = joinpath(@__DIR__, "..", "viz")
+viz = joinpath(@__DIR__, "..")
 isfile(joinpath(viz, "Manifest.toml")) || include(joinpath(viz, "setup.jl"))   # first launch only
 Pkg.activate(viz)
 

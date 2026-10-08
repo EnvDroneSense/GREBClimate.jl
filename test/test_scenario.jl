@@ -47,10 +47,10 @@ end
     for p in (:decon_mean_climate, :full_model, :co2_double, :rcp45, :sst_plus1)
         r = resolved(preset(p; processes = (co2 = false,)))
         @test quiet(() -> init_model!(r, fields)).CO2_ctrl == 0
-        @test forcing(1, 1950, r).CO2 == 0
+        @test forcing(scenario_time(1950, 1), r).CO2 == 0
     end
     # The solar part of the forcing is untouched
-    @test forcing(1, 1950, resolved(preset(:solar_plus27; processes = (co2 = false,)))).sw_solar_forcing ≈ 1392 / 1365
+    @test forcing(scenario_time(1950, 1), resolved(preset(:solar_plus27; processes = (co2 = false,)))).sw_solar_forcing ≈ 1392 / 1365
 end
 
 @testset "free combinations of scenario parts" begin
@@ -58,25 +58,25 @@ end
     @test Config() == preset(:full_model)
     # Parts no preset combines
     r = resolved(Config(scenario = Scenario(co2 = ConstantCO2(500), solar = SolarConstant(27))))
-    @test forcing(1, 1950, r) == (CO2 = 500.0f0, sw_solar_forcing = (1365.0f0 + 27.0f0) / 1365.0f0)
+    @test forcing(scenario_time(1950, 1), r) == (CO2 = 500.0f0, sw_solar_forcing = (1365.0f0 + 27.0f0) / 1365.0f0)
     r = resolved(Config(scenario = Scenario(co2 = CO2Step(300, 900, 2000), solar = SolarCycle(2, 22))))
-    @test forcing(1, 1999, r).CO2 == 300 && forcing(1, 2000, r).CO2 == 900
-    @test forcing(1, 2000, r).sw_solar_forcing ≈ (1365 + 2sin(2π * 2000 / 22)) / 1365
+    @test forcing(scenario_time(1999, 1), r).CO2 == 300 && forcing(scenario_time(2000, 1), r).CO2 == 900
+    @test forcing(scenario_time(2000, 1), r).sw_solar_forcing ≈ (1365 + 2sin(2π * 2000 / 22)) / 1365
     r = resolved(Config(scenario = Scenario(co2 = SeasonalCO2(1000, 300, :boreal_summer))))
-    @test forcing(1, 1950, r).CO2 == 300 && forcing(300, 1950, r).CO2 == 1000
-    @test_throws ErrorException forcing(1, 1951, resolved(preset(:rcp45)))    # year not in the table
+    @test forcing(scenario_time(1950, 1), r).CO2 == 300 && forcing(scenario_time(1950, 300), r).CO2 == 1000
+    @test_throws ErrorException forcing(scenario_time(1951, 1), resolved(preset(:rcp45)))    # year not in the table
 end
 
 @testset "A1B ramp: 700 ppm in 2100, held afterwards" begin
     r = resolved(preset(:a1b))
-    @test forcing(1, 1950, r).CO2 == 310 && forcing(1, 2050, r).CO2 == 520
-    @test forcing(1, 2100, r).CO2 == 700
-    @test forcing(1, 2101, r).CO2 == 700 && forcing(1, 2300, r).CO2 == 700
+    @test forcing(scenario_time(1950, 1), r).CO2 == 310 && forcing(scenario_time(2050, 1), r).CO2 == 520
+    @test forcing(scenario_time(2100, 1), r).CO2 == 700
+    @test forcing(scenario_time(2101, 1), r).CO2 == 700 && forcing(scenario_time(2300, 1), r).CO2 == 700
 end
 
 @testset "SeasonalCO2 season is half the year, from 1 October" begin
     r = resolve(Config(scenario=Scenario(co2=SeasonalCO2(680, 340, :boreal_winter))))
-    co2(step) = GREBClimate.forcing(step, 1950, r).CO2
+    co2(step) = GREBClimate.forcing(scenario_time(1950, step), r).CO2
     @test GREBClimate._winter_first_step == GREBClimate.first_step_of(10, 1) == 547
     @test GREBClimate._winter_last_step == GREBClimate.first_step_of(4, 1) == 181
     @test co2.([1, 181, 182, 546, 547, 730]) == Float32[680, 680, 340, 340, 680, 680]

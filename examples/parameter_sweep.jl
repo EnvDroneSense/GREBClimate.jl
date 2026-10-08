@@ -2,13 +2,16 @@
 # parameter_sweep.jl - CO2-concentration sensitivity sweep.
 #
 # Control at 280 ppm (the control CO2 of :custom_co2); scenario phase run at
-# each level in co2_grid. Records scenario-minus-control anomalies of Ts, ice
-# extent and precipitation as area-weighted global means.
+# each level in co2_grid, the levels side by side with `run_ensemble`. Records
+# scenario-minus-control anomalies of Ts, ice extent and precipitation as
+# area-weighted global means.
 #
-# Run as script:  julia --project=. examples/parameter_sweep.jl [data_dir]
+# Run as script:  julia --project=. -t 4,0 examples/parameter_sweep.jl [data_dir]
 # Or from REPL:   include("examples/parameter_sweep.jl"); parameter_sweep("data_dir")
 #
 # JLD2 data is not committed; pass its directory as argument or via GREB_DATA.
+# Start Julia with several threads (`-t 4,0`) for the levels to run in parallel;
+# each running level holds a copy of the input fields, about 370 MB.
 # =============================================================================
 
 using GREBClimate
@@ -18,15 +21,15 @@ using Statistics
     parameter_sweep(jld2_dir; co2_grid=default_co2_grid(), spinup=3, ctrl=5, scnr=100)
 
 Run the :custom_co2 experiment at each CO2 level (ppm) in `co2_grid`, with the
-control at that preset's 280 ppm. Each grid point gets its own
-config/fields instance and CO2 table. Returns a Vector of
+control at that preset's 280 ppm. Each level has its own CO2 table and runs on
+its own copy of the fields. Returns a Vector of
 (co2, Ts_anom, ice_anom, precip_anom) NamedTuples and writes
 examples/parameter_sweep_results.csv.
 
 `result.scnr` holds one `MonthlyRecord` per month and is already an anomaly
-against the control's final-year monthly climatology (`scenario_anomalies`
-in src/core/postprocess.jl), so no further subtraction happens here. Each anomaly
-below is the mean over the scenario's final 12 records, i.e. its final year.
+against the control's final-year monthly climatology, so no further subtraction
+happens here. Each anomaly below is the mean over the scenario's final 12
+records, i.e. its final year.
 """
 function parameter_sweep(jld2_dir::AbstractString;
                           co2_grid::AbstractVector{<:Real}=default_co2_grid(),
@@ -41,50 +44,38 @@ function parameter_sweep(jld2_dir::AbstractString;
         return nothing
     end
 
-    println("Loading GREB dataset from: ", jld2_dir)
-    fields_template = load_climatology(jld2_dir; dataset=:ncep)
-
     scnr >= 12 || throw(ArgumentError("scnr must be >= 12 to take a final-year mean, got $scnr"))
 
+    println("Loading GREB dataset from: ", jld2_dir)
+    fields = load_climatology(jld2_dir; dataset=:ncep)
     run = RunSpec(ctrl=ctrl, scnr=scnr)
-    results = NamedTuple{(:co2, :Ts_anom, :ice_anom, :precip_anom),
-                          Tuple{Float64,Float64,Float64,Float64}}[]
 
     # :custom_co2's scenario clock starts at 1950 and advances one year per
-    # simulated year, so the table needs an entry per scenario year.
+    # simulated year, so each table needs an entry per scenario year.
     years = 1950:(1950 + scnr - 1)
 
-    mktempdir() do tmpdir
-        for (i, co2) in enumerate(co2_grid)
-            println("[$i/$(length(co2_grid))] CO2 = $(round(co2, digits=1)) ppm ",
-                    "(spinup=$spinup, ctrl=$ctrl, scnr=$scnr years)...")
+    # The final-year mean of an anomaly field, over the scenario's last 12 records
+    final_year(result, field) = mean(global_mean(getproperty(rec, field)) for rec in @view result.scnr[end-11:end])
 
+    anomalies = mktempdir() do tmpdir
+        configs = map(enumerate(co2_grid)) do (i, co2)
             co2_path = joinpath(tmpdir, "co2_$(i).txt")
             open(co2_path, "w") do io
                 for yr in years
                     println(io, yr, " ", co2)
                 end
             end
-
-            cfg = preset(:custom_co2; path=co2_path, corrections=SpinUp(spinup))
-            fields = deepcopy(fields_template)   # each grid point mutates its own state
-
-            try
-                result = greb_model!(run, cfg; jld2_dir=jld2_dir, fields=fields)
-
-                scnr_final_year = @view result.scnr[end-11:end]  # last 12 monthly records
-                Ts_anom = mean(global_mean(rec.Ts) for rec in scnr_final_year)
-                ice_anom = mean(global_mean(rec.ice) for rec in scnr_final_year)
-                precip_anom = mean(global_mean(rec.precip) for rec in scnr_final_year)
-
-                push!(results, (co2=co2, Ts_anom=Ts_anom,
-                                 ice_anom=ice_anom, precip_anom=precip_anom))
-            catch err
-                @error "sweep point failed" co2 exception=(err, catch_backtrace())
-                push!(results, (co2=co2, Ts_anom=NaN, ice_anom=NaN, precip_anom=NaN))
-            end
+            preset(:custom_co2; path=co2_path, corrections=SpinUp(spinup))
+        end
+        println("Running $(length(configs)) CO2 levels (spinup=$spinup, ctrl=$ctrl, scnr=$scnr years), ",
+                "$(min(Threads.nthreads(), length(configs))) at a time...")
+        run_ensemble(run, configs; fields, jld2_dir) do result
+            (Ts_anom=final_year(result, :Ts), ice_anom=final_year(result, :ice),
+             precip_anom=final_year(result, :precip))
         end
     end
+
+    results = [(co2=co2, a...) for (co2, a) in zip(co2_grid, anomalies)]
 
     out_path = joinpath(@__DIR__, "parameter_sweep_results.csv")
     open(out_path, "w") do io

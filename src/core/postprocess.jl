@@ -18,24 +18,23 @@ function monthly_climatology(records::Vector{MonthlyRecord})::Vector{MonthlyReco
 end
 
 """
-    scenario_anomalies(scnr_records, ctrl_clim)::Vector{MonthlyRecord}
+    scenario_anomalies(scnr_records, scnr_times, ctrl_clim)::Vector{MonthlyRecord}
 
 Subtracts the matching calendar month of `ctrl_clim` (from
 [`monthly_climatology`](@ref)) from each record in `scnr_records`,
 turning absolute monthly output into anomalies relative to the control run.
+`scnr_times` holds the [`RecordTime`](@ref) of each record.
 """
-function scenario_anomalies(scnr_records::Vector{MonthlyRecord}, ctrl_clim::Vector{MonthlyRecord})::Vector{MonthlyRecord}
+function scenario_anomalies(scnr_records::Vector{MonthlyRecord}, scnr_times::Vector{RecordTime},
+    ctrl_clim::Vector{MonthlyRecord})::Vector{MonthlyRecord}
     isempty(scnr_records) && return scnr_records
     isempty(ctrl_clim) && return scnr_records
 
-    fields = propertynames(scnr_records[1])
     anom = MonthlyRecord[]
 
-    for (idx, rec) in enumerate(scnr_records)
-        mon = mod(idx - 1, months_per_year) + 1
-        ref = ctrl_clim[mon]
-        push!(anom, NamedTuple{fields}(
-            Tuple(getfield(rec, fld) .- getfield(ref, fld) for fld in fields)))
+    for (rec, time) in zip(scnr_records, scnr_times)
+        ref = ctrl_clim[time.month]
+        push!(anom, map((x, x_ref) -> x .- x_ref, rec, ref))
     end
     return anom
 end

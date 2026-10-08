@@ -68,7 +68,7 @@ Version 2.0 replaces `PhysicsConfig` and `create_experiment_config` with `preset
 ### Launch the notebook (optional)
 
 ```bash
-julia notebooks/launch_pluto.jl
+julia viz/notebooks/launch_pluto.jl
 ```
 
 The first launch sets up its `viz/` environment. See [Plots and notebook](https://EnvDroneSense.github.io/GREBClimate.jl/dev/viz/) for the plots and scripting.

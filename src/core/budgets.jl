@@ -25,8 +25,9 @@ end
 
 # What an observer of `greb_model!` is handed at each call. The arrays are the
 # model's own, not copies.
-_step_view(phase, it, year, ityr, CO2, Ts, Ta, To, q, tend, fields, r) =
-    (; phase, it, year, ityr, CO2, Ts, Ta, To, q, tend, fields, config=r)
+_step_view(t::ModelTime, CO2, Ts, Ta, To, q, tend, fields, r) =
+    (; time=t, phase=t.phase, step=t.step, year=year(t), step_of_year=step_of_year(t),
+        CO2, Ts, Ta, To, q, tend, fields, config=r)
 
 """
     BudgetCheck()
@@ -81,17 +82,17 @@ end
 _floor(T) = ifelse(T < min_T_K, min_T_K, T)
 
 function _check_step!(b::BudgetCheck, view)
-    tend, fields, ityr = view.tend, view.fields, view.ityr
+    tend, fields, slice = view.tend, view.fields, view.step_of_year
     config = view.config
     hydro_on = config.config.processes.hydrology !== :none
     rain_limited = config.config.processes.hydrology === :full && config.config.processes.atmosphere &&
                    config.hydrology.rain === :rh
     for j in 1:ydim, i in 1:xdim
         Ts = b.Ts[i, j] + tend.dT_ocean[i, j] +
-             Δt * (surface_flux(tend, i, j) + fields.Ts_flux_correction[i, j, ityr]) / b.cap_surf[i, j]
+             Δt * (surface_flux(tend, i, j) + fields.Ts_flux_correction[i, j, slice]) / b.cap_surf[i, j]
         Ta = b.Ta[i, j] + tend.dTa_crcl[i, j] + Δt * atmosphere_flux(tend, i, j) / cap_air
-        To = b.To[i, j] + tend.dTo[i, j] + fields.To_flux_correction[i, j, ityr]
-        dq = Δt * (tend.dq_eva[i, j] + tend.dq_rain[i, j]) + tend.dq_crcl[i, j] + fields.q_flux_correction[i, j, ityr]
+        To = b.To[i, j] + tend.dTo[i, j] + fields.To_flux_correction[i, j, slice]
+        dq = Δt * (tend.dq_eva[i, j] + tend.dq_rain[i, j]) + tend.dq_crcl[i, j] + fields.q_flux_correction[i, j, slice]
         low = dq <= -b.q[i, j]
         low && (dq = -min_humidity_change * b.q[i, j])
         high = dq > max_humidity_change
@@ -128,7 +129,7 @@ After the run it holds:
 |:------|:--------|
 | `steps` | steps checked |
 | `seen` | lowest and highest value of each field over the run |
-| `first` | `nothing`, or the first step outside the range: `(phase, it, year, field, value)` |
+| `first` | `nothing`, or the first step outside the range: `(phase, step, year, field, value)` |
 
 `GREBClimate.in_range(check)` is `true` when no step left the range. A NaN
 counts as outside. Not exported: create it with `GREBClimate.RangeCheck()`.
@@ -137,7 +138,7 @@ mutable struct RangeCheck
     limits::NamedTuple{(:Ts, :Ta, :To, :q),NTuple{4,Tuple{Float32,Float32}}}
     seen::NamedTuple{(:Ts, :Ta, :To, :q),NTuple{4,Tuple{Float32,Float32}}}
     steps::Int
-    first::Union{Nothing,NamedTuple{(:phase, :it, :year, :field, :value),Tuple{Symbol,Int,Int,Symbol,Float32}}}
+    first::Union{Nothing,NamedTuple{(:phase, :step, :year, :field, :value),Tuple{Phase,Int,Int,Symbol,Float32}}}
 end
 
 function RangeCheck(; Ts=(100, 360), Ta=(100, 360), To=(250, 330), q=(0, 0.08))
@@ -169,7 +170,7 @@ function (c::RangeCheck)(point::Symbol, view)
         lo, hi, outside = _range(getproperty(view, field), lower, upper)
         if c.first === nothing && outside > 0
             value = lo < lower ? lo : hi > upper ? hi : NaN32
-            c.first = (phase=view.phase, it=Int(view.it), year=Int(view.year), field=field, value=value)
+            c.first = (phase=view.phase, step=Int(view.step), year=Int(view.year), field=field, value=value)
         end
         (min(old[1], lo), max(old[2], hi))
     end

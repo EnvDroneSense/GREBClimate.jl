@@ -5,7 +5,77 @@ Notable changes to GREBClimate.jl, following
 
 ## [Unreleased]
 
-### Fixed
+## [2.2.0] - 2026-10-09
+
+### Added
+
+- `test/parallel.jl` runs the test files in several processes at once; the whole
+  suite takes about 90 s instead of about 295 s on a 14-thread machine.
+
+### Changed
+
+- `benchmark/profile.jl step` samples 25 years by default (was 50), which is
+  enough for the sample target in one run.
+- `notebooks/` moved to `viz/notebooks/`; launch with
+  `julia viz/notebooks/launch_pluto.jl`.
+- **Breaking:** the fields of `MonthlyAccumulator` take the names of
+  `MonthlyRecord` (`Tmm` is now `Ts`, `apmm` is `albedo`, `olrmm` is `olr`, and
+  so on), and its keyword constructor is gone; `MonthlyAccumulator()` is
+  unchanged. The output fields are declared once, as
+  `GREBClimate.OUTPUT_FIELDS`. Results are unchanged.
+- **Breaking:** one time value, `ModelTime(phase, start_year, step)`, says
+  where a run is; day, month and year are derived from it. Results are
+  unchanged. What changes for a caller:
+  - `greb_model!` returns `(ctrl, scnr, ctrl_time, scnr_time, scnr_anomaly)`.
+    `ctrl_time` and `scnr_time` hold the `(year, month)` of each record;
+    `scnr_anomaly` is `true` when `scnr` is the anomaly against the control and
+    `false` when it holds absolute values.
+  - `forcing(t::ModelTime, r)` replaces `forcing(it, year, r)`.
+  - `scenario_anomalies(scnr, scnr_time, ctrl_clim)` takes the record times
+    and no longer assumes that the first record is January.
+  - The observer's view has `time`, `phase`, `step`, `year` and
+    `step_of_year` in place of `phase`, `it`, `year` and `ityr`. `phase` is
+    `GREBClimate.control` or `GREBClimate.scenario`, no longer `:ctrl` or
+    `:scnr`; `RangeCheck`'s `first` has `step` in place of `it`.
+  - `time_loop!`, `output!` and `diagnostics!` take the time value and return
+    `nothing`; the month and record counters are gone.
+- **Breaking:** `TimeState` is removed. The physics kernels (`SWradiation!`,
+  `LWradiation!`, `hydro!`, `seaice!`, `deep_ocean!`, `convergence!`,
+  `advection!`, `circulation!`) and `tendencies!` take the index of the
+  climatology slice, an `Int`, where they took a `TimeState`; `time_loop!` and
+  `qflux_correction!` lose the argument. Results are unchanged.
+- **Breaking:** `ClimateFields` no longer carries the ten anomaly arrays
+  (`Ts_clim_anom_enso`, `Ts_clim_anom_cc` and the others). The anomalies of a
+  `BoundaryAnomaly` scenario are in `fields.boundary_anomaly`, which is
+  `nothing` until `load_boundary_anomaly!` loads a source and then holds five
+  arrays for one source at a time; `anom_cc_source` and `anom_enso_source`
+  become `boundary_anomaly_source`. A `ClimateFields` is 135 MB smaller, also
+  per ensemble member. Results are unchanged.
+- `examples/parameter_sweep.jl` runs its CO2 levels side by side with
+  `run_ensemble`; the table it writes is unchanged. `tools/experiments/` holds
+  helpers for experiment scripts and `sensitivity.jl`, which prints the
+  effective climate sensitivity of an abrupt-CO2 run.
+- `run_ensemble` no longer keeps the copies of the fields alive after it returns:
+  a session held 2 to 3 GiB more than it needed. Results are unchanged.
+- Internal calendar constants are written out: `ndt_days`, `ndays_yr`,
+  `cjday_mon` and `jday_mon_cumsum` are `steps_per_day`, `days_per_year`,
+  `days_in_month` and `last_day_of_month`.
+- The plotting toolbox (`viz/`) reads the year and month of each record from
+  the result's `ctrl_time` and `scnr_time`, and whether the scenario is an
+  anomaly from its `scnr_anomaly` (no longer guessed from the temperature):
+  animation frames are titled
+  `Jul 1950`, and yearly means and the seasonal cycle group by the record
+  times. `annual`, `seasonal_cycle` and `map_frames` take the times as an
+  optional argument; a bare record vector is counted from January of year 1,
+  as before.
+- `ClimateFields` has a `flux_source` field, the file `load_flux_corrections!`
+  last loaded the three flux-correction arrays from. A `Stored` run on a
+  `fields` that already holds the corrections from the same file no longer
+  saves, reloads and restores them, which saves 4 to 7 percent of a one-year
+  run on a reused `fields`. A caller who writes into the arrays sets
+  `flux_source` back to `""`. Results are unchanged.
+
+### Changes to model results
 
 - `:a1b` (`A1BRamp`) holds 700 ppm after 2100, as the Fortran does. It fell
   back to 340 ppm in 2101, so a run of more than 151 scenario years lost its
