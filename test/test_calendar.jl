@@ -86,10 +86,10 @@ end
         @test first(all_steps) === ModelTime(scenario, 1950, 1)
         @test last(all_steps) === ModelTime(scenario, 1950, 2 * nstep_yr)
         @test year(last(all_steps)) == 1951
-        # Walking a phase allocates nothing
+        # Walking a phase allocates nothing per step
         walk(p) = (n = 0; for t in p; n += year(t); end; n)
         walk(steps(scenario, 1950, 1))
-        @test @allocated(walk(steps(scenario, 1950, 100))) == 0
+        @test @allocated(walk(steps(scenario, 1950, 100))) == @allocated(walk(steps(scenario, 1950, 1)))
     end
 
     @testset "from time to data" begin

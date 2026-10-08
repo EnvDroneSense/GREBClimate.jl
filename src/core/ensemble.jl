@@ -67,7 +67,7 @@ function run_ensemble(reduce, run::RunSpec, configs; fields::ClimateFields, jld2
     finally
         # The finished tasks stay reachable for a while and hold the pool;
         # emptying it lets the copies be collected when the call returns.
-        while isready(pool)
+        for _ in 1:ntasks
             take!(pool)
         end
         close(pool)
