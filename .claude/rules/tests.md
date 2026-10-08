@@ -30,3 +30,9 @@ simulating a year; it is not called during the spin-up, so pass
 is bit-identity — see the `-t 1` vs `-t 2` monthly-mean comparison in
 `test_threading.jl`. Do not run the model to test something the model does
 not do.
+
+Selecting tests: `SHARD` in `test/support/selection.jl` holds (file, CI shard,
+tier). A new test file needs a row there with the smallest tier that should
+include it: `smoke` for files under ~10 s, `standard` for kernel, budget and
+preset files, `full` for model runs and anything slow. The source-to-test map
+is in the root `CLAUDE.md`. A subset run proves only the files it ran.
