@@ -150,7 +150,7 @@ end
     qsat(T, wz) = 3.75e-3 * exp(17.08085 * (T - 273.15) / (T - 273.15 + 234.175)) * wz
     bulk = G.cq_latent * G.ρ_air * G.ce
     for land in (true, false)
-        fields = constant_fields(z_topo = land ? 1.0 : -1.0, swet = 0.4, u = 3.0, v = 4.0, ws = 6.0)
+        fields = constant_fields(z_topo = land ? 1.0 : -1.0, swet = 0.4, u = 3.0, v = 4.0, wind_speed = 6.0)
         G.derive_fields!(fields, Processes())
         wz = fields.wz_air[1, 1]
         # :original and :original_gust use the wind components, the other

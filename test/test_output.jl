@@ -128,7 +128,7 @@ end
 end
 
 # All ocean, with wind and rising air
-_time_loop_fields() = constant_fields(z_topo = -1.0, swet = 0.5, u = 2.0, v = 1.0, omega = 0.001, omega_std = 0.01, ws = 4.0)
+_time_loop_fields() = constant_fields(z_topo = -1.0, swet = 0.5, u = 2.0, v = 1.0, omega = 0.001, omega_std = 0.01, wind_speed = 4.0)
 
 @testset "time_loop! integrates one timestep and clamps at min_T_K" begin
     fields = _time_loop_fields()

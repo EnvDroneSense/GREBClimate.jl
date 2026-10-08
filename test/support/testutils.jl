@@ -83,7 +83,7 @@ A `ClimateFields` that is the same in every cell and at every step: topography
 soil wetness, winds and vertical velocity. For checking a kernel against a
 hand calculation.
 """
-function constant_fields(; z_topo, swet = 1.0, u = 0.0, v = 0.0, omega = 0.0, omega_std = 0.0, ws = 0.0)
+function constant_fields(; z_topo, swet = 1.0, u = 0.0, v = 0.0, omega = 0.0, omega_std = 0.0, wind_speed = 0.0)
     f = ClimateFields()
     f.z_topo .= z_topo
     f.mld_clim .= 50.0
@@ -96,7 +96,7 @@ function constant_fields(; z_topo, swet = 1.0, u = 0.0, v = 0.0, omega = 0.0, om
     f.v_clim .= v
     f.omega_clim .= omega
     f.omega_std_clim .= omega_std
-    f.wind_speed_clim .= ws
+    f.wind_speed_clim .= wind_speed
     return f
 end
 

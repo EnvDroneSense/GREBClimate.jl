@@ -38,6 +38,9 @@ Notable changes to GREBClimate.jl, following
   arrays for one source at a time; `anom_cc_source` and `anom_enso_source`
   become `boundary_anomaly_source`. A `ClimateFields` is 135 MB smaller, also
   per ensemble member. Results are unchanged.
+- Internal calendar constants are written out: `ndt_days`, `ndays_yr`,
+  `cjday_mon` and `jday_mon_cumsum` are `steps_per_day`, `days_per_year`,
+  `days_in_month` and `last_day_of_month`.
 - The plotting toolbox (`viz/`) reads the year and month of each record from
   the result's `ctrl_time` and `scnr_time`: animation frames are titled
   `Jul 1950`, and yearly means and the seasonal cycle group by the record

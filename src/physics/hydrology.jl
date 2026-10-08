@@ -83,7 +83,7 @@ function hydro!(Ts, q, fields::ClimateFields, slice::Int, p::Processes, h::Resol
             end
         end
     elseif h.evaporation === :skin
-        ws_view = clim_slice(fields.wind_speed_clim, slice)
+        wind_speed = clim_slice(fields.wind_speed_clim, slice)
         @turbo for j in 1:ydim
             for i in 1:xdim
                 T0 = Ts[i, j] - 273.15f0
@@ -95,9 +95,9 @@ function hydro!(Ts, q, fields::ClimateFields, slice::Int, p::Processes, h::Resol
                 T = Tskin - 273.15f0
                 qs_val = const_factor1 * exp(const_factor2 * T / (T + const_factor3)) * wz_air[i, j]
 
-                ws_base = ws_view[i, j]
+                mean_wind = wind_speed[i, j]
                 gust = ifelse(@is_land(z_topo[i, j]), 132.25f0, 29.16f0)
-                wind = sqrt(ws_base*ws_base + gust)
+                wind = sqrt(mean_wind*mean_wind + gust)
 
                 cE = ifelse(@is_land(z_topo[i, j]), cE_land, cE_ocean)
                 qlat = cE * wind * ρ_air * cq_latent * (q[i, j] - qs_val) * swet[i, j]
@@ -138,7 +138,7 @@ function hydro!(Ts, q, fields::ClimateFields, slice::Int, p::Processes, h::Resol
             end
         end
     elseif h.evaporation === :skin_gust
-        ws_view = clim_slice(fields.wind_speed_clim, slice)
+        wind_speed = clim_slice(fields.wind_speed_clim, slice)
         gust_land_2 = 81.0f0  # 9.0^2
         gust_ocean_2 = 16.0f0  # 4.0^2
         @turbo for j in 1:ydim
@@ -147,7 +147,7 @@ function hydro!(Ts, q, fields::ClimateFields, slice::Int, p::Processes, h::Resol
                 qs = max(const_factor1 * exp(const_factor2 * T / (T + const_factor3)) * wz_air[i, j], 1f-8)
                 rq = q[i, j] / qs
 
-                wind = ws_view[i, j]
+                wind = wind_speed[i, j]
                 wind = sqrt(wind*wind + ifelse(@is_land(z_topo[i, j]), gust_land_2, gust_ocean_2))
                 coeff = ifelse(@is_land(z_topo[i, j]), 0.56f0, 0.79f0)
                 qlat = (q[i, j] - qs) * wind * cq_latent * ρ_air * coeff * ce * swet[i, j]

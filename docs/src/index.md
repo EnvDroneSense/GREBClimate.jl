@@ -20,9 +20,8 @@ Pkg.add("GREBClimate")
 
 Or, working from a clone:
 
-```julia
-julia --project=.
-using Pkg; Pkg.instantiate()
+```bash
+julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
 
 The model needs a ~439 MB input dataset, which [`greb_data_dir`](@ref)
@@ -35,6 +34,7 @@ downloads and caches on first use; see [Input data](@ref).
 | [Tutorial](@ref) | Load the data, configure an experiment, run it and read the result |
 | [Input data](@ref) | Where the dataset comes from, how it is found, and its layout |
 | [Model overview](@ref) | What the model computes and how a run is structured |
+| [Time and calendar](@ref) | The model calendar, the time value of a run, and what the time system does not do yet |
 | [Plots and notebook](@ref) | The `viz/` plotting toolbox and the Pluto explorer |
 | [Configuration](@ref) | The parts of a configuration, their options, and the experiment presets |
 | [API Reference](@ref) | Every exported function and type |
