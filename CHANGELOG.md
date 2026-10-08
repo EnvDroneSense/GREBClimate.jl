@@ -5,8 +5,12 @@ Notable changes to GREBClimate.jl, following
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-10-09
+
 ### Changed
 
+- `notebooks/` moved to `viz/notebooks/`; launch with
+  `julia viz/notebooks/launch_pluto.jl`.
 - **Breaking:** the fields of `MonthlyAccumulator` take the names of
   `MonthlyRecord` (`Tmm` is now `Ts`, `apmm` is `albedo`, `olrmm` is `olr`, and
   so on), and its keyword constructor is gone; `MonthlyAccumulator()` is
@@ -57,7 +61,6 @@ Notable changes to GREBClimate.jl, following
   times. `annual`, `seasonal_cycle` and `map_frames` take the times as an
   optional argument; a bare record vector is counted from January of year 1,
   as before.
-
 - `ClimateFields` has a `flux_source` field, the file `load_flux_corrections!`
   last loaded the three flux-correction arrays from. A `Stored` run on a
   `fields` that already holds the corrections from the same file no longer
@@ -65,7 +68,7 @@ Notable changes to GREBClimate.jl, following
   run on a reused `fields`. A caller who writes into the arrays sets
   `flux_source` back to `""`. Results are unchanged.
 
-### Fixed
+### Changes to model results
 
 - `:a1b` (`A1BRamp`) holds 700 ppm after 2100, as the Fortran does. It fell
   back to 340 ppm in 2101, so a run of more than 151 scenario years lost its
