@@ -9,6 +9,7 @@ from the repository root with `julia --project=. tools/<folder>/<script>.jl`.
 | | | `convert_greb_to_jld2.jl` | Converts GREB `.bin` files into `greb_input_data/` |
 | | | `package_dataset.jl` | Builds the dataset archive and its SHA256 for the DataDep |
 | `diagnostics/` | Measure a property of the model | `budget.jl` | Runs a preset with a per-step observer and prints whether each store changes by the sum of its flows, how often a limiter held a cell, and the global-mean flows |
+| `experiments/` | Run the model to answer a question | `helpers.jl`, `sensitivity.jl` | `helpers.jl` is the module `ExperimentTools`: annual global means of a result, a range test of both phases, the Gregory sensitivity estimate and map diagnostics (zonal mean, polar amplification, land against ocean, pattern correlation, sine fit). `sensitivity.jl` runs an abrupt-CO2 preset and prints the forcing, feedback, effective sensitivity and the warming reached |
 | `validation/` | Check the model against a reference | `bit_identity.jl`, `preset_reference.jl` | `bit_identity.jl` saves every record field of every experiment preset, then compares a later build with exact equality; for refactors that must not change results. `preset_reference.jl` writes `test/data/preset_reference.jl`, what each preset imposes, which `test/test_presets.jl` checks |
 
 Where a new script goes:
@@ -17,6 +18,7 @@ Where a new script goes:
 |:---------|:-------|
 | produces or publishes `greb_input_data/` | `dataset/` |
 | runs the model to measure a property of the model | `diagnostics/` |
+| runs the model many times, or reduces its output, to answer a question | `experiments/` |
 | runs the model and compares with observed data | `validation/` |
 
 Scripts that run the model should read the local dataset with

@@ -40,6 +40,10 @@ Notable changes to GREBClimate.jl, following
   arrays for one source at a time; `anom_cc_source` and `anom_enso_source`
   become `boundary_anomaly_source`. A `ClimateFields` is 135 MB smaller, also
   per ensemble member. Results are unchanged.
+- `examples/parameter_sweep.jl` runs its CO2 levels side by side with
+  `run_ensemble`; the table it writes is unchanged. `tools/experiments/` holds
+  helpers for experiment scripts and `sensitivity.jl`, which prints the
+  effective climate sensitivity of an abrupt-CO2 run.
 - `run_ensemble` no longer keeps the copies of the fields alive after it returns:
   a session held 2 to 3 GiB more than it needed. Results are unchanged.
 - Internal calendar constants are written out: `ndt_days`, `ndays_yr`,
