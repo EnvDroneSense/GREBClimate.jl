@@ -78,10 +78,22 @@ GREB_TEST_SHARD=light julia --project=. -e 'using Pkg; Pkg.test()'
 GREB_TEST_SHARD=heavy julia --project=. -e 'using Pkg; Pkg.test()'
 ```
 
+While developing you rarely need the whole suite. Run named files, or a tier
+(`smoke`, `standard`, `full`; each includes the ones before it):
+
+```bash
+julia --project=. -e 'using Pkg; Pkg.test(test_args=["state", "io"])'
+GREB_TEST_TIER=smoke julia --project=. -e 'using Pkg; Pkg.test()'
+```
+
+For repeated runs, `julia --project=. -i test/live.jl` keeps one session open
+and compiles once: call `t("state")` or `t(:smoke)`. A subset run only proves
+the files it ran; run the full suite before opening a pull request.
+
 Things worth knowing before you add tests:
 
 - **A new test file must be added to the `SHARD` table in
-  [test/runtests.jl](test/runtests.jl), or it will not run.** Nothing globs
+  [test/support/selection.jl](test/support/selection.jl), or it will not run.** Nothing globs
   the directory.
 - Shared fixtures live in `test/support/testutils.jl`: `quiet()`, `with_tempdir()`,
   `synthetic_fields()`, `constant_fields()`, `uniform_record()`,
