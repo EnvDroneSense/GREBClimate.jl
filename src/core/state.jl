@@ -206,6 +206,18 @@ air sends down, positive into the surface.
 """
 const MonthlyRecord = NamedTuple{OUTPUT_FIELDS,NTuple{length(OUTPUT_FIELDS),Matrix{Float32}}}
 
+"The climatologies a [`BoundaryAnomaly`](@ref) adds its anomalies to at scenario start."
+const _BOUNDARY_FIELDS = (:Ts_clim, :u_clim, :v_clim, :omega_clim, :wind_speed_clim)
+
+"""
+    BoundaryAnomalyFields
+
+The anomalies of a [`BoundaryAnomaly`](@ref) scenario: a `NamedTuple` with one
+`(xdim, ydim, nstep_yr)` array per climatology the anomaly is added to
+(`Ts_clim`, `u_clim`, `v_clim`, `omega_clim`, `wind_speed_clim`).
+"""
+const BoundaryAnomalyFields = NamedTuple{_BOUNDARY_FIELDS,NTuple{length(_BOUNDARY_FIELDS),Array{Float32,3}}}
+
 """
     ClimateFields
 
@@ -220,6 +232,10 @@ start of each run.
 `load_climatology` sets `loaded = true`. [`greb_model!`](@ref) refuses unloaded
 fields unless `allow_uninitialized=true`: an all-zero climatology raises no
 error, it runs and returns NaN in every output field.
+
+`boundary_anomaly` is `nothing` until [`load_boundary_anomaly!`](@ref) loads
+the anomalies of a [`BoundaryAnomaly`](@ref) scenario; it then holds the
+[`BoundaryAnomalyFields`](@ref) of one source at a time.
 """
 Base.@kwdef mutable struct ClimateFields
     # 2D fields (xdim, ydim)
@@ -239,18 +255,6 @@ Base.@kwdef mutable struct ClimateFields
     omega_clim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # vertical velocity [Pa/s]
     omega_std_clim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # omega std deviation [Pa/s]
     wind_speed_clim::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # wind speed [m/s]
-
-    # Anomaly fields for ENSO/climate-change experiments
-    Ts_clim_anom_enso::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
-    u_clim_anom_enso::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
-    v_clim_anom_enso::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
-    omega_clim_anom_enso::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
-    wind_speed_clim_anom_enso::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
-    Ts_clim_anom_cc::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
-    u_clim_anom_cc::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
-    v_clim_anom_cc::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
-    omega_clim_anom_cc::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
-    wind_speed_clim_anom_cc::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
 
     # The winds split by sign (derive_fields!): pos + neg = the wind
     u_clim_pos::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)  # eastward part, 0 elsewhere
@@ -274,10 +278,10 @@ Base.@kwdef mutable struct ClimateFields
     # Regional CO2 mask (1.0 = full CO2, 0.5 = half CO2)
     co2_part::Matrix{Float32} = ones(Float32, xdim, ydim)
 
-    # Where the anomaly arrays were loaded from: the directory (RCP8.5), and the
-    # directory and the event (ENSO). Set by the two anomaly loaders.
-    anom_cc_source::String = ""
-    anom_enso_source::Tuple{String,Symbol} = ("", :none)
+    # The anomalies of a BoundaryAnomaly scenario and where they were loaded
+    # from (directory and source). Set by `load_boundary_anomaly!`.
+    boundary_anomaly::Union{Nothing,BoundaryAnomalyFields} = nothing
+    boundary_anomaly_source::Tuple{String,Symbol} = ("", :none)
 
     # false for a bare `ClimateFields()`; set by `load_climatology`. See the
     # docstring above and `greb_model!`'s `allow_uninitialized` keyword.

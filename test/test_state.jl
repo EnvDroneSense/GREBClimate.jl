@@ -26,7 +26,7 @@ end
     X, Y, N = GREBClimate.xdim, GREBClimate.ydim, GREBClimate.nstep_yr
 
     # ClimateFields: 2D grid fields, the (ydim, nstep_yr) solar table,
-    # the Bool flag, the two anomaly sources, and everything else 3D.
+    # the Bool flag, the boundary anomaly and its source, and everything else 3D.
     cf = ClimateFields()
     cf_2d = (:z_topo, :glacier, :z_ocean, :cap_surf, :wz_air, :wz_vapor,
              :rain_limit, :co2_part)
@@ -34,9 +34,9 @@ end
         v = getfield(cf, f)
         if f === :loaded
             @test v === false
-        elseif f === :anom_cc_source
-            @test v == ""
-        elseif f === :anom_enso_source
+        elseif f === :boundary_anomaly
+            @test v === nothing        # allocated by load_boundary_anomaly!, not here
+        elseif f === :boundary_anomaly_source
             @test v == ("", :none)
         elseif f === :sw_solar
             @test size(v) == (Y, N) && eltype(v) === Float32
@@ -49,7 +49,7 @@ end
     # co2_part is the one field that is not zero-initialised.
     @test all(isone, cf.co2_part)
     for f in fieldnames(ClimateFields)
-        f in (:loaded, :co2_part, :anom_cc_source, :anom_enso_source) && continue
+        f in (:loaded, :co2_part, :boundary_anomaly, :boundary_anomaly_source) && continue
         @test all(iszero, getfield(cf, f))
     end
 

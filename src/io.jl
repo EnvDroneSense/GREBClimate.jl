@@ -21,17 +21,17 @@ const _COMMON_CLIMATOLOGY_FILES = (
     omega_std_clim="erainterim.omega_std.vertmean.clim", wind_speed_clim="erainterim.windspeed.850hpa.clim",
 )
 const _SOLAR_FILE = "solar_radiation.clim"
-const _CC_ANOMALY_FILES = (
-    Ts_clim_anom_cc="cmip5.tsurf.rcp85.ensmean.forcing", u_clim_anom_cc="cmip5.zonal.wind.rcp85.ensmean.forcing",
-    v_clim_anom_cc="cmip5.meridional.wind.rcp85.ensmean.forcing", wind_speed_clim_anom_cc="cmip5.windspeed.rcp85.ensmean.forcing",
-    omega_clim_anom_cc="cmip5.omega.rcp85.ensmean.forcing",
-)
-const _ENSO_EVENTS = (:elnino, :lanina)
-_enso_anomaly_files(event::Symbol) = (
-    Ts_clim_anom_enso="erainterim.tsurf.$event.forcing", u_clim_anom_enso="erainterim.zonal.wind.$event.forcing",
-    v_clim_anom_enso="erainterim.meridional.wind.$event.forcing", wind_speed_clim_anom_enso="erainterim.windspeed.$event.forcing",
-    omega_clim_anom_enso="erainterim.omega.$event.forcing",
-)
+# The sources of a boundary anomaly, and the file of each anomaly by the
+# climatology it is added to
+const _BOUNDARY_ANOMALY_SOURCES = (:cmip5_rcp85, :elnino, :lanina)
+function _boundary_anomaly_files(source::Symbol)
+    source in _BOUNDARY_ANOMALY_SOURCES ||
+        throw(ArgumentError("source must be :cmip5_rcp85, :elnino or :lanina, got :$source"))
+    file(variable) = source === :cmip5_rcp85 ? "cmip5.$variable.rcp85.ensmean.forcing" :
+                     "erainterim.$variable.$source.forcing"
+    return (Ts_clim=file("tsurf"), u_clim=file("zonal.wind"), v_clim=file("meridional.wind"),
+            omega_clim=file("omega"), wind_speed_clim=file("windspeed"))
+end
 # The combined file `climatology/flux_corrections.jld2`: its keys, by the array each fills
 const _FLUX_CORRECTION_KEYS = (Ts_flux_correction="Tsurf_flux_correction", q_flux_correction="vapour_flux_correction",
                                To_flux_correction="Tocean_flux_correction")
@@ -48,8 +48,8 @@ anomaly files. The dataset tools must convert and package at least these.
 function dataset_field_files()
     names = Set{String}(values(_STATIC_FILES))
     push!(names, _SOLAR_FILE)
-    for files in (values(_CLIMATOLOGY_FILES)..., _COMMON_CLIMATOLOGY_FILES, _CC_ANOMALY_FILES,
-                  (_enso_anomaly_files(e) for e in _ENSO_EVENTS)...)
+    for files in (values(_CLIMATOLOGY_FILES)..., _COMMON_CLIMATOLOGY_FILES,
+                  (_boundary_anomaly_files(source) for source in _BOUNDARY_ANOMALY_SOURCES)...)
         union!(names, values(files))
     end
     return names
@@ -187,41 +187,32 @@ function load_flux_corrections!(jld2_dir::String, fields::ClimateFields)
     return nothing
 end
 
-function _load_anomaly_fields!(fields::ClimateFields, jld2_dir::String, files::NamedTuple)
-    for (field, name) in pairs(files)
-        filepath = joinpath(jld2_dir, "climatology", name * ".jld2")
-        isfile(filepath) ||
-            error("Anomaly forcing file not found: $filepath (run tools/dataset/convert_greb_to_jld2.jl)")
-        getfield(fields, field) .= read_field(filepath).data
-    end
-end
-
 """
     load_boundary_anomaly!(jld2_dir::String, fields::ClimateFields, source::Symbol)
 
-Loads the anomaly fields of a [`BoundaryAnomaly`](@ref) scenario into `fields`.
-`source` is `:cmip5_rcp85` (the CMIP5 RCP8.5 ensemble mean, into
-`fields.Ts_clim_anom_cc`/`u_clim_anom_cc`/`v_clim_anom_cc`/`omega_clim_anom_cc`/
-`wind_speed_clim_anom_cc`), or `:elnino` or `:lanina` (the ERA-Interim composite mean,
-into `fields.*_anom_enso`). Errors on a missing file rather than defaulting to
-zero.
+Loads the anomalies of a [`BoundaryAnomaly`](@ref) scenario into
+`fields.boundary_anomaly` (a [`BoundaryAnomalyFields`](@ref)). `source` is
+`:cmip5_rcp85` (the CMIP5 RCP8.5 ensemble mean), or `:elnino` or `:lanina` (the
+ERA-Interim composite mean). Errors on a missing file rather than defaulting
+to zero.
 
-`fields` remembers the directory and the source, and [`greb_model!`](@ref)
-does not read the files again for a later run on the same `fields`, directory
-and source.
+The five arrays are allocated at the first load, so `fields` carries none
+until a `BoundaryAnomaly` scenario runs. `fields` holds one source at a time
+and remembers its directory: [`greb_model!`](@ref) does not read the files
+again for a later run on the same `fields`, directory and source.
 """
 function load_boundary_anomaly!(jld2_dir::String, fields::ClimateFields, source::Symbol)
-    if source === :cmip5_rcp85
-        fields.anom_cc_source = ""
-        _load_anomaly_fields!(fields, jld2_dir, _CC_ANOMALY_FILES)
-        fields.anom_cc_source = jld2_dir
-    elseif source in _ENSO_EVENTS
-        fields.anom_enso_source = ("", :none)
-        _load_anomaly_fields!(fields, jld2_dir, _enso_anomaly_files(source))
-        fields.anom_enso_source = (jld2_dir, source)
-    else
-        throw(ArgumentError("source must be :cmip5_rcp85, :elnino or :lanina, got :$source"))
+    files = _boundary_anomaly_files(source)
+    fields.boundary_anomaly_source = ("", :none)
+    anomaly = something(fields.boundary_anomaly, map(_ -> zeros(Float32, xdim, ydim, nstep_yr), files))
+    for (name, file) in pairs(files)
+        filepath = joinpath(jld2_dir, "climatology", file * ".jld2")
+        isfile(filepath) ||
+            error("Anomaly forcing file not found: $filepath (run tools/dataset/convert_greb_to_jld2.jl)")
+        anomaly[name] .= read_field(filepath).data
     end
+    fields.boundary_anomaly = anomaly
+    fields.boundary_anomaly_source = (jld2_dir, source)
     return nothing
 end
 

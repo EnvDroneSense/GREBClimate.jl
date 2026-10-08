@@ -31,6 +31,13 @@ Notable changes to GREBClimate.jl, following
   `advection!`, `circulation!`) and `tendencies!` take the index of the
   climatology slice, an `Int`, where they took a `TimeState`; `time_loop!` and
   `qflux_correction!` lose the argument. Results are unchanged.
+- **Breaking:** `ClimateFields` no longer carries the ten anomaly arrays
+  (`Ts_clim_anom_enso`, `Ts_clim_anom_cc` and the others). The anomalies of a
+  `BoundaryAnomaly` scenario are in `fields.boundary_anomaly`, which is
+  `nothing` until `load_boundary_anomaly!` loads a source and then holds five
+  arrays for one source at a time; `anom_cc_source` and `anom_enso_source`
+  become `boundary_anomaly_source`. A `ClimateFields` is 135 MB smaller, also
+  per ensemble member. Results are unchanged.
 - The plotting toolbox (`viz/`) reads the year and month of each record from
   the result's `ctrl_time` and `scnr_time`: animation frames are titled
   `Jul 1950`, and yearly means and the seasonal cycle group by the record

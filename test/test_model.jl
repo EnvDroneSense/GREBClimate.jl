@@ -299,12 +299,18 @@ end
         end
 
         fields = ClimateFields()
+        @test fields.boundary_anomaly === nothing      # no anomaly arrays until one is loaded
         load_boundary_anomaly!(tmpdir_anom, fields, :cmip5_rcp85)
-        @test all(==(2.0), fields.Ts_clim_anom_cc)
-        @test all(==(3.0), fields.u_clim_anom_cc)
-        @test all(==(4.0), fields.v_clim_anom_cc)
-        @test all(==(5.0), fields.omega_clim_anom_cc)
-        @test all(==(6.0), fields.wind_speed_clim_anom_cc)
+        @test fields.boundary_anomaly isa GREBClimate.BoundaryAnomalyFields
+        @test fields.boundary_anomaly_source == (tmpdir_anom, :cmip5_rcp85)
+        @test all(==(2.0), fields.boundary_anomaly.Ts_clim)
+        @test all(==(3.0), fields.boundary_anomaly.u_clim)
+        @test all(==(4.0), fields.boundary_anomaly.v_clim)
+        @test all(==(5.0), fields.boundary_anomaly.omega_clim)
+        @test all(==(6.0), fields.boundary_anomaly.wind_speed_clim)
+        # Adding an anomaly that is not the loaded one is an error, not a silent mix-up
+        @test_throws ErrorException GREBClimate._add_boundary_anomaly!(BoundaryAnomaly(:elnino), fields)
+        @test_throws ErrorException GREBClimate._add_boundary_anomaly!(BoundaryAnomaly(:elnino), ClimateFields())
 
         # The scenario-start step applies the anomaly on top of the (here
         # all-zero) base climatology - Ts_clim must reflect it, not stay at zero.
@@ -316,11 +322,11 @@ end
         for (sym, suffix) in ((:elnino, "elnino"), (:lanina, "lanina"))
             fields2 = ClimateFields()
             load_boundary_anomaly!(tmpdir_anom, fields2, sym)
-            @test all(==(7.0), fields2.Ts_clim_anom_enso)
-            @test all(==(8.0), fields2.u_clim_anom_enso)
-            @test all(==(9.0), fields2.v_clim_anom_enso)
-            @test all(==(10.0), fields2.omega_clim_anom_enso)
-            @test all(==(11.0), fields2.wind_speed_clim_anom_enso)
+            @test all(==(7.0), fields2.boundary_anomaly.Ts_clim)
+            @test all(==(8.0), fields2.boundary_anomaly.u_clim)
+            @test all(==(9.0), fields2.boundary_anomaly.v_clim)
+            @test all(==(10.0), fields2.boundary_anomaly.omega_clim)
+            @test all(==(11.0), fields2.boundary_anomaly.wind_speed_clim)
 
             # Both composite files already carry their sign (the La Nina one is
             # a cold anomaly), so both experiments add them, as the Fortran does.
@@ -341,23 +347,25 @@ end
             @test all(==(anomaly), tclim(GREBClimate.scenario, RunSpec(ctrl = 0, scnr = 1)))
         end
 
-        # A second run on the same fields and directory does not read the files
-        # again; another event or another directory does.
+        # A second run on the same fields, directory and source does not read the
+        # files again; another source or another directory does, into the same arrays.
         reused = ClimateFields()
         first_tclim(p, dir) = at_first_step(v -> copy(v.fields.Ts_clim), RunSpec(ctrl = 0, scnr = 1),
                                             preset(p; corrections = NoCorrections()); phase = GREBClimate.scenario,
                                             jld2_dir = dir, fields = reused)
         @test all(==(7.0f0), first_tclim(:lanina, tmpdir_anom))
-        @test reused.anom_enso_source == (tmpdir_anom, :lanina)
-        reused.Ts_clim_anom_enso .= 70.0f0                     # a mark a reload would erase
+        @test reused.boundary_anomaly_source == (tmpdir_anom, :lanina)
+        arrays = reused.boundary_anomaly
+        reused.boundary_anomaly.Ts_clim .= 70.0f0              # a mark a reload would erase
         @test all(==(70.0f0), first_tclim(:lanina, tmpdir_anom))
         @test all(==(7.0f0), first_tclim(:elnino, tmpdir_anom))
-        @test reused.anom_enso_source == (tmpdir_anom, :elnino)
+        @test reused.boundary_anomaly_source == (tmpdir_anom, :elnino)
         @test all(==(2.0f0), first_tclim(:rcp85_boundary, tmpdir_anom))
-        reused.Ts_clim_anom_cc .= 20.0f0
+        @test reused.boundary_anomaly === arrays               # another source reuses the five arrays
+        reused.boundary_anomaly.Ts_clim .= 20.0f0
         @test all(==(20.0f0), first_tclim(:rcp85_boundary, tmpdir_anom))
         @test_throws ErrorException first_tclim(:rcp85_boundary, joinpath(tmpdir_anom, "elsewhere"))
-        @test reused.anom_cc_source == ""                   # a failed load leaves no source
+        @test reused.boundary_anomaly_source == ("", :none)    # a failed load leaves no source
 
         # A missing required file must error loudly, not silently zero.
         rm(joinpath(clim_dir, "cmip5.tsurf.rcp85.ensmean.forcing.jld2"))

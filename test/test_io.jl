@@ -141,8 +141,11 @@ end
     @test "ncep.tsurf.1948-2007.clim" in names && "erainterim.tsurf.1979-2015.clim" in names
     # Every name fills an array that ClimateFields has
     lists = (GREBClimate._STATIC_FILES, values(GREBClimate._CLIMATOLOGY_FILES)..., GREBClimate._COMMON_CLIMATOLOGY_FILES,
-             GREBClimate._CC_ANOMALY_FILES, GREBClimate._enso_anomaly_files(:elnino), GREBClimate._FLUX_CORRECTION_KEYS)
+             GREBClimate._FLUX_CORRECTION_KEYS)
     @test all(l -> all(f -> hasfield(ClimateFields, f), keys(l)), lists)
+    # Every source of a boundary anomaly names one file per anomaly array
+    @test all(s -> keys(GREBClimate._boundary_anomaly_files(s)) == fieldnames(GREBClimate.BoundaryAnomalyFields),
+              GREBClimate._BOUNDARY_ANOMALY_SOURCES)
 
     # The tools keep their own list: it may hold more, never less
     tools = Module()

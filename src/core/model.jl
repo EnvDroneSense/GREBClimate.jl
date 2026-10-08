@@ -66,21 +66,19 @@ function init_model!(r::ResolvedConfig, fields::ClimateFields)
         q_ini=q_ini, CO2_ctrl=CO2_ctrl)
 end
 
-"The climatologies a [`BoundaryAnomaly`](@ref) adds its anomalies to at scenario start."
-const _BOUNDARY_FIELDS = (:Ts_clim, :u_clim, :v_clim, :omega_clim, :wind_speed_clim)
-
 _add_boundary_anomaly!(::SurfaceForcing, fields::ClimateFields) = fields
 
 function _add_boundary_anomaly!(b::BoundaryAnomaly, fields::ClimateFields)
+    anomaly = fields.boundary_anomaly
+    (anomaly === nothing || fields.boundary_anomaly_source[2] !== b.source) &&
+        error("the boundary anomaly :$(b.source) is not loaded: call load_boundary_anomaly! first")
     if b.source === :cmip5_rcp85
         @info "Applying CMIP5 RCP8.5 climate change forcing"
-        suffix = :_anom_cc
     else
         @info "Applying ERA-Interim $(b.source === :elnino ? "El Niño" : "La Niña") forcing"
-        suffix = :_anom_enso
     end
     for name in _BOUNDARY_FIELDS
-        getfield(fields, name) .+= getfield(fields, Symbol(name, suffix))
+        getfield(fields, name) .+= anomaly[name]
     end
     return fields
 end
@@ -241,9 +239,7 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     # The anomaly files are read once per `fields`, directory and source
     if is_forced_boundary
         dir, source = String(jld2_dir), s.surface.source
-        loaded = source === :cmip5_rcp85 ? fields.anom_cc_source == dir :
-                 fields.anom_enso_source == (dir, source)
-        loaded || load_boundary_anomaly!(dir, fields, source)
+        fields.boundary_anomaly_source == (dir, source) || load_boundary_anomaly!(dir, fields, source)
     end
 
     ini = init_model!(r, fields)
