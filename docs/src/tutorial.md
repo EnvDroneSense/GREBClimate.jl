@@ -104,6 +104,8 @@ runs without any; with the default hydrology such a run diverges within about
 ```julia
 result.ctrl    # Vector{MonthlyRecord}, one per control-run month
 result.scnr    # Vector{MonthlyRecord}, one per scenario-run month
+result.ctrl_time[1]   # (year = 1970, month = 1): the time of result.ctrl[1]
+result.scnr_time[1]   # (year = 1950, month = 1) for a scenario starting in 1950
 ```
 
 Each [`MonthlyRecord`](@ref) is a `NamedTuple` with fields

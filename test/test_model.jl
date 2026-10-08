@@ -81,8 +81,8 @@ end
         @test all(==(distinctive_value), resolve(cfg; jld2_dir = tmpdir).solar_table)
         sw_solar(phase, run) = at_first_step(v -> copy(v.fields.sw_solar), run, cfg; phase, jld2_dir = tmpdir, fields)
         # The control keeps the modern table, the scenario runs on the paleo one
-        @test sw_solar(:ctrl, RunSpec(ctrl = 1, scnr = 0)) == saved_sw_solar
-        @test all(==(distinctive_value), sw_solar(:scnr, RunSpec(ctrl = 0, scnr = 1)))
+        @test sw_solar(GREBClimate.control, RunSpec(ctrl = 1, scnr = 0)) == saved_sw_solar
+        @test all(==(distinctive_value), sw_solar(GREBClimate.scenario, RunSpec(ctrl = 0, scnr = 1)))
 
         # sw_solar restored to its pre-run value after greb_model! returns
         @test fields.sw_solar == saved_sw_solar
@@ -95,8 +95,8 @@ end
     cfg = preset(:regional_co2_nh; corrections = NoCorrections())
     part(phase, run) = at_first_step(v -> copy(v.fields.co2_part), run, cfg; phase, jld2_dir = "")
     # The control runs on the full CO2 everywhere, as in the original code
-    @test all(isone, part(:ctrl, RunSpec(ctrl = 1, scnr = 0)))
-    scnr = part(:scnr, RunSpec(ctrl = 0, scnr = 1))
+    @test all(isone, part(GREBClimate.control, RunSpec(ctrl = 1, scnr = 0)))
+    scnr = part(GREBClimate.scenario, RunSpec(ctrl = 0, scnr = 1))
     @test all(==(0.5f0), scnr[:, 1:24]) && all(isone, scnr[:, 25:48])
 end
 
@@ -338,15 +338,15 @@ end
             cfg = preset(p; corrections = NoCorrections())
             tclim(phase, run) = at_first_step(v -> copy(v.fields.Ts_clim), run, cfg; phase,
                                               jld2_dir = tmpdir_anom, fields = ClimateFields())
-            @test all(iszero, tclim(:ctrl, RunSpec(ctrl = 1, scnr = 0)))
-            @test all(==(anomaly), tclim(:scnr, RunSpec(ctrl = 0, scnr = 1)))
+            @test all(iszero, tclim(GREBClimate.control, RunSpec(ctrl = 1, scnr = 0)))
+            @test all(==(anomaly), tclim(GREBClimate.scenario, RunSpec(ctrl = 0, scnr = 1)))
         end
 
         # A second run on the same fields and directory does not read the files
         # again; another event or another directory does.
         reused = ClimateFields()
         first_tclim(p, dir) = at_first_step(v -> copy(v.fields.Ts_clim), RunSpec(ctrl = 0, scnr = 1),
-                                            preset(p; corrections = NoCorrections()); phase = :scnr,
+                                            preset(p; corrections = NoCorrections()); phase = GREBClimate.scenario,
                                             jld2_dir = dir, fields = reused)
         @test all(==(7.0f0), first_tclim(:lanina, tmpdir_anom))
         @test reused.anom_enso_source == (tmpdir_anom, :lanina)
@@ -387,7 +387,7 @@ end
         f.cap_surf .= cap0
         Ts, Ta, q, To = start()
         quiet() do
-            time_loop!(1, 1970, ini.CO2_ctrl, 1, 0, Ts, Ta, q, To, MonthlyRecord[], f, ModelState(),
+            time_loop!(control_time(), ini.CO2_ctrl, Ts, Ta, q, To, MonthlyRecord[], GREBClimate.RecordTime[], f, ModelState(),
                        ModelWorkspace(), MonthlyAccumulator(), TimeState(1, 1), r)
         end
         return Ts
@@ -422,7 +422,7 @@ end
     # Ts after the first control step
     first_ts(years) = at_first_step(v -> copy(v.Ts), RunSpec(ctrl = 1, scnr = 0),
                                     preset(:full_model; corrections = SpinUp(years));
-                                    phase = :ctrl, jld2_dir = "", fields = synthetic_fields())
+                                    phase = GREBClimate.control, jld2_dir = "", fields = synthetic_fields())
     none, one_year = first_ts(0), first_ts(1)
     @test all(isfinite, none) && none != one_year
 end
@@ -441,7 +441,7 @@ end
                 f = synthetic_fields()
                 f.Ts_flux_correction .= preloaded
                 cfg = preset(:full_model; processes = (topography = topography,), corrections = c)
-                return at_first_step(v -> copy(v.Ts), RunSpec(ctrl = 1, scnr = 0), cfg; phase = :ctrl, jld2_dir, fields = f)
+                return at_first_step(v -> copy(v.Ts), RunSpec(ctrl = 1, scnr = 0), cfg; phase = GREBClimate.control, jld2_dir, fields = f)
             end
             stored = first_ts(Stored())
             @test all(isfinite, stored)
@@ -462,5 +462,31 @@ end
             greb_model!(RunSpec(ctrl = 1, scnr = 0), preset(:full_model; corrections = Stored());
                         jld2_dir = empty_dir, fields = synthetic_fields(), allow_uninitialized = true)
         end
+    end
+end
+
+@testset "greb_model! returns the time of every record" begin
+    run_times(run, config) = quiet() do
+        greb_model!(run, config; fields = synthetic_fields(), allow_uninitialized = true)
+    end
+    # Record n of a phase is month mod1(n, 12) of year start + (n - 1) ÷ 12
+    by_position(start, n) = [(year = start + (i - 1) ÷ 12, month = mod1(i, 12)) for i in 1:n]
+
+    result = run_times(RunSpec(ctrl = 2, scnr = 2), Config(scenario = Scenario(start_year = 1850), corrections = NoCorrections()))
+    @test length(result.ctrl) == length(result.ctrl_time) == 24
+    @test length(result.scnr) == length(result.scnr_time) == 24
+    @test result.ctrl_time == by_position(1970, 24)
+    @test result.scnr_time == by_position(1850, 24)   # the scenario's start year
+
+    @testset "scenario without control" begin
+        result = run_times(RunSpec(ctrl = 0, scnr = 1), preset(:co2_double; corrections = NoCorrections()))
+        @test isempty(result.ctrl) && isempty(result.ctrl_time)
+        @test result.scnr_time == by_position(1950, 12)
+    end
+
+    @testset "years at and below zero" begin
+        config = Config(scenario = Scenario(start_year = -1, output = :absolute), corrections = NoCorrections())
+        result = run_times(RunSpec(ctrl = 0, scnr = 2), config)
+        @test result.scnr_time == by_position(-1, 24)
     end
 end

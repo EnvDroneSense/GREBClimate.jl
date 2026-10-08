@@ -12,6 +12,20 @@ Notable changes to GREBClimate.jl, following
   so on), and its keyword constructor is gone; `MonthlyAccumulator()` is
   unchanged. The output fields are declared once, as
   `GREBClimate.OUTPUT_FIELDS`. Results are unchanged.
+- **Breaking:** one time value, `ModelTime(phase, start_year, step)`, says
+  where a run is; day, month and year are derived from it. Results are
+  unchanged. What changes for a caller:
+  - `greb_model!` returns `(ctrl, scnr, ctrl_time, scnr_time)`. The two new
+    entries hold the `(year, month)` of each record.
+  - `forcing(t::ModelTime, r)` replaces `forcing(it, year, r)`.
+  - `scenario_anomalies(scnr, scnr_time, ctrl_clim)` takes the record times
+    and no longer assumes that the first record is January.
+  - The observer's view has `time`, `phase`, `step`, `year` and
+    `step_of_year` in place of `phase`, `it`, `year` and `ityr`. `phase` is
+    `GREBClimate.control` or `GREBClimate.scenario`, no longer `:ctrl` or
+    `:scnr`; `RangeCheck`'s `first` has `step` in place of `it`.
+  - `time_loop!`, `output!` and `diagnostics!` take the time value and return
+    `nothing`; the month and record counters are gone.
 
 ### Fixed
 

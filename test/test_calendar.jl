@@ -3,7 +3,7 @@ using Test
 using GREBClimate
 using GREBClimate: step_of_year, day_of_year, month_of_day, month_of_step,
     is_day_end, is_month_end, is_year_end, steps_in_month, first_step_of,
-    decimal_year, months_per_year
+    decimal_year, months_per_year, spinup, control, scenario, steps, year, month, data_slice
 
 @testset "calendar" begin
     @testset "step and day of the year" begin
@@ -52,5 +52,47 @@ using GREBClimate: step_of_year, day_of_year, month_of_day, month_of_step,
         @test decimal_year(1991, 730) == 1991 + 729 / 730
         @test decimal_year(1991, 731) == 1991.0   # the caller advances the year
         @test decimal_year(-5, 366) == -5 + 365 / 730
+    end
+end
+
+@testset "model time" begin
+    @testset "a plain value, everything derived" begin
+        @test isbitstype(ModelTime)
+        t = ModelTime(scenario, 1950, 1000)
+        @test (step_of_year(t), day_of_year(t), month(t), year(t)) == (270, 135, 5, 1951)
+        @test data_slice(t) == step_of_year(t)
+        @test decimal_year(t) == 1951 + 269 / 730
+        @test all(s -> month(ModelTime(control, 1970, s)) == month_of_step(s), 1:(2 * nstep_yr))
+        @test all(s -> is_month_end(ModelTime(control, 1970, s)) == is_month_end(s), 1:(2 * nstep_yr))
+        @test is_year_end(ModelTime(control, 1970, 730)) && !is_year_end(ModelTime(control, 1970, 731))
+    end
+
+    @testset "years at and below zero" begin
+        for start in (1970, 1, 0, -231_000)
+            counter = start
+            for s in 1:(3 * nstep_yr)
+                @test year(ModelTime(scenario, start, s)) == counter
+                is_year_end(s) && (counter += 1)
+            end
+        end
+        @test decimal_year(ModelTime(scenario, -5, 366)) == -5 + 365 / 730
+    end
+
+    @testset "the steps of a phase" begin
+        phase = steps(scenario, 1950, 2)
+        @test length(phase) == 2 * nstep_yr && eltype(phase) === ModelTime
+        all_steps = collect(phase)
+        @test first(all_steps) === ModelTime(scenario, 1950, 1)
+        @test last(all_steps) === ModelTime(scenario, 1950, 2 * nstep_yr)
+        @test year(last(all_steps)) == 1951
+        # Walking a phase allocates nothing
+        walk(p) = (n = 0; for t in p; n += year(t); end; n)
+        walk(steps(scenario, 1950, 1))
+        @test @allocated(walk(steps(scenario, 1950, 100))) == 0
+    end
+
+    @testset "empty phase" begin
+        @test isempty(collect(steps(spinup, 1970, 0)))
+        @test length(steps(control, 1970, 0)) == 0
     end
 end

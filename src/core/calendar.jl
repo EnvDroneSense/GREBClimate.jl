@@ -104,3 +104,78 @@ julia> decimal_year(1991, 1), decimal_year(1991, 366)
 ```
 """
 decimal_year(year::Integer, it::Integer) = year + (step_of_year(it) - 1) / nstep_yr
+
+"""
+    Phase
+
+The part of a run a step belongs to: `spinup`, `control` or `scenario`.
+"""
+@enum Phase::UInt8 spinup control scenario
+
+"""
+    ModelTime(phase, start_year, step)
+
+Where a run is: the [`Phase`](@ref), the calendar year the phase started in,
+and the step counted from 1 at the start of the phase. Everything else is
+derived from these three.
+
+```jldoctest
+julia> t = ModelTime(GREBClimate.scenario, 1950, 731);
+
+julia> GREBClimate.year(t), GREBClimate.month(t), step_of_year(t)
+(1951, 1, 1)
+```
+"""
+struct ModelTime
+    phase::Phase
+    start_year::Int
+    step::Int
+end
+
+step_of_year(t::ModelTime) = step_of_year(t.step)
+day_of_year(t::ModelTime) = day_of_year(t.step)
+is_month_end(t::ModelTime) = is_month_end(t.step)
+is_year_end(t::ModelTime) = is_year_end(t.step)
+
+"Month (1-12) of `t`."
+month(t::ModelTime) = month_of_step(t.step)
+
+"Calendar year of `t`. Any whole number: 0 and negative years count on as the others do."
+year(t::ModelTime) = t.start_year + (t.step - 1) ÷ nstep_yr
+
+"""
+    decimal_year(t::ModelTime) -> Float64
+
+The time of `t` as a decimal year on the model calendar.
+"""
+decimal_year(t::ModelTime) = decimal_year(year(t), t.step)
+
+"Index of the climatology slice the model reads at `t`."
+data_slice(t::ModelTime) = step_of_year(t)
+
+struct PhaseSteps
+    phase::Phase
+    start_year::Int
+    nsteps::Int
+end
+
+"""
+    steps(phase, start_year, nyears)
+
+Every [`ModelTime`](@ref) of a phase of `nyears` years that starts on 1 January
+of `start_year`, in order.
+"""
+steps(phase::Phase, start_year::Integer, nyears::Integer) = PhaseSteps(phase, start_year, nyears * nstep_yr)
+
+Base.length(s::PhaseSteps) = s.nsteps
+Base.eltype(::Type{PhaseSteps}) = ModelTime
+Base.iterate(s::PhaseSteps, step::Int=1) =
+    step > s.nsteps ? nothing : (ModelTime(s.phase, s.start_year, step), step + 1)
+
+"""
+    RecordTime
+
+The calendar `year` and `month` (1-12) of one [`MonthlyRecord`](@ref): a
+`NamedTuple`.
+"""
+const RecordTime = @NamedTuple{year::Int, month::Int}
