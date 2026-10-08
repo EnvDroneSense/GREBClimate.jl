@@ -35,7 +35,8 @@ is bit-identity — see the `-t 1` vs `-t 2` monthly-mean comparison in
 not do.
 
 Selecting tests: `SHARD` in `test/support/selection.jl` holds (file, CI shard,
-tier). A new test file needs a row there with the smallest tier that should
-include it: `smoke` for files under ~10 s, `standard` for kernel, budget and
+tier, cost in seconds). `test/parallel.jl` uses the cost to balance the groups it
+runs side by side; a new file needs a rough measured value. A new test file needs
+a row there with the smallest tier that should include it: `smoke` for files under ~10 s, `standard` for kernel, budget and
 preset files, `full` for model runs and anything slow. The source-to-test map
 is in the root `CLAUDE.md`. A subset run proves only the files it ran.

@@ -3,7 +3,7 @@
 #   julia --project=. -t 1 benchmark/profile.jl [mode] [jld2_dir] [--years=N] [--samples=N] [--out=DIR] [--viewer=pprof]
 #   julia --project=. benchmark/profile.jl compare <run before> <run after>
 #
-#   step     - sample control runs of `--years` simulated years (default 50), repeated
+#   step     - sample control runs of `--years` simulated years (default 25), repeated
 #              until `--samples` samples are collected (default 10000): the time loop
 #   setup    - the same with 1-year runs: the cost of one `greb_model!` call
 #   allocs   - record every allocation of one run of `--years` years (default 1)
@@ -37,7 +37,7 @@ const WORKLOAD = "full_model control, stored corrections"
 
 # Years per run and the most runs of each sampling mode. The sampler's rate
 # varies, so a run is repeated until the sample target is reached.
-const CPU_MODES = (step=(years=50, max_runs=8), setup=(years=1, max_runs=400))
+const CPU_MODES = (step=(years=25, max_runs=8), setup=(years=1, max_runs=400))
 const TARGET_SAMPLES = 10_000
 const MIN_SAMPLES = 5_000        # below this only the largest rows mean anything
 const PROFILE_BUFFER = 10_000_000

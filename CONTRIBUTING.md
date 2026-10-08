@@ -77,6 +77,11 @@ GREB_TEST_SHARD=light julia --project=. -e 'using Pkg; Pkg.test()'
 GREB_TEST_SHARD=heavy julia --project=. -e 'using Pkg; Pkg.test()'
 ```
 
+To run the whole suite faster on a multi-core machine, `julia --project=. test/parallel.jl`
+runs the files in four processes at once (`--jobs=N`, `--tier=NAME`, `--shard=NAME`
+narrow it). Each process runs `Pkg.test`, so bounds checking stays on. It takes about
+100 s instead of about 295 s and needs roughly 1 GB of memory per process.
+
 While developing you rarely need the whole suite. Run named files, or a tier
 (`smoke`, `standard`, `full`; each includes the ones before it):
 

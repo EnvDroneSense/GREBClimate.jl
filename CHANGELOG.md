@@ -7,8 +7,15 @@ Notable changes to GREBClimate.jl, following
 
 ## [2.2.0] - 2026-10-09
 
+### Added
+
+- `test/parallel.jl` runs the test files in several processes at once; the whole
+  suite takes about 90 s instead of about 295 s on a 14-thread machine.
+
 ### Changed
 
+- `benchmark/profile.jl step` samples 25 years by default (was 50), which is
+  enough for the sample target in one run.
 - `notebooks/` moved to `viz/notebooks/`; launch with
   `julia viz/notebooks/launch_pluto.jl`.
 - **Breaking:** the fields of `MonthlyAccumulator` take the names of
