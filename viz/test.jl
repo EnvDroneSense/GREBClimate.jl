@@ -48,19 +48,20 @@ fields = (z_topo=Float32[i <= NX ÷ 2 ? 100 : -100 for i in 1:NX, j in 1:NY],)
 
     ctrl = [rec((i, j) -> 280 + m % 12) for m in 0:23]
     anom = [rec((i, j) -> 1f0 + m / 10) for m in 0:23]
-    res = (ctrl=ctrl, scnr=anom)
+    res = (ctrl=ctrl, scnr=anom, scnr_anomaly=true)
 
     @testset "runs" begin
         @test [r[1] for r in GREBViz.runs(res)] == ["control", "scenario anomaly"]
-        @test GREBViz.runs((ctrl=ctrl, scnr=ctrl))[2][3] == false          # orbital: stays absolute
+        @test GREBViz.runs((ctrl=ctrl, scnr=ctrl, scnr_anomaly=false))[2][3] == false   # orbital: stays absolute
+        @test GREBViz.runs((ctrl=ctrl, scnr=anom))[2][3] == false          # no flag: absolute, no guessing
         @test length(GREBViz.runs((ctrl=ctrl, scnr=typeof(ctrl)()))) == 1
         @test_throws ErrorException GREBViz.runs((ctrl=typeof(ctrl)(), scnr=typeof(ctrl)()))
         # A result with record times is dated; one without counts from year 1
         scnr_time = [(year=1950 + m ÷ 12, month=m % 12 + 1) for m in 0:23]
-        dated = GREBViz.runs((ctrl=ctrl, scnr=anom, ctrl_time=GREBViz.by_position(24), scnr_time=scnr_time))
+        dated = GREBViz.runs((ctrl=ctrl, scnr=anom, scnr_anomaly=true, ctrl_time=GREBViz.by_position(24), scnr_time=scnr_time))
         @test dated[2][4] == scnr_time && dated[2][5]
         @test GREBViz.runs(res)[2][4] == GREBViz.by_position(24) && !GREBViz.runs(res)[2][5]
-        @test evolution((ctrl=ctrl, scnr=anom, ctrl_time=GREBViz.by_position(24), scnr_time=scnr_time)).panels[2].labels[[1, 24]] ==
+        @test evolution((ctrl=ctrl, scnr=anom, scnr_anomaly=true, ctrl_time=GREBViz.by_position(24), scnr_time=scnr_time)).panels[2].labels[[1, 24]] ==
               ["Jan 1950", "Dec 1951"]
         @test evolution(res; step=:year).panels[1].labels == ["year 1", "year 2"]
         @test evolution(res).panels[1].labels[13] == "Jan, year 2"

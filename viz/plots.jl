@@ -27,23 +27,22 @@ unitlabel(v) = fieldinfo(v).unit == "" ? fieldinfo(v).label : "$(fieldinfo(v).la
     runs(x) -> Vector of (title, records, anomaly::Bool, times, dated::Bool)
 
 The non-empty runs of a `greb_model!` result, or one untitled run for a bare
-record vector. `res.scnr` is usually an anomaly against the control's final
-year, but stays absolute for orbital experiments and when `ctrl=0`, so the kind
-is read from the data: absolute Ts averages ~280 K, an anomaly a few K.
+record vector. The scenario is an anomaly when the result's `scnr_anomaly` is
+true; a result without that entry, and a bare record vector, count as absolute.
 
 `times` is the `(year, month)` of each record: the result's `ctrl_time` and
 `scnr_time`, and then `dated` is true. Records without times are counted from
 January of year 1 ([`by_position`](@ref)).
 """
 function runs(res::NamedTuple)
-    out = [tagged(name, res[run], get(res, Symbol(run, :_time), nothing))
+    out = [tagged(name, res[run], get(res, Symbol(run, :_time), nothing),
+                  run === :scnr && get(res, :scnr_anomaly, false))
            for (name, run) in (("control", :ctrl), ("scenario", :scnr)) if !isempty(res[run])]
     isempty(out) ? error("the result has no control or scenario records") : out
 end
 runs(records::AbstractVector) = [("", records, false, by_position(length(records)), false)]
 
-function tagged(name, recs, times)
-    anom = mean(first(recs).Ts) < 100
+function tagged(name, recs, times, anom)
     dated = times !== nothing
     (anom ? "$name anomaly" : name, recs, anom, dated ? times : by_position(length(recs)), dated)
 end

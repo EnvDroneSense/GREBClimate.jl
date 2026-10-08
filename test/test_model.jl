@@ -485,6 +485,14 @@ end
     @test result.ctrl_time == by_position(1970, 24)
     @test result.scnr_time == by_position(1850, 24)   # the scenario's start year
 
+    @testset "scnr_anomaly says what scnr holds" begin
+        @test result.scnr_anomaly                       # default output is :anomaly, both runs have records
+        absolute = run_times(RunSpec(ctrl = 1, scnr = 1),
+                             Config(scenario = Scenario(output = :absolute), corrections = NoCorrections()))
+        @test !absolute.scnr_anomaly
+        @test !run_times(RunSpec(ctrl = 0, scnr = 1), preset(:co2_double; corrections = NoCorrections())).scnr_anomaly
+    end
+
     @testset "scenario without control" begin
         result = run_times(RunSpec(ctrl = 0, scnr = 1), preset(:co2_double; corrections = NoCorrections()))
         @test isempty(result.ctrl) && isempty(result.ctrl_time)

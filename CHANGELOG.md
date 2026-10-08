@@ -15,8 +15,10 @@ Notable changes to GREBClimate.jl, following
 - **Breaking:** one time value, `ModelTime(phase, start_year, step)`, says
   where a run is; day, month and year are derived from it. Results are
   unchanged. What changes for a caller:
-  - `greb_model!` returns `(ctrl, scnr, ctrl_time, scnr_time)`. The two new
-    entries hold the `(year, month)` of each record.
+  - `greb_model!` returns `(ctrl, scnr, ctrl_time, scnr_time, scnr_anomaly)`.
+    `ctrl_time` and `scnr_time` hold the `(year, month)` of each record;
+    `scnr_anomaly` is `true` when `scnr` is the anomaly against the control and
+    `false` when it holds absolute values.
   - `forcing(t::ModelTime, r)` replaces `forcing(it, year, r)`.
   - `scenario_anomalies(scnr, scnr_time, ctrl_clim)` takes the record times
     and no longer assumes that the first record is January.
@@ -42,7 +44,9 @@ Notable changes to GREBClimate.jl, following
   `cjday_mon` and `jday_mon_cumsum` are `steps_per_day`, `days_per_year`,
   `days_in_month` and `last_day_of_month`.
 - The plotting toolbox (`viz/`) reads the year and month of each record from
-  the result's `ctrl_time` and `scnr_time`: animation frames are titled
+  the result's `ctrl_time` and `scnr_time`, and whether the scenario is an
+  anomaly from its `scnr_anomaly` (no longer guessed from the temperature):
+  animation frames are titled
   `Jul 1950`, and yearly means and the seasonal cycle group by the record
   times. `annual`, `seasonal_cycle` and `map_frames` take the times as an
   optional argument; a bare record vector is counted from January of year 1,

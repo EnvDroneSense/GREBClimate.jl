@@ -182,11 +182,12 @@ end
 
 Run `config`: its flux corrections (a [`SpinUp`](@ref), the [`Stored`](@ref)
 ones, or none), a control run of `run.ctrl` years and a scenario run of
-`run.scnr` years. Returns `(ctrl, scnr, ctrl_time, scnr_time)`: `ctrl` and
-`scnr` are vectors of [`MonthlyRecord`](@ref), `ctrl_time` and `scnr_time` hold
-the [`RecordTime`](@ref) (year and month) of each record. `scnr` is the
-anomaly against the control's final year when the scenario's `output` is
-`:anomaly`.
+`run.scnr` years. Returns `(ctrl, scnr, ctrl_time, scnr_time, scnr_anomaly)`:
+`ctrl` and `scnr` are vectors of [`MonthlyRecord`](@ref), `ctrl_time` and
+`scnr_time` hold the [`RecordTime`](@ref) (year and month) of each record.
+`scnr_anomaly` is `true` when `scnr` is the anomaly against the control's final
+year: the scenario's `output` is `:anomaly` and both runs have records. It is
+`false` when `scnr` holds absolute values.
 
 | Keyword | Meaning |
 |:--------|:--------|
@@ -352,12 +353,14 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     end
 
     # Post‑processing: anomalies against the control's final year
-    if s.output === :anomaly && !isempty(ctrl_output) && !isempty(scnr_output)
+    scnr_anomaly = s.output === :anomaly && !isempty(ctrl_output) && !isempty(scnr_output)
+    if scnr_anomaly
         ctrl_clim = monthly_climatology(ctrl_output)
         scnr_output = scenario_anomalies(scnr_output, scnr_time, ctrl_clim)
     end
 
-    return (ctrl=ctrl_output, scnr=scnr_output, ctrl_time=ctrl_time, scnr_time=scnr_time)
+    return (ctrl=ctrl_output, scnr=scnr_output, ctrl_time=ctrl_time, scnr_time=scnr_time,
+            scnr_anomaly=scnr_anomaly)
 
     finally
         for (name, a) in saved

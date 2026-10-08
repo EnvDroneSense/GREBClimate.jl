@@ -44,9 +44,9 @@ evolution_gif("run.gif", ev; fields = fields)
 ```
 
 Every plot takes a `greb_model!` result, drawing control and scenario as
-separate panels, or a plain vector of monthly records. The scenario is usually
-an anomaly (a change against the control), drawn on a colour scale centred at
-zero: red is warmer or more, blue colder or less.
+separate panels, or a plain vector of monthly records. When the result's
+`scnr_anomaly` is true the scenario is an anomaly (a change against the
+control), drawn on a colour scale centred at zero: red is warmer or more, blue colder or less.
 
 ## What each plot shows
 
