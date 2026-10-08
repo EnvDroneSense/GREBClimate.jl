@@ -62,7 +62,6 @@ end
 @testset "diagnostics! accumulates annual means and resets at year end" begin
     fields = ClimateFields()
     state = ModelState()
-    ts = TimeState(1, 1)
     z = () -> zeros(GREBClimate.xdim, GREBClimate.ydim)
     surf = SurfaceState(fill(280.0, GREBClimate.xdim, GREBClimate.ydim), fill(270.0, GREBClimate.xdim, GREBClimate.ydim),
         fill(285.0, GREBClimate.xdim, GREBClimate.ydim), fill(0.005, GREBClimate.xdim, GREBClimate.ydim))
@@ -92,7 +91,6 @@ end
 @testset "output! pushes a monthly-mean MonthlyRecord at month boundaries" begin
     ws = ModelWorkspace()
     acc = MonthlyAccumulator()
-    ts = TimeState(1, 1)
     surf = SurfaceState(fill(280.0, GREBClimate.xdim, GREBClimate.ydim), fill(270.0, GREBClimate.xdim, GREBClimate.ydim),
         fill(285.0, GREBClimate.xdim, GREBClimate.ydim), fill(0.005, GREBClimate.xdim, GREBClimate.ydim))
     tend = (albedo=fill(0.3, GREBClimate.xdim, GREBClimate.ydim), SW=fill(100.0, GREBClimate.xdim, GREBClimate.ydim),
@@ -140,7 +138,6 @@ _time_loop_fields() = constant_fields(z_topo = -1.0, swet = 0.5, u = 2.0, v = 1.
     state = ModelState()
     ws = ModelWorkspace()
     acc = MonthlyAccumulator()
-    ts = TimeState(1, 1)
 
     Ts = fill(GREBClimate.min_T_K - 0.5, GREBClimate.xdim, GREBClimate.ydim)
     Ta = copy(ini.Ta_ini)
@@ -150,7 +147,7 @@ _time_loop_fields() = constant_fields(z_topo = -1.0, swet = 0.5, u = 2.0, v = 1.
 
     times = GREBClimate.RecordTime[]
     time_loop!(control_time(), ini.CO2_ctrl, Ts, Ta, q, To, output_buf, times,
-        fields, state, ws, acc, ts, cfg)
+        fields, state, ws, acc, cfg)
 
     @test all(isfinite, Ts)
     @test all(isfinite, Ta)
@@ -174,7 +171,7 @@ end
 
     time_loop!(control_time(), ini.CO2_ctrl, Ts, Ta, copy(ini.q_ini), copy(ini.To_ini),
         MonthlyRecord[], GREBClimate.RecordTime[], fields, ModelState(), ModelWorkspace(), MonthlyAccumulator(),
-        TimeState(1, 1), cfg)
+        cfg)
 
     @test isnan(Ts[5, 5])
     @test isnan(Ta[40, 30])

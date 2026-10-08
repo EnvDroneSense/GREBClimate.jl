@@ -153,6 +153,12 @@ decimal_year(t::ModelTime) = decimal_year(year(t), t.step)
 "Index of the climatology slice the model reads at `t`."
 data_slice(t::ModelTime) = step_of_year(t)
 
+"Index of the slice before `slice`; the year repeats, so the first follows the last."
+previous_slice(slice::Integer) = slice > 1 ? slice - 1 : nstep_yr
+
+"Slice `slice` of a climatology `A` of size `(xdim, ydim, nstep_yr)`, as a view."
+clim_slice(A::AbstractArray{<:Any,3}, slice::Integer) = @view A[:, :, slice]
+
 struct PhaseSteps
     phase::Phase
     start_year::Int

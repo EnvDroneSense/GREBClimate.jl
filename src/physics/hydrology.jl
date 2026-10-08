@@ -8,7 +8,7 @@ const _hydro_ce_ocean = 0.58f0 * ce
 const _hydro_latent_factor = cq_latent * ρ_air * ce
 
 """
-    hydro!(Ts, q, fields::ClimateFields, timestate, p::Processes, h::ResolvedHydrology, ws::ModelWorkspace)
+    hydro!(Ts, q, fields::ClimateFields, slice, p::Processes, h::ResolvedHydrology, ws::ModelWorkspace)
 
 Computes latent heat flux and evaporation/rain tendencies. `h.evaporation`
 selects the evaporation scheme; `h.rain` and its coefficients
@@ -18,7 +18,7 @@ Returns `(Q_lat, Q_lat_air, dq_eva, dq_rain)`. The saturation formula is not
 finite for `Ts` at or below 38.975 K; a run stays above it through the 40 K
 floor.
 """
-function hydro!(Ts, q, fields::ClimateFields, timestate, p::Processes, h::ResolvedHydrology, ws::ModelWorkspace)
+function hydro!(Ts, q, fields::ClimateFields, slice::Int, p::Processes, h::ResolvedHydrology, ws::ModelWorkspace)
     c_q = h.c_q
     c_rq = h.c_rq
     c_omega = h.c_omega
@@ -36,11 +36,11 @@ function hydro!(Ts, q, fields::ClimateFields, timestate, p::Processes, h::Resolv
 
     z_topo = fields.z_topo
     wz_air = fields.wz_air
-    u = @view fields.u_clim[:, :, timestate.ityr]
-    v = @view fields.v_clim[:, :, timestate.ityr]
-    swet = @view fields.soil_wetness_clim[:, :, timestate.ityr]
-    omega = @view fields.omega_clim[:, :, timestate.ityr]
-    omega_std = @view fields.omega_std_clim[:, :, timestate.ityr]
+    u = clim_slice(fields.u_clim, slice)
+    v = clim_slice(fields.v_clim, slice)
+    swet = clim_slice(fields.soil_wetness_clim, slice)
+    omega = clim_slice(fields.omega_clim, slice)
+    omega_std = clim_slice(fields.omega_std_clim, slice)
     rain_limit = fields.rain_limit
     apply_rain_limit = h.rain === :rh
 
@@ -83,7 +83,7 @@ function hydro!(Ts, q, fields::ClimateFields, timestate, p::Processes, h::Resolv
             end
         end
     elseif h.evaporation === :skin
-        ws_view = @view fields.wind_speed_clim[:, :, timestate.ityr]
+        ws_view = clim_slice(fields.wind_speed_clim, slice)
         @turbo for j in 1:ydim
             for i in 1:xdim
                 T0 = Ts[i, j] - 273.15f0
@@ -138,7 +138,7 @@ function hydro!(Ts, q, fields::ClimateFields, timestate, p::Processes, h::Resolv
             end
         end
     elseif h.evaporation === :skin_gust
-        ws_view = @view fields.wind_speed_clim[:, :, timestate.ityr]
+        ws_view = clim_slice(fields.wind_speed_clim, slice)
         gust_land_2 = 81.0f0  # 9.0^2
         gust_ocean_2 = 16.0f0  # 4.0^2
         @turbo for j in 1:ydim

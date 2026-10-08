@@ -284,17 +284,6 @@ Base.@kwdef mutable struct ClimateFields
     loaded::Bool = false
 end
 
-"""
-    TimeState
-
-Tracks the model's position within the current year: `jday` (calendar
-day, 1..365) and `ityr` (timestep-of-year, 1..`nstep_yr`). Mutated in
-place each timestep by [`time_loop!`](@ref)/[`qflux_correction!`](@ref).
-"""
-mutable struct TimeState
-    jday::Int  # Current calendar day in year [1..365]
-    ityr::Int  # Current timestep in year [1..730]
-end
 
 # The land test as a macro for the `@turbo` loops, which compile a comparison
 # they can see better than a function call

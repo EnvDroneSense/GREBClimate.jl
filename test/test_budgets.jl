@@ -10,11 +10,11 @@ function _budget_run(; steps, setup! = (Ts, Ta, q, To, fields) -> nothing, confi
     Ts, Ta, q, To = copy(ini.Ts_ini), copy(ini.Ta_ini), copy(ini.q_ini), copy(ini.To_ini)
     setup!(Ts, Ta, q, To, fields)
     check = GREBClimate.BudgetCheck()
-    state, ws, acc, ts = ModelState(), ModelWorkspace(), MonthlyAccumulator(), TimeState(1, 1)
+    state, ws, acc = ModelState(), ModelWorkspace(), MonthlyAccumulator()
     quiet() do
         for step in 1:steps
             time_loop!(control_time(step), ini.CO2_ctrl, Ts, Ta, q, To, MonthlyRecord[], GREBClimate.RecordTime[],
-                       fields, state, ws, acc, ts, r; observer = check)
+                       fields, state, ws, acc, r; observer = check)
         end
     end
     return check
@@ -46,7 +46,7 @@ end
     quiet() do
         time_loop!(control_time(), ini.CO2_ctrl, Ts, copy(ini.Ta_ini), copy(ini.q_ini), copy(ini.To_ini),
                    MonthlyRecord[], GREBClimate.RecordTime[], fields, ModelState(), ModelWorkspace(), MonthlyAccumulator(),
-                   TimeState(1, 1), r; observer = (point, view) -> (seen[point] = copy(view.Ts)))
+                   r; observer = (point, view) -> (seen[point] = copy(view.Ts)))
     end
     @test seen[:after_tendencies] == ini.Ts_ini
     @test seen[:after_step] == Ts

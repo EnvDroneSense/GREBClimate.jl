@@ -26,6 +26,11 @@ Notable changes to GREBClimate.jl, following
     `:scnr`; `RangeCheck`'s `first` has `step` in place of `it`.
   - `time_loop!`, `output!` and `diagnostics!` take the time value and return
     `nothing`; the month and record counters are gone.
+- **Breaking:** `TimeState` is removed. The physics kernels (`SWradiation!`,
+  `LWradiation!`, `hydro!`, `seaice!`, `deep_ocean!`, `convergence!`,
+  `advection!`, `circulation!`) and `tendencies!` take the index of the
+  climatology slice, an `Int`, where they took a `TimeState`; `time_loop!` and
+  `qflux_correction!` lose the argument. Results are unchanged.
 
 ### Fixed
 

@@ -63,7 +63,7 @@ function output!(t::ModelTime, surf::SurfaceState, tend, ws::ModelWorkspace,
 end
 
 """
-    time_loop!(t::ModelTime, CO2, Ts, Ta, q, To, output_buf, times, fields, state, ws, acc, timestate, r::ResolvedConfig;
+    time_loop!(t::ModelTime, CO2, Ts, Ta, q, To, output_buf, times, fields, state, ws, acc, r::ResolvedConfig;
                ws_a=ws, ws_q=ws, observer=nothing)
 
 One full model timestep at time `t`: computes [`tendencies!`](@ref),
@@ -76,22 +76,20 @@ enable. `observer` is called before and after the update (see
 """
 function time_loop!(t::ModelTime, CO2, Ts, Ta, q, To, output_buf, times,
     fields::ClimateFields, state::ModelState, ws::ModelWorkspace, acc::MonthlyAccumulator,
-    timestate, r::ResolvedConfig; ws_a::ModelWorkspace=ws, ws_q::ModelWorkspace=ws,
+    r::ResolvedConfig; ws_a::ModelWorkspace=ws, ws_q::ModelWorkspace=ws,
     observer=nothing)
-    timestate.jday = day_of_year(t)
-    timestate.ityr = step_of_year(t)
-    ityr = timestate.ityr
+    slice = data_slice(t)
 
     # Compute tendencies
-    tend = tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, timestate, r; ws_a=ws_a, ws_q=ws_q)
+    tend = tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, slice, r; ws_a=ws_a, ws_q=ws_q)
 
     observer === nothing ||
         observer(:after_tendencies, _step_view(t, CO2, Ts, Ta, To, q, tend, fields, r))
 
     # Correction views
-    TF_corr = @view fields.Ts_flux_correction[:, :, ityr]
-    qF_corr = @view fields.q_flux_correction[:, :, ityr]
-    ToF_corr = @view fields.To_flux_correction[:, :, ityr]
+    TF_corr = clim_slice(fields.Ts_flux_correction, slice)
+    qF_corr = clim_slice(fields.q_flux_correction, slice)
+    ToF_corr = clim_slice(fields.To_flux_correction, slice)
     cap_surf = fields.cap_surf
     wz_vapor = fields.wz_vapor
 
@@ -131,7 +129,7 @@ function time_loop!(t::ModelTime, CO2, Ts, Ta, q, To, output_buf, times,
     end
 
     # Sea ice heat capacity
-    seaice!(Ts, fields, timestate, r.config.processes)
+    seaice!(Ts, fields, slice, r.config.processes)
 
     observer === nothing ||
         observer(:after_step, _step_view(t, CO2, Ts, Ta, To, q, tend, fields, r))

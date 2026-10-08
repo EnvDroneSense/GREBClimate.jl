@@ -20,7 +20,7 @@ end
         quiet() do
             init_model!(r, fields)
         end
-        out = hydro!(Ts, q, fields, TimeState(1, 1), Processes(), r.hydrology, ModelWorkspace())
+        out = hydro!(Ts, q, fields, 1, Processes(), r.hydrology, ModelWorkspace())
         @test all(isfinite, out.Q_lat)
         @test all(isfinite, out.dq_rain)
     end
@@ -39,7 +39,6 @@ end
     # Rain coefficients (1, 0, 0, 0): this hand-made climatology has no omega
     r = resolve(preset(:full_model; hydrology = (rain = :original,)))
     state = ModelState()
-    ts = TimeState(1, 1)
     ws = ModelWorkspace()
 
     Ts = fill(290.0, GREBClimate.xdim, GREBClimate.ydim)
@@ -47,7 +46,7 @@ end
     q = fill(0.010, GREBClimate.xdim, GREBClimate.ydim)
     To = fill(285.0, GREBClimate.xdim, GREBClimate.ydim)
 
-    GREBClimate.qflux_correction!(340.0, Ts, Ta, q, To, fields, state, ts, r, ws, 1)
+    GREBClimate.qflux_correction!(340.0, Ts, Ta, q, To, fields, state, r, ws, 1)
 
     @test any(!=(0.0), fields.Ts_flux_correction)
     @test any(!=(0.0), fields.To_flux_correction)
@@ -380,7 +379,7 @@ end
     start() = (copy(ini.Ts_ini), copy(ini.Ta_ini), copy(ini.q_ini), copy(ini.To_ini))
     Ts, Ta, q, To = start()
     quiet() do
-        qflux_correction!(ini.CO2_ctrl, Ts, Ta, q, To, f, ModelState(), TimeState(1, 1), r,
+        qflux_correction!(ini.CO2_ctrl, Ts, Ta, q, To, f, ModelState(), r,
                           ModelWorkspace(), 1)
     end
     function run_step()
@@ -388,7 +387,7 @@ end
         Ts, Ta, q, To = start()
         quiet() do
             time_loop!(control_time(), ini.CO2_ctrl, Ts, Ta, q, To, MonthlyRecord[], GREBClimate.RecordTime[], f, ModelState(),
-                       ModelWorkspace(), MonthlyAccumulator(), TimeState(1, 1), r)
+                       ModelWorkspace(), MonthlyAccumulator(), r)
         end
         return Ts
     end

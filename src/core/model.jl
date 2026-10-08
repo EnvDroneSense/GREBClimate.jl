@@ -109,29 +109,27 @@ end
 const _control_start_year = 1970
 
 """
-    qflux_correction!(CO2_ctrl, Ts, Ta, q, To, fields, state, timestate, r::ResolvedConfig, ws, years; ws_a=ws, ws_q=ws)
+    qflux_correction!(CO2_ctrl, Ts, Ta, q, To, fields, state, r::ResolvedConfig, ws, years; ws_a=ws, ws_q=ws)
 
 Runs `years` years of `tendencies!` to derive the ocean/atmosphere flux
 corrections (`fields.Ts_flux_correction`/`q_flux_correction`/`To_flux_correction`) that make the
 control climate match observed climatology. Mutates `Ts`/`Ta`/`q`/`To` in
 place as it integrates. `ws_a`/`ws_q` are forwarded to [`tendencies!`](@ref).
 """
-function qflux_correction!(CO2_ctrl, Ts, Ta, q, To, fields::ClimateFields, state::ModelState, timestate, r::ResolvedConfig, ws::ModelWorkspace, years;
+function qflux_correction!(CO2_ctrl, Ts, Ta, q, To, fields::ClimateFields, state::ModelState, r::ResolvedConfig, ws::ModelWorkspace, years;
     ws_a::ModelWorkspace=ws, ws_q::ModelWorkspace=ws)
     cap_surf = fields.cap_surf
     for t in steps(spinup, _control_start_year, years)
-        timestate.jday = day_of_year(t)
-        timestate.ityr = step_of_year(t)
-        ityr = timestate.ityr
+        slice = data_slice(t)
 
-        tend = tendencies!(CO2_ctrl, Ts, Ta, To, q, fields, state, ws, timestate, r; ws_a=ws_a, ws_q=ws_q)
+        tend = tendencies!(CO2_ctrl, Ts, Ta, To, q, fields, state, ws, slice, r; ws_a=ws_a, ws_q=ws_q)
 
-        Tc = @view fields.Ts_clim[:, :, ityr]
-        Toc = @view fields.To_clim[:, :, ityr]
-        qc = @view fields.q_clim[:, :, ityr]
-        TFc = @view fields.Ts_flux_correction[:, :, ityr]
-        ToFc = @view fields.To_flux_correction[:, :, ityr]
-        qFc = @view fields.q_flux_correction[:, :, ityr]
+        Tc = clim_slice(fields.Ts_clim, slice)
+        Toc = clim_slice(fields.To_clim, slice)
+        qc = clim_slice(fields.q_clim, slice)
+        TFc = clim_slice(fields.Ts_flux_correction, slice)
+        ToFc = clim_slice(fields.To_flux_correction, slice)
+        qFc = clim_slice(fields.q_flux_correction, slice)
 
         # Surface/air temperature, deep ocean, and humidity update.
         Ts0_buf = ws.Ts0; Ta0_buf = ws.Ta0; To0_buf = ws.To0; q0_buf = ws.q0
@@ -165,7 +163,7 @@ function qflux_correction!(CO2_ctrl, Ts, Ta, q, To, fields::ClimateFields, state
         end
 
         # Sea ice (updates cap_surf in place)
-        seaice!(ws.Ts0, fields, timestate, r.config.processes)
+        seaice!(ws.Ts0, fields, slice, r.config.processes)
 
         surf = SurfaceState(ws.Ts0, ws.Ta0, ws.To0, ws.q0)
         diagnostics!(t, surf, state)
@@ -263,8 +261,6 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     ws_q = ModelWorkspace()
     acc = MonthlyAccumulator()
 
-    timestate = TimeState(1, 1)
-
     # ── 2. Flux-correction spin-up ──────────────────────────────
     corrections = config.corrections
     if corrections isa Stored
@@ -278,7 +274,7 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
         end
     elseif corrections isa SpinUp
         @info "Flux-correction spin-up: CO2 = $CO2_ctrl ppm, $(corrections.years) yr"
-        qflux_correction!(CO2_ctrl, Ts_ini, Ta_ini, q_ini, To_ini, fields, state, timestate, r, ws, corrections.years;
+        qflux_correction!(CO2_ctrl, Ts_ini, Ta_ini, q_ini, To_ini, fields, state, r, ws, corrections.years;
             ws_a=ws_a, ws_q=ws_q)
     else
         @info "No flux corrections"
@@ -301,10 +297,9 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     ctrl_time = RecordTime[]
     sizehint!(ctrl_output, time_ctrl * months_per_year)
     sizehint!(ctrl_time, time_ctrl * months_per_year)
-    timestate = TimeState(1, 1)
 
     for t in steps(control, _control_start_year, time_ctrl)
-        time_loop!(t, CO2_ctrl, Ts, Ta, q, To, ctrl_output, ctrl_time, fields, state, ws, acc, timestate, r;
+        time_loop!(t, CO2_ctrl, Ts, Ta, q, To, ctrl_output, ctrl_time, fields, state, ws, acc, r;
             ws_a=ws_a, ws_q=ws_q, observer=observer)
     end
 
@@ -346,17 +341,17 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
 
         # Forced‑boundary experiments: overwrite Ts with climatology
         if is_forced_boundary
-            Ts .= @view fields.Ts_clim[:, :, data_slice(t)]
+            Ts .= clim_slice(fields.Ts_clim, data_slice(t))
         end
 
         # Ocean surface held at climatology plus an offset, CO2 at control
         if s.surface isa SSTOffset
             CO2 = CO2_ctrl
-            k = data_slice(t)
-            @views @. Ts = ifelse(!is_land(fields.z_topo), fields.Ts_clim[:, :, k] + s.surface.offset, Ts)
+            Ts_clim = clim_slice(fields.Ts_clim, data_slice(t))
+            @. Ts = ifelse(!is_land(fields.z_topo), Ts_clim + s.surface.offset, Ts)
         end
 
-        time_loop!(t, CO2, Ts, Ta, q, To, scnr_output, scnr_time, fields, state, ws, acc, timestate, r;
+        time_loop!(t, CO2, Ts, Ta, q, To, scnr_output, scnr_time, fields, state, ws, acc, r;
             ws_a=ws_a, ws_q=ws_q, observer=observer)
     end
 

@@ -1,12 +1,12 @@
 """
-    seaice!(Ts0, fields::ClimateFields, timestate, p::Processes)
+    seaice!(Ts0, fields::ClimateFields, slice, p::Processes)
 
 Updates `fields.cap_surf` (surface heat capacity) for ocean points based on
 `Ts0`-derived ice fraction, blending land/open-ocean/ice capacities. No-op
 with `p.ocean = :none`; skips the ice blend with `p.ice_albedo = false`.
 """
-function seaice!(Ts0, fields::ClimateFields, timestate, p::Processes)
-    mld = @view fields.mld_clim[:, :, timestate.ityr]
+function seaice!(Ts0, fields::ClimateFields, slice::Int, p::Processes)
+    mld = clim_slice(fields.mld_clim, slice)
     z_topo = fields.z_topo
     glacier = fields.glacier
     cap_surf = fields.cap_surf
@@ -45,14 +45,14 @@ function seaice!(Ts0, fields::ClimateFields, timestate, p::Processes)
 end
 
 """
-    deep_ocean!(Ts, To, fields::ClimateFields, timestate, p::Processes, ws::ModelWorkspace)
+    deep_ocean!(Ts, To, fields::ClimateFields, slice, p::Processes, ws::ModelWorkspace)
 
 Computes surface/deep-ocean coupling tendencies (`dT_ocean`, `dTo`) from
 mixed-layer-depth entrainment/detrainment and turbulent mixing, active only
 where the point is ocean and above the sea-ice threshold. Returns zeros
 unless `p.ocean` is `:full`.
 """
-function deep_ocean!(Ts, To, fields::ClimateFields, timestate, p::Processes, ws::ModelWorkspace)
+function deep_ocean!(Ts, To, fields::ClimateFields, slice::Int, p::Processes, ws::ModelWorkspace)
     # Use pre-allocated zero buffers
     dT_ocean = ws.dT_ocean
     dTo = ws.dTo
@@ -68,8 +68,8 @@ function deep_ocean!(Ts, To, fields::ClimateFields, timestate, p::Processes, ws:
     z_ocean = fields.z_ocean
 
     # ── Change in mixed-layer depth ─────────────────────────
-    mld_now = @view fields.mld_clim[:, :, timestate.ityr]
-    mld_prev = timestate.ityr > 1 ? @view(fields.mld_clim[:, :, timestate.ityr-1]) : @view(fields.mld_clim[:, :, nstep_yr])
+    mld_now = clim_slice(fields.mld_clim, slice)
+    mld_prev = clim_slice(fields.mld_clim, previous_slice(slice))
 
     # Zero buffers first
     fill!(dT_ocean, 0.0f0)

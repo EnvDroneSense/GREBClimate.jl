@@ -5,7 +5,7 @@
     fields = ClimateFields()
     state = ModelState()
     ws = ModelWorkspace()
-    ts = TimeState(1, 1)
+    slice = 1
     r = resolve(preset(:full_model))
 
     Ts = fill(288.0, GREBClimate.xdim, GREBClimate.ydim)
@@ -13,7 +13,7 @@
     To = fill(285.0, GREBClimate.xdim, GREBClimate.ydim)
     q = fill(0.006, GREBClimate.xdim, GREBClimate.ydim)
 
-    tend = tendencies!(340.0, Ts, Ta, To, q, fields, state, ws, ts, r)
+    tend = tendencies!(340.0, Ts, Ta, To, q, fields, state, ws, slice, r)
     @test tend.Q_sens ≈ GREBClimate.ct_sens .* (Ta .- Ts)
     @test all(isfinite, tend.SW)
     @test all(isfinite, tend.LW_surf)
@@ -21,7 +21,7 @@
     @test all(isfinite, tend.dq_crcl)
 
     r_off = resolve(preset(:full_model; processes = (atmosphere = false,)))
-    tend_off = tendencies!(340.0, Ts, Ta, To, q, fields, state, ws, ts, r_off)
+    tend_off = tendencies!(340.0, Ts, Ta, To, q, fields, state, ws, slice, r_off)
     @test all(iszero, tend_off.Q_sens)
 end
 
@@ -32,7 +32,7 @@ end
     # goes with the ocean
     fields = ClimateFields()
     fields.z_topo[1, 1], fields.z_topo[2, 1], fields.z_topo[3, 1] = -1.0f0, 0.0f0, 1.0f0
-    sw = SWradiation!(fill(270.0f0, X, Y), fields, ModelState(), TimeState(1, 1), Processes(), ModelWorkspace())
+    sw = SWradiation!(fill(270.0f0, X, Y), fields, ModelState(), 1, Processes(), ModelWorkspace())
     @test sw.ice_cover[2, 1] == sw.ice_cover[1, 1]
     @test sw.ice_cover[3, 1] > sw.ice_cover[1, 1]
     @test sw.albedo[2, 1] == sw.albedo[1, 1]
@@ -52,7 +52,7 @@ end
         fields.v_clim_pos[i, k, it] = 0.2 + 0.0002 * k
     end
     ws = ModelWorkspace()
-    ts = TimeState(1, 1)
+    slice = 1
     p = Processes()
 
     test_is = [1, 2, 3, 50, 94, 95, 96]
@@ -84,7 +84,7 @@ end
     diffusion!(view(T1, :, :), GREBClimate.z_air, fields, ws)
     @test ws.dX_diff == dX_diff_f32
 
-    advection!(T1, GREBClimate.z_air, fields, ws, ts, p)
+    advection!(T1, GREBClimate.z_air, fields, ws, slice, p)
     dX_adv_ref = Dict(
         (1,1)=>99.99281072836801, (2,1)=>37.62423619149657, (3,1)=>6.428217314852662,
         (50,1)=>-4.182755344492395, (94,1)=>11.771946283998448, (95,1)=>60.257791236566284,
@@ -101,7 +101,7 @@ end
     end
 
     dX_out = zeros(xdim_, ydim_)
-    circulation!(T1, GREBClimate.z_air, dX_out, fields, ws, ts, p)
+    circulation!(T1, GREBClimate.z_air, dX_out, fields, ws, slice, p)
     dX_out_ref = Dict(
         (1,1)=>4824.155681112328, (2,1)=>4609.661409972268, (3,1)=>4395.402855867866,
         (50,1)=>-98.5576039612888, (94,1)=>-4172.300403641432, (95,1)=>-4369.7800972827745,
@@ -122,7 +122,7 @@ end
     Ts = fill(290.0, GREBClimate.xdim, GREBClimate.ydim)
     q = fill(0.005, GREBClimate.xdim, GREBClimate.ydim)
     h = ResolvedHydrology(:fitted, :bogus, 1, 0, 0, 0)
-    @test_throws ErrorException hydro!(Ts, q, ClimateFields(), TimeState(1, 1), Processes(), h, ModelWorkspace())
+    @test_throws ErrorException hydro!(Ts, q, ClimateFields(), 1, Processes(), h, ModelWorkspace())
 end
 
 @testset "hydro! fitted rain: dq_rain and Q_lat_air values, with no limit on rain" begin
@@ -134,9 +134,9 @@ end
 
     Ts = fill(290.0f0, GREBClimate.xdim, GREBClimate.ydim)
     q = fill(0.008f0, GREBClimate.xdim, GREBClimate.ydim)
-    ts = TimeState(1, 1)
+    slice = 1
     ws = ModelWorkspace()
-    result = hydro!(Ts, q, fields, ts, Processes(), h, ws)
+    result = hydro!(Ts, q, fields, slice, Processes(), h, ws)
 
     expected_dq_rain = h.c_q * GREBClimate.cq_rain * q[1, 1]
     @test isapprox(result.dq_rain[1, 1], expected_dq_rain; rtol = 1e-5)
@@ -166,7 +166,7 @@ end
         )
         for scheme in keys(expected)
             h = resolve(preset(:full_model; hydrology = (evaporation = scheme,))).hydrology
-            result = hydro!(Ts, q, fields, TimeState(1, 1), Processes(), h, ModelWorkspace())
+            result = hydro!(Ts, q, fields, 1, Processes(), h, ModelWorkspace())
             @test isapprox(result.Q_lat[1, 1], expected[scheme]; rtol = 1e-5)
             @test isapprox(result.dq_eva[1, 1], -expected[scheme] / G.cq_latent / G.r_qviwv; rtol = 1e-5)
         end
@@ -184,7 +184,7 @@ end
     Ts[1:2, 1] .= (260.0f0, (G.To_ice1 + G.To_ice2) / 2)
     Ts[1:2, 2] .= (250.0f0, (G.Tl_ice1 + G.Tl_ice2) / 2)
     state = ModelState()
-    run(p) = map(copy, SWradiation!(Ts, fields, state, TimeState(1, 1), p, ModelWorkspace()))
+    run(p) = map(copy, SWradiation!(Ts, fields, state, 1, p, ModelWorkspace()))
 
     a_atmos = 0.5 * G.a_cloud
     combined(a_surf) = a_surf + a_atmos - a_surf * a_atmos
@@ -222,7 +222,7 @@ end
     G.derive_fields!(fields, Processes())
     Ts, Ta, q = fill(288.0f0, X, Y), fill(280.0f0, X, Y), fill(0.006f0, X, Y)
     run(co2; p = Processes(), f = fields) =
-        map(copy, LWradiation!(Ts, Ta, q, co2, f, TimeState(1, 1), p, ModelWorkspace()))
+        map(copy, LWradiation!(Ts, Ta, q, co2, f, 1, p, ModelWorkspace()))
     lw = run(340.0f0)
 
     p1, p2, p3, p4, p5, p6, p7, p8, p9, p10 = Float64.(G.emissivity_fit)
@@ -258,19 +258,19 @@ end
     # Fully ice-covered, the middle of the ramp, then ice-free
     Ts = fill(280.0f0, X, Y)
     Ts[1:2, 1] .= (260.0f0, (G.To_ice1 + G.To_ice2) / 2)
-    ts = TimeState(1, 1)
+    slice = 1
 
-    seaice!(Ts, fields, ts, Processes())
+    seaice!(Ts, fields, slice, Processes())
     @test isapprox(fields.cap_surf[1:5, 1],
                    [G.cap_land, (G.cap_land + open_ocean) / 2, open_ocean, G.cap_land, G.cap_land]; rtol = 1e-4)
 
     # Without the ice-albedo feedback the ocean keeps its open-water capacity
-    seaice!(Ts, fields, ts, Processes(ice_albedo = false))
+    seaice!(Ts, fields, slice, Processes(ice_albedo = false))
     @test isapprox(fields.cap_surf[1:5, 1], [open_ocean, open_ocean, open_ocean, G.cap_land, G.cap_land]; rtol = 1e-6)
 
     # Without an ocean the kernel leaves the capacity alone
     fields.cap_surf .= 7.0f0
-    seaice!(Ts, fields, ts, Processes(ocean = :none))
+    seaice!(Ts, fields, slice, Processes(ocean = :none))
     @test all(==(7.0f0), fields.cap_surf)
 end
 
@@ -285,7 +285,7 @@ end
     Ts[3, 1] = 260.0f0                        # under sea ice
     To = fill(280.0f0, X, Y)
     ws = ModelWorkspace()
-    r = deep_ocean!(Ts, To, fields, TimeState(1, 1), Processes(), ws)
+    r = deep_ocean!(Ts, To, fields, 1, Processes(), ws)
     turb, mix = G.turb_coeff, G.c_effmix
     close(a, b) = isapprox(a, b; rtol = 1e-4)
 
@@ -303,7 +303,7 @@ end
 
     # Only the full ocean has a deep layer
     for ocean in (:mixed_layer, :none)
-        off = deep_ocean!(Ts, To, fields, TimeState(1, 1), Processes(ocean = ocean), ws)
+        off = deep_ocean!(Ts, To, fields, 1, Processes(ocean = ocean), ws)
         @test all(iszero, off.dT_ocean) && all(iszero, off.dTo)
     end
 end

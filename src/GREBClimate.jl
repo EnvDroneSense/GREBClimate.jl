@@ -28,7 +28,7 @@ export CO2Path, ConstantCO2, CO2Table, CO2File, A1BRamp, CO2SineWave, CO2Step, S
 export CO2Mask, UniformMask, LatitudeMask, SurfaceMask
 export Solar, ModernSolar, SolarConstant, SolarCycle, SolarTable, EarthSunDistance
 export SurfaceForcing, NoSurfaceForcing, BoundaryAnomaly, SSTOffset
-export RunSpec, ModelWorkspace, MonthlyAccumulator, TimeState, MonthlyRecord
+export RunSpec, ModelWorkspace, MonthlyAccumulator, MonthlyRecord
 export ClimateFields, ModelState, SurfaceState
 export greb_data_dir
 export load_climatology, load_flux_corrections!, load_boundary_anomaly!, read_field

@@ -111,21 +111,19 @@ function time_stages(jld2_dir::AbstractString; cfg=preset(:full_model), reps::In
     CO2 = init_model!(r, fields).CO2_ctrl
     state = ModelState()
     ws = ModelWorkspace()
-    timestate = TimeState(1, 1)
-
-    ityr = timestate.ityr
-    Ts = copy(fields.Ts_clim[:, :, ityr])
+    slice = 1
+    Ts = copy(fields.Ts_clim[:, :, slice])
     Ta = copy(Ts)
-    To = copy(fields.To_clim[:, :, ityr])
-    q = copy(fields.q_clim[:, :, ityr])
+    To = copy(fields.To_clim[:, :, slice])
+    q = copy(fields.q_clim[:, :, slice])
 
     stages = [
-        ("circulation!(Ta)", () -> circulation!(Ta, GREBClimate.z_air, ws.dTa_crcl, fields, ws, timestate, p)),
-        ("circulation!(q)", () -> circulation!(q, GREBClimate.z_vapor, ws.dq_crcl, fields, ws, timestate, p)),
-        ("SWradiation!", () -> SWradiation!(Ts, fields, state, timestate, p, ws)),
-        ("LWradiation!", () -> LWradiation!(Ts, Ta, q, CO2, fields, timestate, p, ws)),
-        ("hydro!", () -> hydro!(Ts, q, fields, timestate, p, r.hydrology, ws)),
-        ("deep_ocean!", () -> deep_ocean!(Ts, To, fields, timestate, p, ws)),
+        ("circulation!(Ta)", () -> circulation!(Ta, GREBClimate.z_air, ws.dTa_crcl, fields, ws, slice, p)),
+        ("circulation!(q)", () -> circulation!(q, GREBClimate.z_vapor, ws.dq_crcl, fields, ws, slice, p)),
+        ("SWradiation!", () -> SWradiation!(Ts, fields, state, slice, p, ws)),
+        ("LWradiation!", () -> LWradiation!(Ts, Ta, q, CO2, fields, slice, p, ws)),
+        ("hydro!", () -> hydro!(Ts, q, fields, slice, p, r.hydrology, ws)),
+        ("deep_ocean!", () -> deep_ocean!(Ts, To, fields, slice, p, ws)),
     ]
 
     for (_, f) in stages
@@ -204,16 +202,14 @@ function check_allocations(jld2_dir::AbstractString)
     CO2 = init_model!(r, fields).CO2_ctrl
     state = ModelState()
     ws = ModelWorkspace()
-    timestate = TimeState(1, 1)
-
-    ityr = timestate.ityr
-    Ts = copy(fields.Ts_clim[:, :, ityr])
+    slice = 1
+    Ts = copy(fields.Ts_clim[:, :, slice])
     Ta = copy(Ts)
-    To = copy(fields.To_clim[:, :, ityr])
-    q = copy(fields.q_clim[:, :, ityr])
+    To = copy(fields.To_clim[:, :, slice])
+    q = copy(fields.q_clim[:, :, slice])
 
-    tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, timestate, r)  # warm-up
-    bytes = @allocated tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, timestate, r)
+    tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, slice, r)  # warm-up
+    bytes = @allocated tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, slice, r)
 
     verdict = bytes <= TENDENCIES_ALLOC_BUDGET ? "within" : "OVER"
     println("tendencies! allocations (single-workspace path): ", bytes, " bytes ",

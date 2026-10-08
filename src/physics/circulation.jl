@@ -39,22 +39,22 @@ function to_ghosted!(P::AbstractMatrix{Float32}, A::AbstractMatrix{<:Real})
 end
 
 """
-    convergence!(T1, fields::ClimateFields, timestate, ws::ModelWorkspace)
+    convergence!(T1, fields::ClimateFields, slice, ws::ModelWorkspace)
 
 Moisture flux convergence from `T1` (specific humidity, `[kg/kg]`) and the
 current `fields.omega_clim` (vertical velocity), writing the tendency into
 `ws.dX_conv`. Implements Eq. 18 from Stassen et al. (2019).
 """
-function convergence!(T1, fields::ClimateFields, timestate, ws::ModelWorkspace)
-    omega = @view fields.omega_clim[:, :, timestate.ityr]
+function convergence!(T1, fields::ClimateFields, slice::Int, ws::ModelWorkspace)
+    omega = clim_slice(fields.omega_clim, slice)
 
     @. ws.dX_conv = -T1 * omega * convergence_factor
     return nothing
 end
 
 # Same tendency, reading a ghosted field.
-function _convergence!(Xp::Matrix{Float32}, fields::ClimateFields, timestate, ws::ModelWorkspace)
-    omega = @view fields.omega_clim[:, :, timestate.ityr]
+function _convergence!(Xp::Matrix{Float32}, fields::ClimateFields, slice::Int, ws::ModelWorkspace)
+    omega = clim_slice(fields.omega_clim, slice)
     dX_conv = ws.dX_conv
 
     @inbounds for k in 1:ydim
@@ -201,13 +201,13 @@ function _diffusion!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, ws::ModelWorkspa
 end
 
 """
-    advection!(T1, h_scl, fields::ClimateFields, ws::ModelWorkspace, timestate, p::Processes)
+    advection!(T1, h_scl, fields::ClimateFields, ws::ModelWorkspace, slice, p::Processes)
 
 Meridional + zonal advection of `T1` (temperature or humidity), writing the
 tendency into `ws.dX_adv`. Gated by `p.heat_advection`/`p.vapor_advection`
 depending on `h_scl`.
 """
-function advection!(T1, h_scl, fields::ClimateFields, ws::ModelWorkspace, timestate, p::Processes)
+function advection!(T1, h_scl, fields::ClimateFields, ws::ModelWorkspace, slice::Int, p::Processes)
     # Disable advection for water vapor or heat according to switches
     if (h_scl == z_vapor && !p.vapor_advection) || (h_scl == z_air && !p.heat_advection)
         fill!(ws.dX_adv, 0.0f0)
@@ -216,20 +216,20 @@ function advection!(T1, h_scl, fields::ClimateFields, ws::ModelWorkspace, timest
     wz = _wz_for(h_scl, fields)
     to_ghosted!(ws.X_work, T1)
     to_ghosted!(ws.wz_ghost, wz)
-    _advection!(ws.X_work, ws.wz_ghost, fields, ws, timestate)
+    _advection!(ws.X_work, ws.wz_ghost, fields, ws, slice)
     return nothing
 end
 
 # Core kernel. `Tp`/`wzp` are ghosted; the switch check has already run.
 function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateFields,
-                     ws::ModelWorkspace, timestate)
+                     ws::ModelWorkspace, slice::Int)
     dX_adv = ws.dX_adv
 
     # Extract 2D views for current time step
-    v_clim_neg_t = @view fields.v_clim_neg[:, :, timestate.ityr]
-    v_clim_pos_t = @view fields.v_clim_pos[:, :, timestate.ityr]
-    u_clim_neg_t = @view fields.u_clim_neg[:, :, timestate.ityr]
-    u_clim_pos_t = @view fields.u_clim_pos[:, :, timestate.ityr]
+    v_clim_neg_t = clim_slice(fields.v_clim_neg, slice)
+    v_clim_pos_t = clim_slice(fields.v_clim_pos, slice)
+    u_clim_neg_t = clim_slice(fields.u_clim_neg, slice)
+    u_clim_pos_t = clim_slice(fields.u_clim_pos, slice)
 
     # Precomputed constants
     ccy = ccy_adv
@@ -360,7 +360,7 @@ function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateF
 end
 
 """
-    circulation!(X_in, h_scl, dX_out, fields::ClimateFields, ws::ModelWorkspace, timestate, p::Processes)
+    circulation!(X_in, h_scl, dX_out, fields::ClimateFields, ws::ModelWorkspace, slice, p::Processes)
 
 Sub-steps `X_in` through `ntime` iterations of [`diffusion!`](@ref),
 [`advection!`](@ref), and [`convergence!`](@ref) (each gated by its
@@ -368,7 +368,7 @@ Sub-steps `X_in` through `ntime` iterations of [`diffusion!`](@ref),
 without an atmosphere or transport. The sub-step loop is a genuine sequential
 recurrence and is not parallelized.
 """
-function circulation!(X_in, h_scl, dX_out, fields::ClimateFields, ws::ModelWorkspace, timestate, p::Processes)
+function circulation!(X_in, h_scl, dX_out, fields::ClimateFields, ws::ModelWorkspace, slice::Int, p::Processes)
     # Early exit if atmospheric processes disabled
     if !p.atmosphere || !p.transport
         fill!(dX_out, 0.0f0)
@@ -399,8 +399,8 @@ function circulation!(X_in, h_scl, dX_out, fields::ClimateFields, ws::ModelWorks
 
     for _tt in 1:ntime
         (do_diff_v || do_diff_h) && _diffusion!(Xp, wzp, ws)
-        (do_adv_v || do_adv_h) && _advection!(Xp, wzp, fields, ws, timestate)
-        do_conv && _convergence!(Xp, fields, timestate, ws)
+        (do_adv_v || do_adv_h) && _advection!(Xp, wzp, fields, ws, slice)
+        do_conv && _convergence!(Xp, fields, slice, ws)
 
         @inbounds for j in 1:ydim
             @turbo for i in 1:xdim

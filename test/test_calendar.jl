@@ -3,7 +3,8 @@ using Test
 using GREBClimate
 using GREBClimate: step_of_year, day_of_year, month_of_day, month_of_step,
     is_day_end, is_month_end, is_year_end, steps_in_month, first_step_of,
-    decimal_year, months_per_year, spinup, control, scenario, steps, year, month, data_slice
+    decimal_year, months_per_year, spinup, control, scenario, steps, year, month, data_slice,
+    previous_slice, clim_slice
 
 @testset "calendar" begin
     @testset "step and day of the year" begin
@@ -89,6 +90,16 @@ end
         walk(p) = (n = 0; for t in p; n += year(t); end; n)
         walk(steps(scenario, 1950, 1))
         @test @allocated(walk(steps(scenario, 1950, 100))) == 0
+    end
+
+    @testset "from time to data" begin
+        @test data_slice(ModelTime(scenario, 1950, 731)) == 1
+        @test previous_slice(2) == 1 && previous_slice(nstep_yr) == nstep_yr - 1
+        @test previous_slice(1) == nstep_yr   # the year repeats
+        A = reshape(collect(1:24), 2, 3, 4)
+        @test clim_slice(A, 3) == A[:, :, 3]
+        clim_slice(A, 3)[1, 1] = -1
+        @test A[1, 1, 3] == -1                # a view, not a copy
     end
 
     @testset "empty phase" begin
