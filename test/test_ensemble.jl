@@ -7,9 +7,7 @@
     configs = [preset(:co2_double; corrections = NoCorrections()),
                preset(:co2_double; corrections = NoCorrections(), hydrology = (evaporation = :skin,)),
                preset(:co2_double; corrections = SpinUp(1))]
-    alone = quiet() do
-        [greb_model!(run, c; fields = deepcopy(fields), allow_uninitialized = true) for c in configs]
-    end
+    alone = [run_synthetic(run, c; fields = deepcopy(fields)) for c in configs]
     same(a, b) = length(a) == length(b) &&
                  all(isequal(getfield(x, f), getfield(y, f)) for (x, y) in zip(a, b) for f in fieldnames(typeof(x)))
 

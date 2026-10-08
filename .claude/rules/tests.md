@@ -21,7 +21,10 @@ buffers by hand under `@inbounds`/`@turbo`, exactly where bounds checking
 earns its cost. Do not disable or "optimize" it away.
 
 Shared fixtures live in `test/support/testutils.jl` (`synthetic_fields`,
-`constant_fields`, `uniform_record`, `quiet`, `with_tempdir`, `gmean`).
+`constant_fields`, `uniform_record`, `quiet`, `with_tempdir`, `gmean`, `run_synthetic`).
+`run_synthetic(run, config; fields, kwargs...)` is a muted `greb_model!` on
+`synthetic_fields()` with `allow_uninitialized`: use it for short model runs
+that do not need the dataset.
 `at_first_step` runs `greb_model!` to the first step of a phase through the
 observer and returns what it saw there: use it for what a preset decides at
 the start (the CO2, the solar table, the climatology in use) instead of

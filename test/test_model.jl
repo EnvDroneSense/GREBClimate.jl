@@ -251,10 +251,7 @@ end
         f = ClimateFields()
         f.z_topo[1:(X - 48), :] .= 100.0f0   # left half land, right half ocean
         cfg = preset(sym; corrections = NoCorrections())
-        result = quiet() do
-            greb_model!(RunSpec(ctrl = 1, scnr = 0), cfg;
-                        jld2_dir = "", fields = f, allow_uninitialized = true)
-        end
+        result = run_synthetic(RunSpec(ctrl = 1, scnr = 0), cfg; fields = f)
         expected = ClimateFields()
         expected.z_topo .= f.z_topo
         GREBClimate.apply_surface_mask!(cfg.scenario.co2_mask, expected, ice_climatology(result.ctrl))
@@ -416,10 +413,7 @@ end
     # and humidity and the mixed-layer ocean replace their climatologies.
     cfg = preset(:full_model; corrections = NoCorrections(),
                  processes = (topography = :flat, clouds = :uniform, humidity = :uniform, ocean = :mixed_layer))
-    quiet() do
-        greb_model!(RunSpec(ctrl = 1, scnr = 0), cfg; jld2_dir = "", fields = f,
-                    allow_uninitialized = true)
-    end
+    run_synthetic(RunSpec(ctrl = 1, scnr = 0), cfg; fields = f)
     for n in names
         @test getfield(f, n) == before[n]
     end
@@ -465,17 +459,13 @@ end
     end
     # A directory without the corrections file is an error, not a run on zeros
     with_tempdir() do empty_dir
-        @test_throws ArgumentError quiet() do
-            greb_model!(RunSpec(ctrl = 1, scnr = 0), preset(:full_model; corrections = Stored());
-                        jld2_dir = empty_dir, fields = synthetic_fields(), allow_uninitialized = true)
-        end
+        @test_throws ArgumentError run_synthetic(RunSpec(ctrl = 1, scnr = 0),
+                                                 preset(:full_model; corrections = Stored()); jld2_dir = empty_dir)
     end
 end
 
 @testset "greb_model! returns the time of every record" begin
-    run_times(run, config) = quiet() do
-        greb_model!(run, config; fields = synthetic_fields(), allow_uninitialized = true)
-    end
+    run_times(run, config) = run_synthetic(run, config)
     # Record n of a phase is month mod1(n, 12) of year start + (n - 1) ÷ 12
     by_position(start, n) = [(year = start + (i - 1) ÷ 12, month = mod1(i, 12)) for i in 1:n]
 

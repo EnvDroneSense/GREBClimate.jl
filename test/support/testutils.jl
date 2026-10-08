@@ -109,6 +109,17 @@ scenario_time(year, step = 1) = ModelTime(GREBClimate.scenario, year, step)
 "The time of control step `step`."
 control_time(step = 1) = ModelTime(GREBClimate.control, 1970, step)
 
+"""
+Run `greb_model!(run, config; kwargs...)` with the logger muted, on `fields`
+(default `synthetic_fields()`) and without the dataset: `jld2_dir` is empty
+unless given, and `allow_uninitialized` is set.
+"""
+function run_synthetic(run, config; fields = synthetic_fields(), jld2_dir = "", kwargs...)
+    return quiet() do
+        greb_model!(run, config; jld2_dir, fields, allow_uninitialized = true, kwargs...)
+    end
+end
+
 struct StopRun <: Exception end
 
 """

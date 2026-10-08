@@ -25,10 +25,7 @@ end
     its = Int[]
     times = ModelTime[]
     observer = (point, view) -> (push!(calls, (view.phase, point)); push!(its, view.step); push!(times, view.time))
-    quiet() do
-        greb_model!(RunSpec(ctrl = 1, scnr = 1), preset(:full_model; corrections = NoCorrections());
-                    fields = synthetic_fields(), allow_uninitialized = true, observer = observer)
-    end
+    run_synthetic(RunSpec(ctrl = 1, scnr = 1), preset(:full_model; corrections = NoCorrections()); observer)
     step = [:after_tendencies, :after_step]
     @test calls == [(phase, point) for phase in (GREBClimate.control, GREBClimate.scenario) for _ in 1:N for point in step]
     @test its == [it for _ in 1:2 for it in 1:N for _ in 1:2]
@@ -125,9 +122,6 @@ end
 
     # In a run it sees every step of the control and the scenario
     seen = G.RangeCheck(Ts = (-Inf, Inf), Ta = (-Inf, Inf), To = (-Inf, Inf), q = (-Inf, Inf))
-    quiet() do
-        greb_model!(RunSpec(ctrl = 1, scnr = 1), preset(:full_model; corrections = NoCorrections());
-                    fields = synthetic_fields(), allow_uninitialized = true, observer = seen)
-    end
+    run_synthetic(RunSpec(ctrl = 1, scnr = 1), preset(:full_model; corrections = NoCorrections()); observer = seen)
     @test seen.steps == 2N
 end
