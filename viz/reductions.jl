@@ -16,8 +16,20 @@ colder than the weighted mean.
 """
 area_weights(nx::Integer, ny::Integer) = [cosd(φ) for _ in 1:nx, φ in lats(ny)]
 
-"Index ranges of the whole years in `n` months; a trailing partial year is dropped."
-yearblocks(n::Integer) = (i:i+11 for i in 1:12:n-11)
+"""
+    by_position(n)
+
+The `(year, month)` of each of `n` records that carry no times: January of year
+1 onward. A `greb_model!` result brings its own times (`ctrl_time`,
+`scnr_time`); this is for a bare record vector.
+"""
+by_position(n::Integer) = [(year=cld(i, 12), month=mod1(i, 12)) for i in 1:n]
+
+"Record indices of each whole year in `times`, in order; a year without all 12 months is dropped."
+function yearblocks(times::AbstractVector)
+    blocks = [findall(t -> t.year == y, times) for y in unique(t.year for t in times)]
+    filter(b -> length(b) == 12, blocks)
+end
 
 "Area-weighted global mean of `var`, one value per month."
 function series(records::AbstractVector, var::Symbol)
@@ -25,14 +37,23 @@ function series(records::AbstractVector, var::Symbol)
     [sum(getfield(r, var) .* w) / sum(w) for r in records]
 end
 
-"Calendar-year means of a monthly series."
-annual(s::AbstractVector) = [mean(s[b]) for b in yearblocks(length(s))]
+"""
+    annual(s, times=by_position(length(s)))
 
-"Each calendar month's global mean, averaged over the whole years present."
-function seasonal_cycle(records::AbstractVector, var::Symbol)
+Calendar-year means of a monthly series, one per whole year. `times` holds the
+`(year, month)` of each value.
+"""
+annual(s::AbstractVector, times::AbstractVector=by_position(length(s))) = [mean(s[b]) for b in yearblocks(times)]
+
+"""
+    seasonal_cycle(records, var, times=by_position(length(records)))
+
+Each calendar month's global mean, averaged over the whole years present.
+"""
+function seasonal_cycle(records::AbstractVector, var::Symbol, times::AbstractVector=by_position(length(records)))
     s = series(records, var)
-    n = 12 * (length(s) ÷ 12)
-    n == 0 ? Float64[] : [mean(s[m:12:n]) for m in 1:12]
+    whole = reduce(vcat, yearblocks(times); init=Int[])
+    isempty(whole) ? Float64[] : [mean(s[i] for i in whole if times[i].month == m) for m in 1:12]
 end
 
 """
@@ -57,13 +78,14 @@ function hovmoller(records::AbstractVector, var::Symbol)
 end
 
 """
-    map_frames(records, var; step=:month) -> Vector{Matrix{Float64}}
+    map_frames(records, var; step=:month, times=by_position(length(records))) -> Vector{Matrix{Float64}}
 
 One grid per month, or per whole calendar year with `step=:year`.
 """
-function map_frames(records::AbstractVector, var::Symbol; step::Symbol=:month)
+function map_frames(records::AbstractVector, var::Symbol; step::Symbol=:month,
+                    times::AbstractVector=by_position(length(records)))
     frames = [Float64.(getfield(r, var)) for r in records]
     step === :month && return frames
-    step === :year && return [mean(frames[b]) for b in yearblocks(length(frames))]
+    step === :year && return [mean(frames[b]) for b in yearblocks(times)]
     error("step must be :month or :year, got :$step")
 end

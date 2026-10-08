@@ -127,8 +127,14 @@ row by the cosine of its latitude:
 Ts_global_mean = [global_mean(rec.Ts) for rec in result.ctrl]
 ```
 
-Record `i` of a phase is month `mod(i - 1, 12) + 1` of year `(i - 1) ÷ 12 + 1`
-of that phase. For the model's own calendar (365 days, 730 steps a year, no
+The year and month of record `i` are `result.ctrl_time[i]` and
+`result.scnr_time[i]`:
+
+```julia
+july = [rec.Ts for (rec, time) in zip(result.scnr, result.scnr_time) if time.month == 7]
+```
+
+For the model's own calendar (365 days, 730 steps a year, no
 leap years) there are [`step_of_year`](@ref), [`day_of_year`](@ref),
 [`month_of_step`](@ref) and [`decimal_year`](@ref).
 

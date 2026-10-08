@@ -31,6 +31,12 @@ Notable changes to GREBClimate.jl, following
   `advection!`, `circulation!`) and `tendencies!` take the index of the
   climatology slice, an `Int`, where they took a `TimeState`; `time_loop!` and
   `qflux_correction!` lose the argument. Results are unchanged.
+- The plotting toolbox (`viz/`) reads the year and month of each record from
+  the result's `ctrl_time` and `scnr_time`: animation frames are titled
+  `Jul 1950`, and yearly means and the seasonal cycle group by the record
+  times. `annual`, `seasonal_cycle` and `map_frames` take the times as an
+  optional argument; a bare record vector is counted from January of year 1,
+  as before.
 
 ### Fixed
 

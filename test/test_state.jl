@@ -68,7 +68,7 @@ end
     end
 
     # MonthlyAccumulator: every field (xdim, ydim). There is no `count`
-    # field - output! divides by cjday_mon[mon] * ndt_days.
+    # field - output! divides by steps_in_month(month).
     ma = MonthlyAccumulator()
     @test fieldnames(MonthlyAccumulator) == GREBClimate.OUTPUT_FIELDS
     for f in fieldnames(MonthlyAccumulator)

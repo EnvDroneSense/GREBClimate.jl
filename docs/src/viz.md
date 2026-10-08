@@ -61,6 +61,12 @@ zero: red is warmer or more, blue colder or less.
 The numbers behind the plots are available directly: `series`, `annual`,
 `seasonal_cycle`, `field`, `hovmoller`, `map_frames` and `area_weights`.
 
+Given a `greb_model!` result, the plots read the year and month of each record
+from its `ctrl_time` and `scnr_time`, so an animation frame is titled
+`Jul 1950`. A bare record vector carries no times and is counted from January
+of year 1; `annual`, `seasonal_cycle` and `map_frames` take the times as an
+optional argument (`seasonal_cycle(result.scnr, :Ts, result.scnr_time)`).
+
 ```bash
 julia --project=viz viz/demo.jl [output_dir]   # runs GREB and saves every plot
 julia --project=viz viz/test.jl                # the toolbox's tests
