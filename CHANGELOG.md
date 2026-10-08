@@ -5,6 +5,14 @@ Notable changes to GREBClimate.jl, following
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** the fields of `MonthlyAccumulator` take the names of
+  `MonthlyRecord` (`Tmm` is now `Ts`, `apmm` is `albedo`, `olrmm` is `olr`, and
+  so on), and its keyword constructor is gone; `MonthlyAccumulator()` is
+  unchanged. The output fields are declared once, as
+  `GREBClimate.OUTPUT_FIELDS`. Results are unchanged.
+
 ### Fixed
 
 - `:a1b` (`A1BRamp`) holds 700 ppm after 2100, as the Fortran does. It fell

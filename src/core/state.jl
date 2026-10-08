@@ -79,77 +79,132 @@ struct SurfaceState
 end
 
 """
+    @output_fields (args...) begin
+        name += expr
+        name -= expr
+    end
+
+Declares the monthly output fields, one row per field. A row says what one
+timestep adds to the monthly sum of `name`; each `struct.field` in `expr` is an
+`(xdim, ydim)` array, read cell by cell. `args` are the arguments of
+`accumulate!` after the accumulator.
+
+Defines:
+
+- [`OUTPUT_FIELDS`](@ref): the names, in row order
+- [`MonthlyAccumulator`](@ref): one field per row
+- `accumulate!(acc, args...)`: adds one timestep, in a single `@turbo` loop
+- `monthly_means(acc, nstep)`: the sums divided by `nstep`, as a record
+- `reset!(acc)`: zeroes the sums
+"""
+macro output_fields(args, rows)
+    names = Symbol[]
+    arrays = Pair{Symbol,Expr}[]
+    updates = Expr[]
+
+    # `struct.field` becomes a local array indexed at the cell
+    function at_cell(ex)
+        ex isa Expr || return ex
+        if ex.head === :.
+            array = Symbol(ex.args[1], :_, ex.args[2].value)
+            any(p -> first(p) === array, arrays) || push!(arrays, array => ex)
+            return :($array[i, j])
+        end
+        return Expr(ex.head, map(at_cell, ex.args)...)
+    end
+
+    for row in rows.args
+        row isa LineNumberNode && continue
+        row isa Expr && row.head in (:+=, :-=) && row.args[1] isa Symbol ||
+            error("@output_fields: expected `name += expr` or `name -= expr`, got `$row`")
+        name = row.args[1]
+        push!(names, name)
+        push!(updates, Expr(row.head, :($(Symbol(:sum_, name))[i, j]), at_cell(row.args[2])))
+    end
+
+    return esc(quote
+        const OUTPUT_FIELDS = $(Expr(:tuple, QuoteNode.(names)...))
+
+        struct MonthlyAccumulator
+            $((:($name::Matrix{Float32}) for name in names)...)
+        end
+
+        function accumulate!(acc::MonthlyAccumulator, $(args.args...))
+            $((:($(Symbol(:sum_, name)) = acc.$name) for name in names)...)
+            $((:($array = $field) for (array, field) in arrays)...)
+            @turbo for j in 1:ydim
+                for i in 1:xdim
+                    $(updates...)
+                end
+            end
+            return nothing
+        end
+
+        monthly_means(acc::MonthlyAccumulator, nstep) =
+            $(Expr(:tuple, (Expr(:(=), name, :(acc.$name ./ nstep)) for name in names)...))
+
+        function reset!(acc::MonthlyAccumulator)
+            $((:(fill!(acc.$name, 0.0f0)) for name in names)...)
+            return acc
+        end
+    end)
+end
+
+# `tend` is what `tendencies!` returns
+@output_fields (surf::SurfaceState, tend, ws::ModelWorkspace) begin
+    Ts     += surf.Ts
+    Ta     += surf.Ta
+    To     += surf.To
+    q      += surf.q
+    albedo += tend.albedo
+    ice    += tend.ice_cover
+    precip += ws.precip
+    evap   += ws.evap
+    qcrcl  += ws.qcrcl
+    sw     += tend.SW
+    lw     += tend.LW_surf
+    qlat   += tend.Q_lat
+    qsens  += tend.Q_sens
+    olr    -= tend.LW_up + (1.0f0 - tend.em) * tend.LW_surf
+    lwdown -= tend.LW_down
+end
+
+"""
+    OUTPUT_FIELDS
+
+The names of the monthly output fields, in the order of a
+[`MonthlyRecord`](@ref). The record type and the accumulator are built from
+the same list.
+"""
+OUTPUT_FIELDS
+
+"""
     MonthlyAccumulator
 
-Accumulates fields over a month for monthly-mean output. Reset after each
-month via `reset!`. `olrmm` and `lwdownmm` are summed with the signs of
-[`MonthlyRecord`](@ref) (`olr` positive upward, `lwdown` positive into the
-surface).
+The sums of the output fields over the current month, one `(xdim, ydim)` field
+per name in [`OUTPUT_FIELDS`](@ref); `olr` and `lwdown` carry the signs of
+[`MonthlyRecord`](@ref). [`output!`](@ref) adds to it every step, divides it
+into a record at the end of the month and resets it with `reset!`.
 """
-Base.@kwdef struct MonthlyAccumulator
-    Tmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface temperature accumulator
-    Tamm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Air temperature accumulator
-    Tomm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Ocean temperature accumulator
-    qmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Humidity accumulator
-    apmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Albedo accumulator
-    icemm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Ice fraction accumulator
-    precipmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Precipitation accumulator
-    evapmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Evaporation accumulator
-    qcrclmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Circulation moisture accumulator
-    swmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Shortwave radiation accumulator
-    lwmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Longwave radiation accumulator
-    qlatmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Latent heat accumulator
-    qsensmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Sensible heat accumulator
-    olrmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Outgoing longwave accumulator
-    lwdownmm::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Downward longwave accumulator
-end
+MonthlyAccumulator
 
-function reset!(acc::MonthlyAccumulator)
-    fill!(acc.Tmm, 0.0f0)
-    fill!(acc.Tamm, 0.0f0)
-    fill!(acc.Tomm, 0.0f0)
-    fill!(acc.qmm, 0.0f0)
-    fill!(acc.apmm, 0.0f0)
-    fill!(acc.icemm, 0.0f0)
-    fill!(acc.precipmm, 0.0f0)
-    fill!(acc.evapmm, 0.0f0)
-    fill!(acc.qcrclmm, 0.0f0)
-    fill!(acc.swmm, 0.0f0)
-    fill!(acc.lwmm, 0.0f0)
-    fill!(acc.qlatmm, 0.0f0)
-    fill!(acc.qsensmm, 0.0f0)
-    fill!(acc.olrmm, 0.0f0)
-    fill!(acc.lwdownmm, 0.0f0)
-end
+MonthlyAccumulator() = MonthlyAccumulator(map(_ -> zeros(Float32, xdim, ydim), OUTPUT_FIELDS)...)
 
-function accumulate!(acc::MonthlyAccumulator, Ts, Ta, To, q, albedo, ice, precip, evap, qcrcl, sw, lw, qlat, qsens,
-    lw_up, lw_down, em)
-    Tmm = acc.Tmm; Tamm = acc.Tamm; Tomm = acc.Tomm; qmm = acc.qmm
-    apmm = acc.apmm; icemm = acc.icemm
-    precipmm = acc.precipmm; evapmm = acc.evapmm; qcrclmm = acc.qcrclmm
-    swmm = acc.swmm; lwmm = acc.lwmm; qlatmm = acc.qlatmm; qsensmm = acc.qsensmm
-    olrmm = acc.olrmm; lwdownmm = acc.lwdownmm
+"""
+    MonthlyRecord
 
-    @turbo for j in 1:ydim
-        for i in 1:xdim
-            Tmm[i, j] += Ts[i, j]
-            Tamm[i, j] += Ta[i, j]
-            Tomm[i, j] += To[i, j]
-            qmm[i, j] += q[i, j]
-            apmm[i, j] += albedo[i, j]
-            icemm[i, j] += ice[i, j]
-            precipmm[i, j] += precip[i, j]
-            evapmm[i, j] += evap[i, j]
-            qcrclmm[i, j] += qcrcl[i, j]
-            swmm[i, j] += sw[i, j]
-            lwmm[i, j] += lw[i, j]
-            qlatmm[i, j] += qlat[i, j]
-            qsensmm[i, j] += qsens[i, j]
-            olrmm[i, j] -= lw_up[i, j] + (1.0f0 - em[i, j]) * lw[i, j]
-            lwdownmm[i, j] -= lw_down[i, j]
-        end
-    end
-end
+One monthly-mean output record: a `NamedTuple` with fields `Ts`, `Ta`, `To`,
+`q`, `albedo`, `ice`, `precip`, `evap`, `qcrcl`, `sw`, `lw`, `qlat`, `qsens`,
+`olr`, `lwdown` ([`OUTPUT_FIELDS`](@ref)), each an `(xdim, ydim)`
+`Matrix{Float32}`. Produced by [`output!`](@ref); `greb_model!`'s
+`ctrl`/`scnr` results are `Vector{MonthlyRecord}`.
+
+The fluxes are in W/m2. `sw`, `lw`, `qlat` and `qsens` are positive into the
+surface; `lw` is the surface's own emission alone, so it is negative. `olr` is
+the longwave leaving to space, positive upward; `lwdown` is the longwave the
+air sends down, positive into the surface.
+"""
+const MonthlyRecord = NamedTuple{OUTPUT_FIELDS,NTuple{length(OUTPUT_FIELDS),Matrix{Float32}}}
 
 """
     ClimateFields
@@ -322,19 +377,3 @@ end
 function ModelState()
     ModelState(1.0f0, zeros(Float32, xdim, ydim))
 end
-
-"""
-    MonthlyRecord
-
-One monthly-mean output record: a `NamedTuple` with fields `Ts`, `Ta`, `To`,
-`q`, `albedo`, `ice`, `precip`, `evap`, `qcrcl`, `sw`, `lw`, `qlat`, `qsens`,
-`olr`, `lwdown`, each an `(xdim, ydim)` `Matrix{Float32}`. Produced by
-[`output!`](@ref); `greb_model!`'s `ctrl`/`scnr` results are
-`Vector{MonthlyRecord}`.
-
-The fluxes are in W/m2. `sw`, `lw`, `qlat` and `qsens` are positive into the
-surface; `lw` is the surface's own emission alone, so it is negative. `olr` is
-the longwave leaving to space, positive upward; `lwdown` is the longwave the
-air sends down, positive into the surface.
-"""
-const MonthlyRecord = NamedTuple{(:Ts, :Ta, :To, :q, :albedo, :ice, :precip, :evap, :qcrcl, :sw, :lw, :qlat, :qsens, :olr, :lwdown),NTuple{15,Matrix{Float32}}};

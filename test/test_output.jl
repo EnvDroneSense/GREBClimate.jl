@@ -115,6 +115,15 @@ end
     # emission the air lets through, 200 + (1 - 0.75) * 50. Positive upward.
     @test all(==(212.5), output_buf[1].olr)
     @test all(==(210.0), output_buf[1].lwdown)   # positive into the surface
+
+    # Every field of the list reaches the record under its own name
+    @test keys(output_buf[1]) == GREBClimate.OUTPUT_FIELDS
+    expected = (Ts=280.0, Ta=270.0, To=285.0, q=0.005, albedo=0.3, ice=0.1, precip=2.0, evap=1.0,
+        qcrcl=0.5, sw=100.0, lw=-50.0, qlat=-20.0, qsens=-5.0, olr=212.5, lwdown=210.0)
+    for name in GREBClimate.OUTPUT_FIELDS
+        @test all(x -> isapprox(x, expected[name]; rtol=1.0f-5), output_buf[1][name])
+    end
+    @test all(f -> all(iszero, getfield(acc, f)), fieldnames(MonthlyAccumulator))   # reset after the record
 end
 
 # All ocean, with wind and rising air

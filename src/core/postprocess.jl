@@ -28,14 +28,12 @@ function scenario_anomalies(scnr_records::Vector{MonthlyRecord}, ctrl_clim::Vect
     isempty(scnr_records) && return scnr_records
     isempty(ctrl_clim) && return scnr_records
 
-    fields = propertynames(scnr_records[1])
     anom = MonthlyRecord[]
 
     for (idx, rec) in enumerate(scnr_records)
         mon = mod(idx - 1, months_per_year) + 1
         ref = ctrl_clim[mon]
-        push!(anom, NamedTuple{fields}(
-            Tuple(getfield(rec, fld) .- getfield(ref, fld) for fld in fields)))
+        push!(anom, map((x, x_ref) -> x .- x_ref, rec, ref))
     end
     return anom
 end

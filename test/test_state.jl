@@ -70,6 +70,7 @@ end
     # MonthlyAccumulator: every field (xdim, ydim). There is no `count`
     # field - output! divides by cjday_mon[mon] * ndt_days.
     ma = MonthlyAccumulator()
+    @test fieldnames(MonthlyAccumulator) == GREBClimate.OUTPUT_FIELDS
     for f in fieldnames(MonthlyAccumulator)
         v = getfield(ma, f)
         @test size(v) == (X, Y) && eltype(v) === Float32 && all(iszero, v)

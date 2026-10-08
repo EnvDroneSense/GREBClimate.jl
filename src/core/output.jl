@@ -56,31 +56,13 @@ function output!(it, irec, mon, surf::SurfaceState, tend, ws::ModelWorkspace,
     output_buf::Vector{MonthlyRecord}, acc::MonthlyAccumulator, timestate)
     mon = clamp(mon, 1, months_per_year)
 
-    accumulate!(acc, surf.Ts, surf.Ta, surf.To, surf.q, tend.albedo, tend.ice_cover,
-        ws.precip, ws.evap, ws.qcrcl, tend.SW, tend.LW_surf, tend.Q_lat, tend.Q_sens,
-        tend.LW_up, tend.LW_down, tend.em)
+    accumulate!(acc, surf, tend, ws)
 
     # ----- Check end of month -----
     if timestate.jday == jday_mon_cumsum[mon] && is_day_end(it)
         ndm = steps_in_month(mon)
         irec += 1
-        push!(output_buf, (
-            Ts=acc.Tmm ./ ndm,
-            Ta=acc.Tamm ./ ndm,
-            To=acc.Tomm ./ ndm,
-            q=acc.qmm ./ ndm,
-            albedo=acc.apmm ./ ndm,
-            ice=acc.icemm ./ ndm,
-            precip=acc.precipmm ./ ndm,
-            evap=acc.evapmm ./ ndm,
-            qcrcl=acc.qcrclmm ./ ndm,
-            sw=acc.swmm ./ ndm,
-            lw=acc.lwmm ./ ndm,
-            qlat=acc.qlatmm ./ ndm,
-            qsens=acc.qsensmm ./ ndm,
-            olr=acc.olrmm ./ ndm,
-            lwdown=acc.lwdownmm ./ ndm
-        ))
+        push!(output_buf, monthly_means(acc, ndm))
         reset!(acc)
         mon = mod(mon, months_per_year) + 1
     end
