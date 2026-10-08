@@ -34,6 +34,8 @@ end
         v = getfield(cf, f)
         if f === :loaded
             @test v === false
+        elseif f === :flux_source
+            @test v == ""              # set by load_flux_corrections!
         elseif f === :boundary_anomaly
             @test v === nothing        # allocated by load_boundary_anomaly!, not here
         elseif f === :boundary_anomaly_source
@@ -49,7 +51,7 @@ end
     # co2_part is the one field that is not zero-initialised.
     @test all(isone, cf.co2_part)
     for f in fieldnames(ClimateFields)
-        f in (:loaded, :co2_part, :boundary_anomaly, :boundary_anomaly_source) && continue
+        f in (:loaded, :co2_part, :flux_source, :boundary_anomaly, :boundary_anomaly_source) && continue
         @test all(iszero, getfield(cf, f))
     end
 

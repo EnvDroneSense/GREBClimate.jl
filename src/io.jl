@@ -184,6 +184,7 @@ function load_flux_corrections!(jld2_dir::String, fields::ClimateFields)
             @info "Loaded $key"
         end
     end
+    fields.flux_source = filepath
     return nothing
 end
 

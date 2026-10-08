@@ -464,6 +464,48 @@ end
     end
 end
 
+@testset "greb_model! reloads Stored corrections only when fields does not hold them from the file" begin
+    with_tempdir() do dir
+        mkpath(joinpath(dir, "climatology"))
+        GREBClimate.jldopen(joinpath(dir, "climatology", "flux_corrections.jld2"), "w") do f
+            f["Tsurf_flux_correction"] = fill(0.5f0, X, Y, GREBClimate.nstep_yr)
+            f["vapour_flux_correction"] = zeros(Float32, X, Y, GREBClimate.nstep_yr)
+            f["Tocean_flux_correction"] = zeros(Float32, X, Y, GREBClimate.nstep_yr)
+        end
+        cfg = preset(:full_model; corrections = Stored())
+        first_ts(f) = at_first_step(v -> copy(v.Ts), RunSpec(ctrl = 1, scnr = 0), cfg;
+                                    phase = GREBClimate.control, jld2_dir = dir, fields = f)
+
+        file = joinpath(dir, "climatology", "flux_corrections.jld2")
+
+        # A run on fields without the marker loads the file for the run and leaves
+        # the arrays and the marker as it found them
+        f = synthetic_fields()
+        fresh = first_ts(f)
+        @test f.flux_source == ""
+        @test all(iszero, f.Ts_flux_correction)
+
+        # Loaded explicitly, the marker is set and a run keeps the arrays
+        quiet() do
+            load_flux_corrections!(dir, f)
+        end
+        @test f.flux_source == file
+        @test isequal(first_ts(f), fresh)
+        @test f.flux_source == file
+        @test all(==(0.5f0), f.Ts_flux_correction)
+
+        # Arrays changed under a set marker are used as they are: no reload
+        f.Ts_flux_correction .= 0.7f0
+        @test !isequal(first_ts(f), fresh)
+        @test all(==(0.7f0), f.Ts_flux_correction)
+
+        # Resetting the marker reloads the file for the run, then restores the arrays
+        f.flux_source = ""
+        @test isequal(first_ts(f), fresh)
+        @test all(==(0.7f0), f.Ts_flux_correction)
+    end
+end
+
 @testset "greb_model! returns the time of every record" begin
     run_times(run, config) = run_synthetic(run, config)
     # Record n of a phase is month mod1(n, 12) of year start + (n - 1) ÷ 12

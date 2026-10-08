@@ -58,6 +58,13 @@ Notable changes to GREBClimate.jl, following
   optional argument; a bare record vector is counted from January of year 1,
   as before.
 
+- `ClimateFields` has a `flux_source` field, the file `load_flux_corrections!`
+  last loaded the three flux-correction arrays from. A `Stored` run on a
+  `fields` that already holds the corrections from the same file no longer
+  saves, reloads and restores them, which saves 4 to 7 percent of a one-year
+  run on a reused `fields`. A caller who writes into the arrays sets
+  `flux_source` back to `""`. Results are unchanged.
+
 ### Fixed
 
 - `:a1b` (`A1BRamp`) holds 700 ppm after 2100, as the Fortran does. It fell

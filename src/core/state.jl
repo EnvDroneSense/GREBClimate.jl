@@ -274,6 +274,9 @@ Base.@kwdef mutable struct ClimateFields
     Ts_flux_correction::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
     q_flux_correction::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
     To_flux_correction::Array{Float32,3} = zeros(Float32, xdim, ydim, nstep_yr)
+    # File the three arrays were loaded from by `load_flux_corrections!`; "" if unknown.
+    # A user who writes into the arrays sets it back to "".
+    flux_source::String = ""
 
     # Regional CO2 mask (1.0 = full CO2, 0.5 = half CO2)
     co2_part::Matrix{Float32} = ones(Float32, xdim, ydim)

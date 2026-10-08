@@ -231,7 +231,13 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     is_forced_boundary = s.surface isa BoundaryAnomaly
     # The run overwrites these in place; restore them so a reused `fields`
     # does not carry one run's changes into the next
-    saved = [name => copy(getfield(fields, name)) for name in _mutated_fields(config)]
+    # Stored corrections that `fields` already holds from this file are neither
+    # reloaded nor saved: a `Stored` run does not write them
+    saved_flux_source = fields.flux_source
+    flux_file = isempty(jld2_dir) ? "" : joinpath(String(jld2_dir), "climatology", "flux_corrections.jld2")
+    flux_in_place = config.corrections isa Stored && !isempty(flux_file) && fields.flux_source == flux_file
+    saved = [name => copy(getfield(fields, name)) for name in _mutated_fields(config)
+             if !(flux_in_place && name in (:Ts_flux_correction, :q_flux_correction, :To_flux_correction))]
     try
 
     state = ModelState()
@@ -266,8 +272,10 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
         if !isempty(jld2_dir)
             file = joinpath(jld2_dir, "climatology", "flux_corrections.jld2")
             isfile(file) || throw(ArgumentError("Stored() found no flux corrections at $file"))
-            @info "Loading the stored flux corrections"
-            load_flux_corrections!(String(jld2_dir), fields)
+            if !flux_in_place
+                @info "Loading the stored flux corrections"
+                load_flux_corrections!(String(jld2_dir), fields)
+            end
         end
     elseif corrections isa SpinUp
         @info "Flux-correction spin-up: CO2 = $CO2_ctrl ppm, $(corrections.years) yr"
@@ -366,5 +374,7 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
         for (name, a) in saved
             getfield(fields, name) .= a
         end
+        # The arrays are back to what they held before the run, so the marker is too
+        fields.flux_source = saved_flux_source
     end
 end
