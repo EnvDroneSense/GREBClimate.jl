@@ -5,6 +5,12 @@ Notable changes to GREBClimate.jl, following
 
 ## [Unreleased]
 
+### Fixed
+
+- `:a1b` (`A1BRamp`) holds 700 ppm after 2100, as the Fortran does. It fell
+  back to 340 ppm in 2101, so a run of more than 151 scenario years lost its
+  forcing. Runs that end by 2100 are unchanged.
+
 ## [2.1.0] - 2026-10-05
 
 ### Added

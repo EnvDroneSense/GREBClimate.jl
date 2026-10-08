@@ -67,6 +67,13 @@ end
     @test_throws ErrorException forcing(1, 1951, resolved(preset(:rcp45)))    # year not in the table
 end
 
+@testset "A1B ramp: 700 ppm in 2100, held afterwards" begin
+    r = resolved(preset(:a1b))
+    @test forcing(1, 1950, r).CO2 == 310 && forcing(1, 2050, r).CO2 == 520
+    @test forcing(1, 2100, r).CO2 == 700
+    @test forcing(1, 2101, r).CO2 == 700 && forcing(1, 2300, r).CO2 == 700
+end
+
 @testset "SeasonalCO2 season is half the year, from 1 October" begin
     r = resolve(Config(scenario=Scenario(co2=SeasonalCO2(680, 340, :boreal_winter))))
     co2(step) = GREBClimate.forcing(step, 1950, r).CO2

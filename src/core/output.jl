@@ -163,7 +163,7 @@ function time_loop!(it, year, CO2, mon, irec, Ts, Ta, q, To, output_buf,
 
     # Output and diagnostics
     surf = SurfaceState(Ts, Ta, To, q)
-    (mon, irec) = output!(it, irec, mon, surf, tend, ws, output_buf, acc, timestate)
+    (; mon, irec) = output!(it, irec, mon, surf, tend, ws, output_buf, acc, timestate)
     diagnostics!(year, surf, state, timestate)
 
     return (mon=mon, irec=irec)

@@ -23,7 +23,7 @@ function _co2_at(::Union{CO2Table,CO2File}, it, year, r)
     return r.co2_table[year]
 end
 
-# After 2100 the ramp falls back to 340 ppm, as the original code does
+# After 2100 the ramp holds its last value
 function _co2_at(::A1BRamp, it, year, r)
     CO2_1950 = 310.0f0
     CO2_2000 = 370.0f0
@@ -35,7 +35,7 @@ function _co2_at(::A1BRamp, it, year, r)
     elseif year <= 2100
         return CO2_2050 + 180.0f0 / 50.0f0 * (year - 2050)
     end
-    return 340.0f0
+    return 700.0f0
 end
 
 _co2_at(::CO2SineWave, it, year, r) = 510.0f0 + 170.0f0 * cos(2f0*Float32(π) * (year - 13.0f0) / 30.0f0)

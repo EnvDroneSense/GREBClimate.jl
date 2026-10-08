@@ -44,7 +44,7 @@ end
     A1BRamp()
 
 The SRES A1B path: 310 ppm in 1950, 370 in 2000, 520 in 2050, 700 in 2100,
-linear in between; 340 ppm after 2100.
+linear in between; 700 ppm after 2100.
 """
 struct A1BRamp <: CO2Path end
 
