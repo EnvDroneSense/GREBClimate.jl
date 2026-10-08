@@ -12,7 +12,7 @@
 # gzip runs with -n so no timestamp is embedded. Rebuilding from an identical
 # tree gives a byte-identical archive, so the recorded SHA256 stays valid.
 #
-# Requires GNU `tar` and `gzip` (Git Bash / WSL / any Unix).
+# Requires GNU `tar` and `gzip`. If this fails on Windows, switch to Linux.
 # =============================================================================
 
 using SHA

@@ -1,7 +1,7 @@
 # Plots and notebook
 
 The repository ships a plotting toolbox (`viz/`) and a Pluto notebook
-(`notebooks/GREB_explorer.jl`) built on it. Neither is part of the package:
+(`viz/notebooks/GREB_explorer.jl`) built on it. Neither is part of the package:
 they share their own environment, `viz/Project.toml` (Plots, Pluto, PlutoUI).
 Both need the dataset on disk (see [Input data](@ref)); they never download it.
 
@@ -10,7 +10,7 @@ Both need the dataset on disk (see [Input data](@ref)); they never download it.
 From the repository root:
 
 ```bash
-julia notebooks/launch_pluto.jl
+julia viz/notebooks/launch_pluto.jl
 ```
 
 This opens Pluto in the browser with the explorer loaded; the first launch also

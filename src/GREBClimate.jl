@@ -7,7 +7,7 @@ module GREBClimate
 # humidity forward under shortwave/longwave radiation, hydrology, sea ice,
 # deep-ocean coupling, and atmospheric circulation (diffusion, advection,
 # moisture convergence). An interactive Pluto version of the same model
-# lives in `notebooks/GREB_explorer.jl`; see the package docs or README for
+# lives in `viz/notebooks/GREB_explorer.jl`; see the package docs or README for
 # usage.
 #
 # Files below are included in dependency order: constants -> calendar ->

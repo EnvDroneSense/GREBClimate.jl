@@ -36,9 +36,8 @@ GREBClimate.jl/
 ├── benchmark/                  # timing/allocation suite (run_benchmarks.jl, README.md)
 ├── docs/                       # Documenter site
 ├── examples/                   # plain-Julia drivers: run_greb.jl, parameter_sweep.jl
-├── notebooks/                  # Pluto explorer + launcher (uses the viz/ environment)
-├── viz/                        # plotting toolbox, own Project.toml
-├── tools/                      # maintainer scripts: dataset/, diagnostics/, validation/ (see tools/README.md)
+├── viz/                        # plotting toolbox + Pluto notebook (notebooks/), own Project.toml
+├── tools/                      # maintainer scripts: dataset/, diagnostics/, experiments/, validation/ (see tools/README.md)
 ├── DATA_README.md              # raw .bin input inventory (maintainers)
 └── CHANGELOG.md
 ```
