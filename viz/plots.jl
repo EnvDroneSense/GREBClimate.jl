@@ -24,21 +24,28 @@ fieldinfo(v::Symbol) = get(VAR_INFO, v, (label=String(v), unit=""))
 unitlabel(v) = fieldinfo(v).unit == "" ? fieldinfo(v).label : "$(fieldinfo(v).label) [$(fieldinfo(v).unit)]"
 
 """
-    runs(x) -> Vector of (title, records, anomaly::Bool)
+    runs(x) -> Vector of (title, records, anomaly::Bool, times, dated::Bool)
 
 The non-empty runs of a `greb_model!` result, or one untitled run for a bare
-record vector. `res.scnr` is usually an anomaly against the control's final
-year, but stays absolute for orbital experiments and when `ctrl=0`, so the kind
-is read from the data: absolute Ts averages ~280 K, an anomaly a few K.
+record vector. The scenario is an anomaly when the result's `scnr_anomaly` is
+true; a result without that entry, and a bare record vector, count as absolute.
+
+`times` is the `(year, month)` of each record: the result's `ctrl_time` and
+`scnr_time`, and then `dated` is true. Records without times are counted from
+January of year 1 ([`by_position`](@ref)).
 """
 function runs(res::NamedTuple)
-    out = [tagged(name, recs) for (name, recs) in (("control", res.ctrl), ("scenario", res.scnr))
-           if !isempty(recs)]
+    out = [tagged(name, res[run], get(res, Symbol(run, :_time), nothing),
+                  run === :scnr && get(res, :scnr_anomaly, false))
+           for (name, run) in (("control", :ctrl), ("scenario", :scnr)) if !isempty(res[run])]
     isempty(out) ? error("the result has no control or scenario records") : out
 end
-runs(records::AbstractVector) = [("", records, false)]
+runs(records::AbstractVector) = [("", records, false, by_position(length(records)), false)]
 
-tagged(name, recs) = (anom = mean(first(recs).Ts) < 100; (anom ? "$name anomaly" : name, recs, anom))
+function tagged(name, recs, times, anom)
+    dated = times !== nothing
+    (anom ? "$name anomaly" : name, recs, anom, dated ? times : by_position(length(recs)), dated)
+end
 
 "Panels stacked in one column, each `h` pixels tall."
 stack(panels, h) = length(panels) == 1 ? only(panels) :
@@ -94,10 +101,10 @@ function plot_map(x; var::Symbol=:Ts, month=:mean, fields=nothing)
     stack(panels, 300)
 end
 
-"One line panel per run of `f(records)`, with a dashed zero line on anomalies."
+"One line panel per run of `f(records, times)`, with a dashed zero line on anomalies."
 function lines(f, x, var, xlabel; kw...)
-    panels = map(runs(x)) do (t, recs, anom)
-        y = f(recs)
+    panels = map(runs(x)) do (t, recs, anom, times)
+        y = f(recs, times)
         p = Plots.plot(1:length(y), y; xlabel=xlabel, ylabel=unitlabel(var), title=paneltitle(t, var),
                        legend=false, lw=2, kw...)
         anom ? Plots.hline!(p, [0]; color=:gray, ls=:dash) : p
@@ -111,9 +118,9 @@ end
 Area-weighted global mean of `var` per month, or per year with `annual=true`.
 """
 plot_timeseries(x; var::Symbol=:Ts, annual::Bool=false) =
-    lines(x, var, annual ? "year" : "month") do recs
+    lines(x, var, annual ? "year" : "month") do recs, times
         s = series(recs, var)
-        annual ? GREBViz.annual(s) : s
+        annual ? GREBViz.annual(s, times) : s
     end
 
 """
@@ -122,7 +129,7 @@ plot_timeseries(x; var::Symbol=:Ts, annual::Bool=false) =
 The 12-month global-mean climatology, averaged over every whole year in the run.
 """
 plot_seasonal(x; var::Symbol=:Ts) =
-    lines(recs -> seasonal_cycle(recs, var), x, var, "month"; marker=:circle, ms=3,
+    lines((recs, times) -> seasonal_cycle(recs, var, times), x, var, "month"; marker=:circle, ms=3,
           xticks=(1:12, ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]))
 
 """

@@ -27,7 +27,11 @@ import netCDF4 as nc
 import numpy as np
 
 GREB_YDIM = 48
-GREB_NSTEP_YR = 730  # 365 days x 2 half-daily steps
+# The model calendar: 365 days, no leap years, 2 steps a day, step 1 the first
+# half of 1 January. The reference is src/core/calendar.jl (nstep_yr,
+# step_of_year, day_of_year); this script cannot call it and repeats the
+# numbers here and in monthly_to_annual_cycle.
+GREB_NSTEP_YR = 730
 GREB_LAT = np.array([-88.125 + 3.75 * i for i in range(GREB_YDIM)])  # cell centers, matches the repo's .ctl files
 
 # name -> (CDS variable, netCDF variable name, dataset family, level or list of levels for a vertical mean, or None)

@@ -74,7 +74,9 @@ julia> s = Scenario(co2 = CO2Step(340, 680, 2000), solar = SolarCycle(2, 11), co
 
 julia> r = resolve(Config(scenario = s));
 
-julia> forcing(1, 1999, r).CO2, forcing(1, 2000, r).CO2
+julia> at(year) = ModelTime(GREBClimate.scenario, year, 1);   # the first step of a year
+
+julia> forcing(at(1999), r).CO2, forcing(at(2000), r).CO2
 (340.0f0, 680.0f0)
 ```
 

@@ -26,6 +26,7 @@ makedocs(
         "Tutorial" => "tutorial.md",
         "Input data" => "data.md",
         "Model overview" => "model.md",
+        "Time and calendar" => "time.md",
         "Plots and notebook" => "viz.md",
         "Configuration" => "configuration.md",
         "API Reference" => "api.md",

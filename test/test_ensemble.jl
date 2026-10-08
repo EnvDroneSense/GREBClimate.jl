@@ -7,9 +7,7 @@
     configs = [preset(:co2_double; corrections = NoCorrections()),
                preset(:co2_double; corrections = NoCorrections(), hydrology = (evaporation = :skin,)),
                preset(:co2_double; corrections = SpinUp(1))]
-    alone = quiet() do
-        [greb_model!(run, c; fields = deepcopy(fields), allow_uninitialized = true) for c in configs]
-    end
+    alone = [run_synthetic(run, c; fields = deepcopy(fields)) for c in configs]
     same(a, b) = length(a) == length(b) &&
                  all(isequal(getfield(x, f), getfield(y, f)) for (x, y) in zip(a, b) for f in fieldnames(typeof(x)))
 
@@ -24,6 +22,19 @@
 
     # The caller's fields are not changed
     @test all(isequal(getfield(fields, f), getfield(untouched, f)) for f in fieldnames(ClimateFields))
+end
+
+@testset "run_ensemble: the copies of the fields are released when it returns" begin
+    fields = synthetic_fields()
+    run = RunSpec(ctrl = 0, scnr = 1)
+    config = preset(:co2_double; corrections = NoCorrections())
+    live() = (GC.gc(true); GC.gc(true); Base.gc_live_bytes())
+    quiet() do
+        greb_model!(run, config; fields = deepcopy(fields), allow_uninitialized = true)   # compile first
+    end
+    before = live()
+    run_ensemble(r -> length(r.scnr), run, fill(config, 3); fields, ntasks = 3, allow_uninitialized = true)
+    @test live() - before < Base.summarysize(fields) ÷ 2   # three copies were made, none is kept
 end
 
 @testset "run_ensemble: logging, errors and arguments" begin

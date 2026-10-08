@@ -55,7 +55,7 @@ function capture_preset(p::Symbol)
 
     co2, solar = Float32[], Float32[]
     for y in 0:(NYEARS - 1), step in SAMPLE_STEPS
-        f = forcing(y * N + step, s.start_year + y, r)
+        f = forcing(scenario_time(s.start_year, y * N + step), r)
         push!(co2, f.CO2)
         push!(solar, f.sw_solar_forcing)
     end

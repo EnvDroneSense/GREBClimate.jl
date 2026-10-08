@@ -51,7 +51,7 @@ julia --project=. -t 1 benchmark/profile.jl [mode] [jld2_dir] [--years=N] [--sam
 
 | Mode | Profiles | Default | Answers |
 |:-----|:---------|:--------|:--------|
-| `step` (default) | Sampled control runs of `:full_model` on the stored flux corrections, repeated until `--samples` samples are collected (at most 8 runs) | 50 years, 10000 samples | Where the time loop spends its time |
+| `step` (default) | Sampled control runs of `:full_model` on the stored flux corrections, repeated until `--samples` samples are collected (at most 8 runs) | 25 years, 10000 samples | Where the time loop spends its time |
 | `setup` | The same with short runs (at most 400) | 1 year, 10000 samples | What one `greb_model!` call costs besides the time loop |
 | `allocs` | Every allocation of one run | 1 year | Which lines allocate, and how much |
 | `dispatch` | Nothing is run: JET's optimization analysis of one `time_loop!` step | - | Whether any call in the step is dispatched at run time |

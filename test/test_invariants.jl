@@ -20,7 +20,7 @@ function _kernel_fixture()
         h = r.hydrology,
         state = ModelState(),
         ws = ModelWorkspace(),
-        ts = TimeState(1, 1),
+        slice = 1,
         Ts = fill(290.0f0, X, Y),
         Ta = fill(280.0f0, X, Y),
         To = fill(285.0f0, X, Y),
@@ -40,16 +40,16 @@ end
     # two. tendencies! is larger because it returns a 16-field tuple; its two
     # circulation! calls run serially here, so nothing pays for @spawn.
     kernels = [
-        ("SWradiation!", () -> SWradiation!(f.Ts, f.fields, f.state, f.ts, f.p, f.ws), 64),
-        ("LWradiation!", () -> LWradiation!(f.Ts, f.Ta, f.q, 340.0f0, f.fields, f.ts, f.p, f.ws), 64),
-        ("hydro!", () -> hydro!(f.Ts, f.q, f.fields, f.ts, f.p, f.h, f.ws), 64),
-        ("seaice!", () -> seaice!(f.Ts, f.fields, f.ts, f.p), 0),
-        ("deep_ocean!", () -> deep_ocean!(f.Ts, f.To, f.fields, f.ts, f.p, f.ws), 64),
-        ("convergence!", () -> convergence!(f.T1, f.fields, f.ts, f.ws), 0),
+        ("SWradiation!", () -> SWradiation!(f.Ts, f.fields, f.state, f.slice, f.p, f.ws), 64),
+        ("LWradiation!", () -> LWradiation!(f.Ts, f.Ta, f.q, 340.0f0, f.fields, f.slice, f.p, f.ws), 64),
+        ("hydro!", () -> hydro!(f.Ts, f.q, f.fields, f.slice, f.p, f.h, f.ws), 64),
+        ("seaice!", () -> seaice!(f.Ts, f.fields, f.slice, f.p), 0),
+        ("deep_ocean!", () -> deep_ocean!(f.Ts, f.To, f.fields, f.slice, f.p, f.ws), 64),
+        ("convergence!", () -> convergence!(f.T1, f.fields, f.slice, f.ws), 0),
         ("diffusion!", () -> diffusion!(f.T1, GREBClimate.z_air, f.fields, f.ws), 0),
-        ("advection!", () -> advection!(f.T1, GREBClimate.z_air, f.fields, f.ws, f.ts, f.p), 0),
-        ("circulation!", () -> circulation!(f.T1, GREBClimate.z_air, f.dX, f.fields, f.ws, f.ts, f.p), 0),
-        ("tendencies!", () -> tendencies!(340.0f0, f.Ts, f.Ta, f.To, f.q, f.fields, f.state, f.ws, f.ts, f.r), 256),
+        ("advection!", () -> advection!(f.T1, GREBClimate.z_air, f.fields, f.ws, f.slice, f.p), 0),
+        ("circulation!", () -> circulation!(f.T1, GREBClimate.z_air, f.dX, f.fields, f.ws, f.slice, f.p), 0),
+        ("tendencies!", () -> tendencies!(340.0f0, f.Ts, f.Ta, f.To, f.q, f.fields, f.state, f.ws, f.slice, f.r), 256),
     ]
 
     # The table is hand-written; this is what stops a new kernel slipping past
@@ -84,15 +84,15 @@ end
 
     F32 = Matrix{Float32}
     signatures = [
-        (SWradiation!, (F32, ClimateFields, ModelState, TimeState, Processes, ModelWorkspace)),
-        (LWradiation!, (F32, F32, F32, Float32, ClimateFields, TimeState, Processes, ModelWorkspace)),
-        (hydro!, (F32, F32, ClimateFields, TimeState, Processes, ResolvedHydrology, ModelWorkspace)),
-        (seaice!, (F32, ClimateFields, TimeState, Processes)),
-        (deep_ocean!, (F32, F32, ClimateFields, TimeState, Processes, ModelWorkspace)),
-        (convergence!, (F32, ClimateFields, TimeState, ModelWorkspace)),
+        (SWradiation!, (F32, ClimateFields, ModelState, Int, Processes, ModelWorkspace)),
+        (LWradiation!, (F32, F32, F32, Float32, ClimateFields, Int, Processes, ModelWorkspace)),
+        (hydro!, (F32, F32, ClimateFields, Int, Processes, ResolvedHydrology, ModelWorkspace)),
+        (seaice!, (F32, ClimateFields, Int, Processes)),
+        (deep_ocean!, (F32, F32, ClimateFields, Int, Processes, ModelWorkspace)),
+        (convergence!, (F32, ClimateFields, Int, ModelWorkspace)),
         (diffusion!, (F32, Float32, ClimateFields, ModelWorkspace)),
-        (advection!, (F32, Float32, ClimateFields, ModelWorkspace, TimeState, Processes)),
-        (circulation!, (F32, Float32, F32, ClimateFields, ModelWorkspace, TimeState, Processes)),
+        (advection!, (F32, Float32, ClimateFields, ModelWorkspace, Int, Processes)),
+        (circulation!, (F32, Float32, F32, ClimateFields, ModelWorkspace, Int, Processes)),
     ]
 
     for (kernel, argtypes) in signatures
@@ -105,5 +105,5 @@ end
 
     # tendencies! matters most and is easiest to check on the real call:
     # @inferred throws unless the inferred type is concrete.
-    @test (@inferred tendencies!(340.0f0, f.Ts, f.Ta, f.To, f.q, f.fields, f.state, f.ws, f.ts, f.r)) isa NamedTuple
+    @test (@inferred tendencies!(340.0f0, f.Ts, f.Ta, f.To, f.q, f.fields, f.state, f.ws, f.slice, f.r)) isa NamedTuple
 end

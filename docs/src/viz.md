@@ -1,7 +1,7 @@
 # Plots and notebook
 
 The repository ships a plotting toolbox (`viz/`) and a Pluto notebook
-(`notebooks/GREB_explorer.jl`) built on it. Neither is part of the package:
+(`viz/notebooks/GREB_explorer.jl`) built on it. Neither is part of the package:
 they share their own environment, `viz/Project.toml` (Plots, Pluto, PlutoUI).
 Both need the dataset on disk (see [Input data](@ref)); they never download it.
 
@@ -10,7 +10,7 @@ Both need the dataset on disk (see [Input data](@ref)); they never download it.
 From the repository root:
 
 ```bash
-julia notebooks/launch_pluto.jl
+julia viz/notebooks/launch_pluto.jl
 ```
 
 This opens Pluto in the browser with the explorer loaded; the first launch also
@@ -44,9 +44,9 @@ evolution_gif("run.gif", ev; fields = fields)
 ```
 
 Every plot takes a `greb_model!` result, drawing control and scenario as
-separate panels, or a plain vector of monthly records. The scenario is usually
-an anomaly (a change against the control), drawn on a colour scale centred at
-zero: red is warmer or more, blue colder or less.
+separate panels, or a plain vector of monthly records. When the result's
+`scnr_anomaly` is true the scenario is an anomaly (a change against the
+control), drawn on a colour scale centred at zero: red is warmer or more, blue colder or less.
 
 ## What each plot shows
 
@@ -60,6 +60,12 @@ zero: red is warmer or more, blue colder or less.
 
 The numbers behind the plots are available directly: `series`, `annual`,
 `seasonal_cycle`, `field`, `hovmoller`, `map_frames` and `area_weights`.
+
+Given a `greb_model!` result, the plots read the year and month of each record
+from its `ctrl_time` and `scnr_time`, so an animation frame is titled
+`Jul 1950`. A bare record vector carries no times and is counted from January
+of year 1; `annual`, `seasonal_cycle` and `map_frames` take the times as an
+optional argument (`seasonal_cycle(result.scnr, :Ts, result.scnr_time)`).
 
 ```bash
 julia --project=viz viz/demo.jl [output_dir]   # runs GREB and saves every plot

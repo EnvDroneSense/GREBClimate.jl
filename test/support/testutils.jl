@@ -83,7 +83,7 @@ A `ClimateFields` that is the same in every cell and at every step: topography
 soil wetness, winds and vertical velocity. For checking a kernel against a
 hand calculation.
 """
-function constant_fields(; z_topo, swet = 1.0, u = 0.0, v = 0.0, omega = 0.0, omega_std = 0.0, ws = 0.0)
+function constant_fields(; z_topo, swet = 1.0, u = 0.0, v = 0.0, omega = 0.0, omega_std = 0.0, wind_speed = 0.0)
     f = ClimateFields()
     f.z_topo .= z_topo
     f.mld_clim .= 50.0
@@ -96,25 +96,42 @@ function constant_fields(; z_topo, swet = 1.0, u = 0.0, v = 0.0, omega = 0.0, om
     f.v_clim .= v
     f.omega_clim .= omega
     f.omega_std_clim .= omega_std
-    f.wind_speed_clim .= ws
+    f.wind_speed_clim .= wind_speed
     return f
 end
 
 "A `MonthlyRecord` with every field filled with `v`; a keyword sets one field to another value."
 uniform_record(v; kw...) = MonthlyRecord(map(n -> fill(Float32(get(kw, n, v)), X, Y), fieldnames(MonthlyRecord)))
 
+"The time of scenario step `step` of a scenario that started in `year`."
+scenario_time(year, step = 1) = ModelTime(GREBClimate.scenario, year, step)
+
+"The time of control step `step`."
+control_time(step = 1) = ModelTime(GREBClimate.control, 1970, step)
+
+"""
+Run `greb_model!(run, config; kwargs...)` with the logger muted, on `fields`
+(default `synthetic_fields()`) and without the dataset: `jld2_dir` is empty
+unless given, and `allow_uninitialized` is set.
+"""
+function run_synthetic(run, config; fields = synthetic_fields(), jld2_dir = "", kwargs...)
+    return quiet() do
+        greb_model!(run, config; jld2_dir, fields, allow_uninitialized = true, kwargs...)
+    end
+end
+
 struct StopRun <: Exception end
 
 """
 Run `greb_model!(run, config; kwargs...)` up to the first step of `phase`
-(`:ctrl` or `:scnr`), return `f(view)` of the observer's view there, and stop
+(`GREBClimate.control` or `GREBClimate.scenario`), return `f(view)` of the observer's view there, and stop
 the run. `point` is `:after_tendencies` (state before the step's update) or
 `:after_step`. For what is already decided at the first step - the CO2, the
 solar table, the climatology in use - without paying for the rest of the year.
 The observer is not called during the spin-up, so pass `NoCorrections()` or
 `SpinUp(0)` unless the spin-up is what is being tested.
 """
-function at_first_step(f, run, config; phase = :scnr, point = :after_step, kwargs...)
+function at_first_step(f, run, config; phase = GREBClimate.scenario, point = :after_step, kwargs...)
     seen = nothing
     function observer(pt, view)
         (view.phase === phase && pt === point) || return nothing

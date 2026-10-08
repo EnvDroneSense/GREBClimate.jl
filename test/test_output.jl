@@ -28,15 +28,20 @@
 
     ctrl_clim = MonthlyRecord[mkrec(100.0 + m) for m in 1:12]
     scnr = MonthlyRecord[mkrec(Float64(idx)) for idx in 1:24]
-    anom = scenario_anomalies(scnr, ctrl_clim)
+    times = [(year = 1950 + (idx - 1) ÷ 12, month = mod1(idx, 12)) for idx in 1:24]
+    anom = scenario_anomalies(scnr, times, ctrl_clim)
     @test all(==(1.0 - 101.0), anom[1].Ts)
     @test all(==(13.0 - 101.0), anom[13].Ts)
     @test all(==(12.0 - 112.0), anom[12].Ts)
 
     # Early-return guards: empty scnr_records or empty ctrl_clim ->
     # scnr_records passed straight through, not turned into anomalies.
-    @test scenario_anomalies(MonthlyRecord[], ctrl_clim) == MonthlyRecord[]
-    @test scenario_anomalies(scnr, MonthlyRecord[]) == scnr
+    @test scenario_anomalies(MonthlyRecord[], GREBClimate.RecordTime[], ctrl_clim) == MonthlyRecord[]
+    @test scenario_anomalies(scnr, times, MonthlyRecord[]) == scnr
+
+    # The control month comes from the record's time, not from its position
+    july = scenario_anomalies(scnr[1:1], [(year = 1950, month = 7)], ctrl_clim)
+    @test all(==(1.0 - 107.0), july[1].Ts)
 end
 
 @testset "ice_climatology" begin
@@ -57,7 +62,6 @@ end
 @testset "diagnostics! accumulates annual means and resets at year end" begin
     fields = ClimateFields()
     state = ModelState()
-    ts = TimeState(1, 1)
     z = () -> zeros(GREBClimate.xdim, GREBClimate.ydim)
     surf = SurfaceState(fill(280.0, GREBClimate.xdim, GREBClimate.ydim), fill(270.0, GREBClimate.xdim, GREBClimate.ydim),
         fill(285.0, GREBClimate.xdim, GREBClimate.ydim), fill(0.005, GREBClimate.xdim, GREBClimate.ydim))
@@ -69,22 +73,24 @@ end
         LW_down=fill(30.0, GREBClimate.xdim, GREBClimate.ydim), LW_up=fill(80.0, GREBClimate.xdim, GREBClimate.ydim),
         em=fill(0.9, GREBClimate.xdim, GREBClimate.ydim))
 
-    ts.ityr = 1
-    diagnostics!(1970, surf, state, ts)
+    diagnostics!(control_time(1), surf, state)
     @test all(==(280.0), state.Ts_annual_mean)   # accumulated once, no averaging/reset yet
 
-    ts.ityr = GREBClimate.nstep_yr
     # Logs the annual summary line. Two steps of 280 K over a year of 730: 0.77 K,
     # the same in the global mean and in the two cells
     @test_logs (:info, "1970: Ts global mean -272.38 °C; 178 E 9 N -272.38; 58 E 51 N -272.38") diagnostics!(
-        1970, surf, state, ts)
+        control_time(GREBClimate.nstep_yr), surf, state)
     @test all(iszero, state.Ts_annual_mean)      # reset after year end
+
+    # The spin-up counts its years from 1; the other phases show the calendar year
+    spinup_end = ModelTime(GREBClimate.spinup, 1970, 2 * GREBClimate.nstep_yr)
+    @test GREBClimate._year_label(spinup_end) == "spin-up year 2"
+    @test GREBClimate._year_label(scenario_time(1950, GREBClimate.nstep_yr + 1)) == "1951"
 end
 
 @testset "output! pushes a monthly-mean MonthlyRecord at month boundaries" begin
     ws = ModelWorkspace()
     acc = MonthlyAccumulator()
-    ts = TimeState(1, 1)
     surf = SurfaceState(fill(280.0, GREBClimate.xdim, GREBClimate.ydim), fill(270.0, GREBClimate.xdim, GREBClimate.ydim),
         fill(285.0, GREBClimate.xdim, GREBClimate.ydim), fill(0.005, GREBClimate.xdim, GREBClimate.ydim))
     tend = (albedo=fill(0.3, GREBClimate.xdim, GREBClimate.ydim), SW=fill(100.0, GREBClimate.xdim, GREBClimate.ydim),
@@ -97,28 +103,32 @@ end
     ws.qcrcl .= 0.5
 
     output_buf = MonthlyRecord[]
-    irec, mon = 0, 1
-    ndt = GREBClimate.ndt_days
-    ndays_jan = GREBClimate.cjday_mon[1]
-    for day in 1:ndays_jan, step in 1:ndt
-        it = (day - 1) * ndt + step
-        ts.jday = day
-        (mon, irec) = output!(it, irec, mon, surf, tend, ws, output_buf, acc, ts)
+    times = GREBClimate.RecordTime[]
+    for step in 1:GREBClimate.steps_in_month(1)
+        output!(scenario_time(1950, step), surf, tend, ws, output_buf, times, acc)
     end
 
     @test length(output_buf) == 1
-    @test irec == 1
-    @test mon == 2
+    @test times == [(year = 1950, month = 1)]
     @test all(==(280.0), output_buf[1].Ts)
     @test all(==(2.0), output_buf[1].precip)
     # Out to space: what the air emits upward plus the part of the surface's
     # emission the air lets through, 200 + (1 - 0.75) * 50. Positive upward.
     @test all(==(212.5), output_buf[1].olr)
     @test all(==(210.0), output_buf[1].lwdown)   # positive into the surface
+
+    # Every field of the list reaches the record under its own name
+    @test keys(output_buf[1]) == GREBClimate.OUTPUT_FIELDS
+    expected = (Ts=280.0, Ta=270.0, To=285.0, q=0.005, albedo=0.3, ice=0.1, precip=2.0, evap=1.0,
+        qcrcl=0.5, sw=100.0, lw=-50.0, qlat=-20.0, qsens=-5.0, olr=212.5, lwdown=210.0)
+    for name in GREBClimate.OUTPUT_FIELDS
+        @test all(x -> isapprox(x, expected[name]; rtol=1.0f-5), output_buf[1][name])
+    end
+    @test all(f -> all(iszero, getfield(acc, f)), fieldnames(MonthlyAccumulator))   # reset after the record
 end
 
 # All ocean, with wind and rising air
-_time_loop_fields() = constant_fields(z_topo = -1.0, swet = 0.5, u = 2.0, v = 1.0, omega = 0.001, omega_std = 0.01, ws = 4.0)
+_time_loop_fields() = constant_fields(z_topo = -1.0, swet = 0.5, u = 2.0, v = 1.0, omega = 0.001, omega_std = 0.01, wind_speed = 4.0)
 
 @testset "time_loop! integrates one timestep and clamps at min_T_K" begin
     fields = _time_loop_fields()
@@ -128,7 +138,6 @@ _time_loop_fields() = constant_fields(z_topo = -1.0, swet = 0.5, u = 2.0, v = 1.
     state = ModelState()
     ws = ModelWorkspace()
     acc = MonthlyAccumulator()
-    ts = TimeState(1, 1)
 
     Ts = fill(GREBClimate.min_T_K - 0.5, GREBClimate.xdim, GREBClimate.ydim)
     Ta = copy(ini.Ta_ini)
@@ -136,8 +145,9 @@ _time_loop_fields() = constant_fields(z_topo = -1.0, swet = 0.5, u = 2.0, v = 1.
     q = copy(ini.q_ini)
     output_buf = MonthlyRecord[]
 
-    (mon, irec) = time_loop!(1, 1970, ini.CO2_ctrl, 1, 0, Ts, Ta, q, To, output_buf,
-        fields, state, ws, acc, ts, cfg)
+    times = GREBClimate.RecordTime[]
+    time_loop!(control_time(), ini.CO2_ctrl, Ts, Ta, q, To, output_buf, times,
+        fields, state, ws, acc, cfg)
 
     @test all(isfinite, Ts)
     @test all(isfinite, Ta)
@@ -145,8 +155,7 @@ _time_loop_fields() = constant_fields(z_topo = -1.0, swet = 0.5, u = 2.0, v = 1.
     @test all(isfinite, q)
     @test all(>=(GREBClimate.min_T_K), Ts)
     @test all(>=(GREBClimate.min_T_K), Ta)
-    @test mon == 1
-    @test irec == 0
+    @test isempty(output_buf) && isempty(times)
 end
 
 @testset "time_loop!'s min_T_K floor leaves NaN as NaN" begin
@@ -160,9 +169,9 @@ end
     Ts[5, 5] = NaN32
     Ta[40, 30] = NaN32
 
-    time_loop!(1, 1970, ini.CO2_ctrl, 1, 0, Ts, Ta, copy(ini.q_ini), copy(ini.To_ini),
-        MonthlyRecord[], fields, ModelState(), ModelWorkspace(), MonthlyAccumulator(),
-        TimeState(1, 1), cfg)
+    time_loop!(control_time(), ini.CO2_ctrl, Ts, Ta, copy(ini.q_ini), copy(ini.To_ini),
+        MonthlyRecord[], GREBClimate.RecordTime[], fields, ModelState(), ModelWorkspace(), MonthlyAccumulator(),
+        cfg)
 
     @test isnan(Ts[5, 5])
     @test isnan(Ta[40, 30])

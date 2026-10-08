@@ -66,21 +66,19 @@ function init_model!(r::ResolvedConfig, fields::ClimateFields)
         q_ini=q_ini, CO2_ctrl=CO2_ctrl)
 end
 
-"The climatologies a [`BoundaryAnomaly`](@ref) adds its anomalies to at scenario start."
-const _BOUNDARY_FIELDS = (:Ts_clim, :u_clim, :v_clim, :omega_clim, :wind_speed_clim)
-
 _add_boundary_anomaly!(::SurfaceForcing, fields::ClimateFields) = fields
 
 function _add_boundary_anomaly!(b::BoundaryAnomaly, fields::ClimateFields)
+    anomaly = fields.boundary_anomaly
+    (anomaly === nothing || fields.boundary_anomaly_source[2] !== b.source) &&
+        error("the boundary anomaly :$(b.source) is not loaded: call load_boundary_anomaly! first")
     if b.source === :cmip5_rcp85
         @info "Applying CMIP5 RCP8.5 climate change forcing"
-        suffix = :_anom_cc
     else
         @info "Applying ERA-Interim $(b.source === :elnino ? "El Niño" : "La Niña") forcing"
-        suffix = :_anom_enso
     end
     for name in _BOUNDARY_FIELDS
-        getfield(fields, name) .+= getfield(fields, Symbol(name, suffix))
+        getfield(fields, name) .+= anomaly[name]
     end
     return fields
 end
@@ -105,30 +103,31 @@ function _mutated_fields(c::Config)
     return names
 end
 
+# The control run and the spin-up carry this year as their label
+const _control_start_year = 1970
+
 """
-    qflux_correction!(CO2_ctrl, Ts, Ta, q, To, fields, state, timestate, r::ResolvedConfig, ws, years; ws_a=ws, ws_q=ws)
+    qflux_correction!(CO2_ctrl, Ts, Ta, q, To, fields, state, r::ResolvedConfig, ws, years; ws_a=ws, ws_q=ws)
 
 Runs `years` years of `tendencies!` to derive the ocean/atmosphere flux
 corrections (`fields.Ts_flux_correction`/`q_flux_correction`/`To_flux_correction`) that make the
 control climate match observed climatology. Mutates `Ts`/`Ta`/`q`/`To` in
 place as it integrates. `ws_a`/`ws_q` are forwarded to [`tendencies!`](@ref).
 """
-function qflux_correction!(CO2_ctrl, Ts, Ta, q, To, fields::ClimateFields, state::ModelState, timestate, r::ResolvedConfig, ws::ModelWorkspace, years;
+function qflux_correction!(CO2_ctrl, Ts, Ta, q, To, fields::ClimateFields, state::ModelState, r::ResolvedConfig, ws::ModelWorkspace, years;
     ws_a::ModelWorkspace=ws, ws_q::ModelWorkspace=ws)
     cap_surf = fields.cap_surf
-    for it in 1:(years*nstep_yr)
-        timestate.jday = day_of_year(it)
-        timestate.ityr = step_of_year(it)
-        ityr = timestate.ityr
+    for t in steps(spinup, _control_start_year, years)
+        slice = data_slice(t)
 
-        tend = tendencies!(CO2_ctrl, Ts, Ta, To, q, fields, state, ws, timestate, r; ws_a=ws_a, ws_q=ws_q)
+        tend = tendencies!(CO2_ctrl, Ts, Ta, To, q, fields, state, ws, slice, r; ws_a=ws_a, ws_q=ws_q)
 
-        Tc = @view fields.Ts_clim[:, :, ityr]
-        Toc = @view fields.To_clim[:, :, ityr]
-        qc = @view fields.q_clim[:, :, ityr]
-        TFc = @view fields.Ts_flux_correction[:, :, ityr]
-        ToFc = @view fields.To_flux_correction[:, :, ityr]
-        qFc = @view fields.q_flux_correction[:, :, ityr]
+        Tc = clim_slice(fields.Ts_clim, slice)
+        Toc = clim_slice(fields.To_clim, slice)
+        qc = clim_slice(fields.q_clim, slice)
+        TFc = clim_slice(fields.Ts_flux_correction, slice)
+        ToFc = clim_slice(fields.To_flux_correction, slice)
+        qFc = clim_slice(fields.q_flux_correction, slice)
 
         # Surface/air temperature, deep ocean, and humidity update.
         Ts0_buf = ws.Ts0; Ta0_buf = ws.Ta0; To0_buf = ws.To0; q0_buf = ws.q0
@@ -162,10 +161,10 @@ function qflux_correction!(CO2_ctrl, Ts, Ta, q, To, fields::ClimateFields, state
         end
 
         # Sea ice (updates cap_surf in place)
-        seaice!(ws.Ts0, fields, timestate, r.config.processes)
+        seaice!(ws.Ts0, fields, slice, r.config.processes)
 
         surf = SurfaceState(ws.Ts0, ws.Ta0, ws.To0, ws.q0)
-        diagnostics!(_SpinUpYear((it - 1) ÷ nstep_yr + 1), surf, state, timestate)
+        diagnostics!(t, surf, state)
 
         # Advance state
         @. Ts = ws.Ts0
@@ -183,9 +182,12 @@ end
 
 Run `config`: its flux corrections (a [`SpinUp`](@ref), the [`Stored`](@ref)
 ones, or none), a control run of `run.ctrl` years and a scenario run of
-`run.scnr` years. Returns `(ctrl, scnr)`, vectors of [`MonthlyRecord`](@ref);
-`scnr` is the anomaly against the control's final year when the scenario's
-`output` is `:anomaly`.
+`run.scnr` years. Returns `(ctrl, scnr, ctrl_time, scnr_time, scnr_anomaly)`:
+`ctrl` and `scnr` are vectors of [`MonthlyRecord`](@ref), `ctrl_time` and
+`scnr_time` hold the [`RecordTime`](@ref) (year and month) of each record.
+`scnr_anomaly` is `true` when `scnr` is the anomaly against the control's final
+year: the scenario's `output` is `:anomaly` and both runs have records. It is
+`false` when `scnr` holds absolute values.
 
 | Keyword | Meaning |
 |:--------|:--------|
@@ -196,8 +198,9 @@ ones, or none), a control run of `run.ctrl` years and a scenario run of
 
 The observer is called at `:after_tendencies` (the step's flows are known,
 the state is still the old one) and at `:after_step` (the state is updated).
-`view` is a `NamedTuple` with `phase` (`:ctrl` or `:scnr`), `it`, `year`,
-`ityr`, `CO2`, the state `Ts`, `Ta`, `To`, `q`, the flows `tend` (what
+`view` is a `NamedTuple` with `time` (the [`ModelTime`](@ref)) and, read from
+it, `phase` (`GREBClimate.control` or `GREBClimate.scenario`), `step`, `year`
+and `step_of_year`; `CO2`, the state `Ts`, `Ta`, `To`, `q`, the flows `tend` (what
 [`tendencies!`](@ref) returns), `fields` and `config`. These are the model's
 own arrays: read or copy them, do not write to them. The spin-up does not
 call the observer. `GREBClimate.BudgetCheck` is one.
@@ -228,7 +231,13 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     is_forced_boundary = s.surface isa BoundaryAnomaly
     # The run overwrites these in place; restore them so a reused `fields`
     # does not carry one run's changes into the next
-    saved = [name => copy(getfield(fields, name)) for name in _mutated_fields(config)]
+    # Stored corrections that `fields` already holds from this file are neither
+    # reloaded nor saved: a `Stored` run does not write them
+    saved_flux_source = fields.flux_source
+    flux_file = isempty(jld2_dir) ? "" : joinpath(String(jld2_dir), "climatology", "flux_corrections.jld2")
+    flux_in_place = config.corrections isa Stored && !isempty(flux_file) && fields.flux_source == flux_file
+    saved = [name => copy(getfield(fields, name)) for name in _mutated_fields(config)
+             if !(flux_in_place && name in (:Ts_flux_correction, :q_flux_correction, :To_flux_correction))]
     try
 
     state = ModelState()
@@ -237,9 +246,7 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     # The anomaly files are read once per `fields`, directory and source
     if is_forced_boundary
         dir, source = String(jld2_dir), s.surface.source
-        loaded = source === :cmip5_rcp85 ? fields.anom_cc_source == dir :
-                 fields.anom_enso_source == (dir, source)
-        loaded || load_boundary_anomaly!(dir, fields, source)
+        fields.boundary_anomaly_source == (dir, source) || load_boundary_anomaly!(dir, fields, source)
     end
 
     ini = init_model!(r, fields)
@@ -257,8 +264,6 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     ws_q = ModelWorkspace()
     acc = MonthlyAccumulator()
 
-    timestate = TimeState(1, 1)
-
     # ── 2. Flux-correction spin-up ──────────────────────────────
     corrections = config.corrections
     if corrections isa Stored
@@ -267,12 +272,14 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
         if !isempty(jld2_dir)
             file = joinpath(jld2_dir, "climatology", "flux_corrections.jld2")
             isfile(file) || throw(ArgumentError("Stored() found no flux corrections at $file"))
-            @info "Loading the stored flux corrections"
-            load_flux_corrections!(String(jld2_dir), fields)
+            if !flux_in_place
+                @info "Loading the stored flux corrections"
+                load_flux_corrections!(String(jld2_dir), fields)
+            end
         end
     elseif corrections isa SpinUp
         @info "Flux-correction spin-up: CO2 = $CO2_ctrl ppm, $(corrections.years) yr"
-        qflux_correction!(CO2_ctrl, Ts_ini, Ta_ini, q_ini, To_ini, fields, state, timestate, r, ws, corrections.years;
+        qflux_correction!(CO2_ctrl, Ts_ini, Ta_ini, q_ini, To_ini, fields, state, r, ws, corrections.years;
             ws_a=ws_a, ws_q=ws_q)
     else
         @info "No flux corrections"
@@ -290,21 +297,15 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     To = copy(To_ini);
     q = copy(q_ini)
     state.sw_solar_forcing = 1.0f0
-    mon = 1;
-    year = 1970;
-    irec = 0
 
     ctrl_output = MonthlyRecord[]
-    sizehint!(ctrl_output, time_ctrl * 12)  # Pre-allocate for all months
-    timestate = TimeState(1, 1)
+    ctrl_time = RecordTime[]
+    sizehint!(ctrl_output, time_ctrl * months_per_year)
+    sizehint!(ctrl_time, time_ctrl * months_per_year)
 
-    for it in 1:(time_ctrl*nstep_yr)
-        (mon, irec) = time_loop!(it, year, CO2_ctrl, mon, irec,
-            Ts, Ta, q, To, ctrl_output, fields, state, ws, acc, timestate, r;
-            ws_a=ws_a, ws_q=ws_q, observer=observer, phase=:ctrl)
-        if is_year_end(it)
-            year += 1
-        end
+    for t in steps(control, _control_start_year, time_ctrl)
+        time_loop!(t, CO2_ctrl, Ts, Ta, q, To, ctrl_output, ctrl_time, fields, state, ws, acc, r;
+            ws_a=ws_a, ws_q=ws_q, observer=observer)
     end
 
     # ── Build ice climatology from control output ───────────────
@@ -329,56 +330,51 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     Ta .= Ta_ini
     q .= q_ini;
     To .= To_ini
-    year = s.start_year
-    mon = 1;
-    irec = 0
 
     state.sw_solar_forcing = 1.0f0
     reset!(acc)
 
     scnr_output = MonthlyRecord[]
-    if time_scnr > 0
-        sizehint!(scnr_output, time_scnr * 12)
-    end
+    scnr_time = RecordTime[]
+    sizehint!(scnr_output, time_scnr * months_per_year)
+    sizehint!(scnr_time, time_scnr * months_per_year)
 
-    for it in 1:(time_scnr*nstep_yr)
-        forcing_result = forcing(it, year, r)
+    for t in steps(scenario, s.start_year, time_scnr)
+        forcing_result = forcing(t, r)
         CO2 = forcing_result.CO2
         state.sw_solar_forcing = forcing_result.sw_solar_forcing
 
         # Forced‑boundary experiments: overwrite Ts with climatology
         if is_forced_boundary
-            ityr_now = step_of_year(it)
-            Ts .= @view fields.Ts_clim[:, :, ityr_now]
+            Ts .= clim_slice(fields.Ts_clim, data_slice(t))
         end
 
         # Ocean surface held at climatology plus an offset, CO2 at control
         if s.surface isa SSTOffset
             CO2 = CO2_ctrl
-            ityr_now = step_of_year(it)
-            @views @. Ts = ifelse(!is_land(fields.z_topo), fields.Ts_clim[:, :, ityr_now] + s.surface.offset, Ts)
+            Ts_clim = clim_slice(fields.Ts_clim, data_slice(t))
+            @. Ts = ifelse(!is_land(fields.z_topo), Ts_clim + s.surface.offset, Ts)
         end
 
-        (mon, irec) = time_loop!(it, year, CO2, mon, irec,
-            Ts, Ta, q, To, scnr_output, fields, state, ws, acc, timestate, r;
-            ws_a=ws_a, ws_q=ws_q, observer=observer, phase=:scnr)
-
-        if is_year_end(it)
-            year += 1
-        end
+        time_loop!(t, CO2, Ts, Ta, q, To, scnr_output, scnr_time, fields, state, ws, acc, r;
+            ws_a=ws_a, ws_q=ws_q, observer=observer)
     end
 
     # Post‑processing: anomalies against the control's final year
-    if s.output === :anomaly && !isempty(ctrl_output) && !isempty(scnr_output)
+    scnr_anomaly = s.output === :anomaly && !isempty(ctrl_output) && !isempty(scnr_output)
+    if scnr_anomaly
         ctrl_clim = monthly_climatology(ctrl_output)
-        scnr_output = scenario_anomalies(scnr_output, ctrl_clim)
+        scnr_output = scenario_anomalies(scnr_output, scnr_time, ctrl_clim)
     end
 
-    return (ctrl=ctrl_output, scnr=scnr_output)
+    return (ctrl=ctrl_output, scnr=scnr_output, ctrl_time=ctrl_time, scnr_time=scnr_time,
+            scnr_anomaly=scnr_anomaly)
 
     finally
         for (name, a) in saved
             getfield(fields, name) .= a
         end
+        # The arrays are back to what they held before the run, so the marker is too
+        fields.flux_source = saved_flux_source
     end
 end
