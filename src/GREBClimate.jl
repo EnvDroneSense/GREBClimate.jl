@@ -16,8 +16,8 @@ module GREBClimate
 # -> forcing -> output -> postprocess -> model -> ensemble.
 # =============================================================================
 
-using LoopVectorization   # @turbo SIMD
-using JLD2
+using LoopVectorization: LoopVectorization, @turbo   # SIMD
+using JLD2: JLD2, jldopen
 using Logging: with_logger, NullLogger
 using DataDeps: DataDeps, DataDep, register, unpack, @datadep_str
 

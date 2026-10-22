@@ -24,14 +24,16 @@ GREBClimate.jl/
 │   │   ├── tendencies.jl       # per-timestep physics pipeline
 │   │   ├── budgets.jl          # shared flux sums, BudgetCheck (the observer's budget check)
 │   │   ├── output.jl           # diagnostics!/output!/time_loop!
+│   │   ├── calendar.jl         # ModelTime, step_of_year, decimal_year
 │   │   ├── postprocess.jl      # monthly climatology/anomalies
-│   │   └── model.jl            # init_model!/qflux_correction!/greb_model!
+│   │   ├── model.jl            # init_model!/qflux_correction!/greb_model!
+│   │   └── ensemble.jl         # run_ensemble
 │   ├── config/                 # Config parts, presets, RunSpec, resolve()
 │   ├── forcing/                # forcing(): CO2 and sunlight per timestep
 │   ├── physics/                # radiation.jl, hydrology.jl, ocean.jl, circulation.jl
 │   ├── data.jl                 # greb_data_dir(): dataset location + DataDep
 │   └── io.jl                   # JLD2 loaders
-├── test/                       # one file per subject; runtests.jl lists them
+├── test/                       # one file per subject; SHARD in support/selection.jl lists them
 │   └── data/                   # generated preset reference (see below)
 ├── benchmark/                  # timing/allocation suite (run_benchmarks.jl, README.md)
 ├── docs/                       # Documenter site
@@ -184,12 +186,15 @@ function's behaviour or signature, check whether an example needs updating.
 | `main` | Released code only |
 | `dev` | Integration; fixes that are not physics modules collect here |
 | `dev-refactor` | Structural (non-physics) refactoring, from `dev` |
+| `refactor/<item>` | Optional item branch, from `dev-refactor`; merges back into it |
 | `physics/<module>` | One physics module each, from `dev` |
+| `archive/*` (tags) | Old branch tips kept for reference |
 
 Open pull requests against the branch you branched from. Shared
 infrastructure (hooks, loaders, formats) goes on `dev-refactor` and reaches
 `dev` before a module relies on it; keep infrastructure and module code in
-separate commits.
+separate commits. A `physics/*` branch can be frozen when nothing else
+depends on it; `physics/volcanic` is frozen, so do not build on it.
 
 ## Opening a pull request
 

@@ -328,7 +328,8 @@ Notable changes to GREBClimate.jl, following
 ### Changes to model results
 
 - `:decon_2xco2` runs the MSCM physics (`mscm_hydrology()`, no moisture
-  convergence) on its own 3-year spin-up, like `:decon_mean_climate`. With the
+  convergence), like `:decon_mean_climate`, on its own 3-year spin-up
+  (`:decon_mean_climate` uses the stored corrections instead). With the
   default hydrology `humidity = :uniform` gave a non-finite run, because the
   imposed humidity is above saturation over cold, high ground and the fitted
   rain scheme rains it out at once. All processes on, the year-50 response is
