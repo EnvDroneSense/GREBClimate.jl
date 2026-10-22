@@ -3,12 +3,12 @@ paths: ["test/**/*.jl"]
 ---
 
 `test/test_invariants.jl` builds its coverage guard (the `all_kernels` set) from
-`names(GREBClimate)` — only *exported* `!`-kernels are ever picked up. An
-unexported kernel (e.g. `_diffusion!`, `_advection!`) is invisible to the
-guard directly; it is only covered because the exported wrapper that calls it
-(`diffusion!`, `advection!`) is in the `kernels` allocation table. A new
-unexported kernel with no exported caller would silently never be checked —
-this asymmetry is easy to get wrong.
+`names(GREBClimate; all=true)`: every `!`-named function defined in a kernel
+file, exported or not, must have a row in the `kernels` allocation table, and
+the set must not be empty. `_`-prefixed workers (`_diffusion!`, `_advection!`,
+`_convergence!`) are skipped; they are covered through the wrapper that calls
+them (`diffusion!`, `advection!`, `convergence!`). A new `_` worker with no
+wrapper in the table would silently never be checked - give it one.
 
 The `kernels` table is guarded by an equality assertion (`setdiff(all_kernels,
 ...)`); the return-type `signatures` table has **no** such assertion — adding a

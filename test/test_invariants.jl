@@ -50,20 +50,25 @@ end
         ("advection!", () -> advection!(f.T1, GREBClimate.z_air, f.fields, f.ws, f.slice, f.p), 0),
         ("circulation!", () -> circulation!(f.T1, GREBClimate.z_air, f.dX, f.fields, f.ws, f.slice, f.p), 0),
         ("tendencies!", () -> tendencies!(340.0f0, f.Ts, f.Ta, f.To, f.q, f.fields, f.state, f.ws, f.slice, f.r), 256),
+        ("to_ghosted!", () -> GREBClimate.to_ghosted!(f.ws.X_work, f.T1), 0),
+        ("refresh_ghosts!", () -> GREBClimate.refresh_ghosts!(f.ws.X_work), 0),
     ]
 
     # The table is hand-written; this is what stops a new kernel slipping past
     # it. "Kernel" means a `!`-named function defined in one of these files.
+    # The kernels are not exported, so the search needs `all = true`; the
+    # `_`-prefixed workers are reached through their public wrapper.
     kernel_files = ("physics/radiation.jl", "physics/hydrology.jl",
         "physics/ocean.jl", "physics/circulation.jl", "core/tendencies.jl")
     defined_in_kernel_file(fn) = any(methods(fn)) do m
         path = replace(String(m.file), '\\' => '/')
         any(kf -> endswith(path, kf), kernel_files)
     end
-    all_kernels = Set(String(n) for n in names(GREBClimate)
-                      if endswith(String(n), "!") &&
+    all_kernels = Set(String(n) for n in names(GREBClimate; all=true)
+                      if endswith(String(n), "!") && !startswith(String(n), r"[_#]") &&
                          getproperty(GREBClimate, n) isa Function &&
                          defined_in_kernel_file(getproperty(GREBClimate, n)))
+    @test !isempty(all_kernels)   # an empty set would make the next check pass on anything
     @test setdiff(all_kernels, Set(first.(kernels))) == Set{String}()
 
     for (name, thunk, budget) in kernels

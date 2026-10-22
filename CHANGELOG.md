@@ -5,6 +5,17 @@ Notable changes to GREBClimate.jl, following
 
 ## [Unreleased]
 
+### Fixed
+
+- `include("examples/run_greb.jl")` no longer looks for the dataset: before, it
+  resolved the data directory at load time and could prompt to download 353 MB
+  even when `run_greb` was then called with an explicit directory. Running the
+  file as a script is unchanged.
+- The test that every physics kernel is in the allocation table checked
+  nothing: it listed exported names only, and no kernel has been exported since
+  2.1.0. It now finds the unexported kernels too, fails if it finds none, and
+  covers `to_ghosted!` and `refresh_ghosts!`, which it had missed.
+
 ## [2.2.0] - 2026-10-09
 
 ### Added
