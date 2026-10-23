@@ -1,10 +1,4 @@
 # The calendar: 365 days, 2 steps a day, 730 steps a year, no leap years.
-using Test
-using GREBClimate
-using GREBClimate: step_of_year, day_of_year, month_of_day, month_of_step,
-    is_day_end, is_month_end, is_year_end, steps_in_month, first_step_of,
-    decimal_year, months_per_year, spinup, control, scenario, steps, year, month, data_slice,
-    previous_slice, clim_slice
 
 @testset "calendar" begin
     @testset "step and day of the year" begin

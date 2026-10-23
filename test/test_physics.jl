@@ -1,5 +1,9 @@
 # Physics kernels: tendencies!, hydro!, SWradiation!, diffusion/advection/circulation.
 
+"A `ResolvedHydrology` from keywords: fitted rain with `c_q = 1` and no other coefficient unless given."
+resolved_hydrology(; rain = :fitted, evaporation = :original, c_q = 1, c_rq = 0, c_omega = 0, c_omega_std = 0) =
+    ResolvedHydrology(rain, evaporation, c_q, c_rq, c_omega, c_omega_std)
+
 @testset "tendencies! Q_sens honors the atmosphere switch" begin
     # Q_sens = ct_sens * (Ta - Ts), checked against a hand-computed value.
     fields = ClimateFields()
@@ -8,13 +12,13 @@
     slice = 1
     r = resolve(preset(:full_model))
 
-    Ts = fill(288.0, GREBClimate.xdim, GREBClimate.ydim)
-    Ta = fill(280.0, GREBClimate.xdim, GREBClimate.ydim)
-    To = fill(285.0, GREBClimate.xdim, GREBClimate.ydim)
-    q = fill(0.006, GREBClimate.xdim, GREBClimate.ydim)
+    Ts = fill(288.0, X, Y)
+    Ta = fill(280.0, X, Y)
+    To = fill(285.0, X, Y)
+    q = fill(0.006, X, Y)
 
     tend = tendencies!(340.0, Ts, Ta, To, q, fields, state, ws, slice, r)
-    @test tend.Q_sens ≈ GREBClimate.ct_sens .* (Ta .- Ts)
+    @test tend.Q_sens ≈ ct_sens .* (Ta .- Ts)
     @test all(isfinite, tend.SW)
     @test all(isfinite, tend.LW_surf)
     @test all(isfinite, tend.dTa_crcl)
@@ -26,7 +30,7 @@
 end
 
 @testset "land is topography above 0 m, in every kernel" begin
-    @test GREBClimate.is_land.([-1.0f0, 0.0f0, 0.1f0]) == [false, false, true]
+    @test is_land.([-1.0f0, 0.0f0, 0.1f0]) == [false, false, true]
 
     # At 270 K land and ocean give different ice cover; a cell at exactly 0 m
     # goes with the ocean
@@ -40,12 +44,11 @@ end
 
 @testset "diffusion!/advection!/circulation! per-cell snapshot (incl. date-line wraparound)" begin
     fields = ClimateFields()
-    xdim_, ydim_ = GREBClimate.xdim, GREBClimate.ydim
-    T1 = Float32[100.0 * i + k for i in 1:xdim_, k in 1:ydim_]
-    wz = [1.0 + 0.001 * i - 0.0005 * k for i in 1:xdim_, k in 1:ydim_]
+    T1 = Float32[100.0 * i + k for i in 1:X, k in 1:Y]
+    wz = [1.0 + 0.001 * i - 0.0005 * k for i in 1:X, k in 1:Y]
     fields.wz_air .= wz
     fields.wz_vapor .= wz
-    for it in 1:GREBClimate.nstep_yr, k in 1:ydim_, i in 1:xdim_
+    for it in 1:N, k in 1:Y, i in 1:X
         fields.u_clim_neg[i, k, it] = 0.5 + 0.0001 * i
         fields.u_clim_pos[i, k, it] = 0.3 + 0.0001 * k
         fields.v_clim_neg[i, k, it] = 0.4 + 0.0002 * i
@@ -58,7 +61,7 @@ end
     test_is = [1, 2, 3, 50, 94, 95, 96]
     test_ks = [1, 11, 48]
 
-    diffusion!(T1, GREBClimate.z_air, fields, ws)
+    diffusion!(T1, z_air, fields, ws)
     dX_diff_ref = Dict(
         (1,1)=>4517.8355192140425, (2,1)=>3542.95440832927, (3,1)=>2652.6121358299374,
         (50,1)=>1.2269892658145531, (94,1)=>-2709.198844945152, (95,1)=>-3576.970530673063,
@@ -79,12 +82,12 @@ end
     # the snapshots above never reach. These values are exactly representable in
     # Float32, so both paths must agree bit for bit.
     dX_diff_f32 = copy(ws.dX_diff)
-    diffusion!(Float64.(T1), GREBClimate.z_air, fields, ws)
+    diffusion!(Float64.(T1), z_air, fields, ws)
     @test ws.dX_diff == dX_diff_f32
-    diffusion!(view(T1, :, :), GREBClimate.z_air, fields, ws)
+    diffusion!(view(T1, :, :), z_air, fields, ws)
     @test ws.dX_diff == dX_diff_f32
 
-    advection!(T1, GREBClimate.z_air, fields, ws, slice, p)
+    advection!(T1, z_air, fields, ws, slice, p)
     dX_adv_ref = Dict(
         (1,1)=>99.99281072836801, (2,1)=>37.62423619149657, (3,1)=>6.428217314852662,
         (50,1)=>-4.182755344492395, (94,1)=>11.771946283998448, (95,1)=>60.257791236566284,
@@ -100,8 +103,8 @@ end
         @test isapprox(ws.dX_adv[i, k], dX_adv_ref[(i, k)]; atol=1e-3, rtol=1e-4)
     end
 
-    dX_out = zeros(xdim_, ydim_)
-    circulation!(T1, GREBClimate.z_air, dX_out, fields, ws, slice, p)
+    dX_out = zeros(X, Y)
+    circulation!(T1, z_air, dX_out, fields, ws, slice, p)
     dX_out_ref = Dict(
         (1,1)=>4824.155681112328, (2,1)=>4609.661409972268, (3,1)=>4395.402855867866,
         (50,1)=>-98.5576039612888, (94,1)=>-4172.300403641432, (95,1)=>-4369.7800972827745,
@@ -119,9 +122,9 @@ end
 end
 
 @testset "hydro! errors on an unknown evaporation scheme" begin
-    Ts = fill(290.0, GREBClimate.xdim, GREBClimate.ydim)
-    q = fill(0.005, GREBClimate.xdim, GREBClimate.ydim)
-    h = ResolvedHydrology(:fitted, :bogus, 1, 0, 0, 0)
+    Ts = fill(290.0, X, Y)
+    q = fill(0.005, X, Y)
+    h = resolved_hydrology(evaporation = :bogus)
     @test_throws ErrorException hydro!(Ts, q, ClimateFields(), 1, Processes(), h, ModelWorkspace())
 end
 
@@ -130,28 +133,27 @@ end
     init_model!(resolve(preset(:full_model)), fields)
     # c_q is large enough that any per-step limit on rain inside hydro! would
     # change the result: the fitted scheme applies none
-    h = ResolvedHydrology(:fitted, :original, 1000, 0, 0, 0)
+    h = resolved_hydrology(c_q = 1000)
 
-    Ts = fill(290.0f0, GREBClimate.xdim, GREBClimate.ydim)
-    q = fill(0.008f0, GREBClimate.xdim, GREBClimate.ydim)
+    Ts = fill(290.0f0, X, Y)
+    q = fill(0.008f0, X, Y)
     slice = 1
     ws = ModelWorkspace()
     result = hydro!(Ts, q, fields, slice, Processes(), h, ws)
 
-    expected_dq_rain = h.c_q * GREBClimate.cq_rain * q[1, 1]
+    expected_dq_rain = h.c_q * cq_rain * q[1, 1]
     @test isapprox(result.dq_rain[1, 1], expected_dq_rain; rtol = 1e-5)
-    @test isapprox(result.Q_lat_air[1, 1], -expected_dq_rain * GREBClimate.cq_latent * GREBClimate.r_qviwv; rtol = 1e-5)
+    @test isapprox(result.Q_lat_air[1, 1], -expected_dq_rain * cq_latent * r_qviwv; rtol = 1e-5)
 end
 
 @testset "hydro! evaporation: latent heat flux of the four schemes over land and ocean" begin
-    G = GREBClimate
     Ts = fill(290.0f0, X, Y)
     q = fill(0.008f0, X, Y)
     qsat(T, wz) = 3.75e-3 * exp(17.08085 * (T - 273.15) / (T - 273.15 + 234.175)) * wz
-    bulk = G.cq_latent * G.ρ_air * G.ce
+    bulk = cq_latent * ρ_air * ce
     for land in (true, false)
         fields = constant_fields(z_topo = land ? 1.0 : -1.0, swet = 0.4, u = 3.0, v = 4.0, wind_speed = 6.0)
-        G.derive_fields!(fields, Processes())
+        derive_fields!(fields, Processes())
         wz = fields.wz_air[1, 1]
         # :original and :original_gust use the wind components, the other
         # two the wind-speed climatology; :skin takes the saturation humidity
@@ -168,28 +170,27 @@ end
             h = resolve(preset(:full_model; hydrology = (evaporation = scheme,))).hydrology
             result = hydro!(Ts, q, fields, 1, Processes(), h, ModelWorkspace())
             @test isapprox(result.Q_lat[1, 1], expected[scheme]; rtol = 1e-5)
-            @test isapprox(result.dq_eva[1, 1], -expected[scheme] / G.cq_latent / G.r_qviwv; rtol = 1e-5)
+            @test isapprox(result.dq_eva[1, 1], -expected[scheme] / cq_latent / r_qviwv; rtol = 1e-5)
         end
     end
 end
 
 @testset "SWradiation!: ice cover, albedo ramp and absorbed shortwave" begin
-    G = GREBClimate
     fields = constant_fields(z_topo = -1.0)   # ocean, cloud cover 0.5
     fields.z_topo[1:3, 2] .= 1.0f0            # three land cells
     fields.glacier[4, 1] = 1.0f0              # a warm cell under a glacier
     fields.sw_solar .= 400.0f0
     # Fully ice-covered, the middle of the ramp, ice-free: ocean, then land
     Ts = fill(280.0f0, X, Y)
-    Ts[1:2, 1] .= (260.0f0, (G.To_ice1 + G.To_ice2) / 2)
-    Ts[1:2, 2] .= (250.0f0, (G.Tl_ice1 + G.Tl_ice2) / 2)
+    Ts[1:2, 1] .= (260.0f0, (To_ice1 + To_ice2) / 2)
+    Ts[1:2, 2] .= (250.0f0, (Tl_ice1 + Tl_ice2) / 2)
     state = ModelState()
-    run(p) = map(copy, SWradiation!(Ts, fields, state, 1, p, ModelWorkspace()))
+    shortwave(p) = map(copy, SWradiation!(Ts, fields, state, 1, p, ModelWorkspace()))
 
-    a_atmos = 0.5 * G.a_cloud
+    a_atmos = 0.5 * a_cloud
     combined(a_surf) = a_surf + a_atmos - a_surf * a_atmos
-    ramp = combined.(G.a_no_ice .+ G.da_ice .* [1, 0.5, 0])
-    sw = run(Processes())
+    ramp = combined.(a_no_ice .+ da_ice .* [1, 0.5, 0])
+    sw = shortwave(Processes())
     for row in 1:2
         @test isapprox(sw.ice_cover[1:3, row], [1, 0.5, 0]; atol = 1e-4)
         @test isapprox(sw.albedo[1:3, row], ramp; rtol = 1e-4)
@@ -200,16 +201,16 @@ end
 
     # The solar multiplier scales the absorbed flux
     state.sw_solar_forcing = 1.1f0
-    @test isapprox(run(Processes()).SW, 1.1f0 .* sw.SW; rtol = 1e-5)
+    @test isapprox(shortwave(Processes()).SW, 1.1f0 .* sw.SW; rtol = 1e-5)
     state.sw_solar_forcing = 1.0f0
 
     # Without the ice-albedo feedback every surface is ice-free for the albedo
-    off = run(Processes(ice_albedo = false))
+    off = shortwave(Processes(ice_albedo = false))
     @test all(a -> isapprox(a, ramp[3]; rtol = 1e-5), off.albedo)
     @test off.ice_cover == sw.ice_cover
 
     # Exactly on a threshold: full ice at the lower one, none at the upper one
-    for (T1, T2, inv) in ((G.To_ice1, G.To_ice2, G.inv_To_ice_range), (G.Tl_ice1, G.Tl_ice2, G.inv_Tl_ice_range))
+    for (T1, T2, inv) in ((To_ice1, To_ice2, inv_To_ice_range), (Tl_ice1, Tl_ice2, inv_Tl_ice_range))
         @test GREBClimate.@ice_ramp(T1, T1, T2, inv) === 1.0f0
         @test GREBClimate.@ice_ramp(T2, T1, T2, inv) === 0.0f0
         @test GREBClimate.@ice_ramp(prevfloat(T2), T1, T2, inv) > 0
@@ -217,56 +218,54 @@ end
 end
 
 @testset "LWradiation!: emissivity and the longwave fluxes" begin
-    G = GREBClimate
     fields = constant_fields(z_topo = 1500.0)   # cloud cover 0.5, Ts_clim 280 K
-    G.derive_fields!(fields, Processes())
+    derive_fields!(fields, Processes())
     Ts, Ta, q = fill(288.0f0, X, Y), fill(280.0f0, X, Y), fill(0.006f0, X, Y)
-    run(co2; p = Processes(), f = fields) =
+    longwave(co2; p = Processes(), f = fields) =
         map(copy, LWradiation!(Ts, Ta, q, co2, f, 1, p, ModelWorkspace()))
-    lw = run(340.0f0)
+    lw = longwave(340.0f0)
 
-    p1, p2, p3, p4, p5, p6, p7, p8, p9, p10 = Float64.(G.emissivity_fit)
-    wz = exp(-1500 / G.z_air)
-    co2, vapor = wz * 340, wz * G.r_qviwv * 0.006
+    p1, p2, p3, p4, p5, p6, p7, p8, p9, p10 = Float64.(emissivity_fit)
+    wz = exp(-1500 / z_air)
+    co2, vapor = wz * 340, wz * r_qviwv * 0.006
     clear = p4 * log(p1 * co2 + p2 * vapor + p3) + p7 + p5 * log(p1 * co2 + p3) + p6 * log(p2 * vapor + p3)
     em = (p8 - 0.5) / p9 * (clear - p10) + p10
     @test isapprox(lw.em[1, 1], em; rtol = 1e-4)
-    @test isapprox(lw.LW_surf[1, 1], -G.σ * 288.0^4; rtol = 1e-5)
+    @test isapprox(lw.LW_surf[1, 1], -σ * 288.0^4; rtol = 1e-5)
     T_rad = 280 + (-0.16 * 280 - 5)             # air temperature plus the radiation offset
-    @test isapprox(lw.LW_down[1, 1], -em * G.σ * T_rad^4; rtol = 1e-4)
+    @test isapprox(lw.LW_down[1, 1], -em * σ * T_rad^4; rtol = 1e-4)
     @test lw.LW_up == lw.LW_down
 
     # More CO2 raises the emissivity; a cell with half the share of doubled
     # CO2 has the control emissivity
-    @test run(680.0f0).em[1, 1] > lw.em[1, 1]
+    @test longwave(680.0f0).em[1, 1] > lw.em[1, 1]
     half = deepcopy(fields)
     half.co2_part .= 0.5f0
-    @test isapprox(run(680.0f0; f = half).em, lw.em; rtol = 1e-6)
+    @test isapprox(longwave(680.0f0; f = half).em, lw.em; rtol = 1e-6)
 
     # Without an atmosphere there is no back radiation; LW_up keeps its value
-    off = run(340.0f0; p = Processes(atmosphere = false))
+    off = longwave(340.0f0; p = Processes(atmosphere = false))
     @test all(iszero, off.LW_down) && off.LW_up == lw.LW_up
 end
 
 @testset "seaice!: surface heat capacity along the ice ramp" begin
-    G = GREBClimate
     fields = constant_fields(z_topo = -1.0)   # ocean, 50 m mixed layer
     fields.z_topo[4, 1] = 1.0f0               # land
     fields.glacier[5, 1] = 1.0f0              # ocean under a glacier
-    G.derive_fields!(fields, Processes())
-    open_ocean = G.cap_ocean * 50
+    derive_fields!(fields, Processes())
+    open_ocean = cap_ocean * 50
     # Fully ice-covered, the middle of the ramp, then ice-free
     Ts = fill(280.0f0, X, Y)
-    Ts[1:2, 1] .= (260.0f0, (G.To_ice1 + G.To_ice2) / 2)
+    Ts[1:2, 1] .= (260.0f0, (To_ice1 + To_ice2) / 2)
     slice = 1
 
     seaice!(Ts, fields, slice, Processes())
     @test isapprox(fields.cap_surf[1:5, 1],
-                   [G.cap_land, (G.cap_land + open_ocean) / 2, open_ocean, G.cap_land, G.cap_land]; rtol = 1e-4)
+                   [cap_land, (cap_land + open_ocean) / 2, open_ocean, cap_land, cap_land]; rtol = 1e-4)
 
     # Without the ice-albedo feedback the ocean keeps its open-water capacity
     seaice!(Ts, fields, slice, Processes(ice_albedo = false))
-    @test isapprox(fields.cap_surf[1:5, 1], [open_ocean, open_ocean, open_ocean, G.cap_land, G.cap_land]; rtol = 1e-6)
+    @test isapprox(fields.cap_surf[1:5, 1], [open_ocean, open_ocean, open_ocean, cap_land, cap_land]; rtol = 1e-6)
 
     # Without an ocean the kernel leaves the capacity alone
     fields.cap_surf .= 7.0f0
@@ -275,29 +274,28 @@ end
 end
 
 @testset "deep_ocean!: entrainment, detrainment and turbulent mixing" begin
-    G = GREBClimate
     fields = constant_fields(z_topo = -1.0)   # ocean, 50 m mixed layer at every step
     fields.z_topo[4, 1] = 1.0f0               # land
     fields.mld_clim[1, 1, N] = 40.0f0          # the step before step 1: the layer deepens by 10 m
     fields.mld_clim[2, 1, N] = 60.0f0          # ... or shoals by 10 m
-    G.derive_fields!(fields, Processes())     # deep-ocean depth: 3 x the deepest mixed layer
+    derive_fields!(fields, Processes())     # deep-ocean depth: 3 x the deepest mixed layer
     Ts = fill(290.0f0, X, Y)
     Ts[3, 1] = 260.0f0                        # under sea ice
     To = fill(280.0f0, X, Y)
     ws = ModelWorkspace()
     r = deep_ocean!(Ts, To, fields, 1, Processes(), ws)
-    turb, mix = G.turb_coeff, G.c_effmix
-    close(a, b) = isapprox(a, b; rtol = 1e-4)
+    turb, mix = turb_coeff, c_effmix
+    near(a, b) = isapprox(a, b; rtol = 1e-4)
 
     # Deepening: the surface layer takes up deep water; below, turbulent mixing only
-    @test close(r.dT_ocean[1, 1], mix * (10 / 50) * (280 - 290) + turb * (280 - 290) / 50)
-    @test close(r.dTo[1, 1], turb * (290 - 280) / (150 - 50))
+    @test near(r.dT_ocean[1, 1], mix * (10 / 50) * (280 - 290) + turb * (280 - 290) / 50)
+    @test near(r.dTo[1, 1], turb * (290 - 280) / (150 - 50))
     # Shoaling: the water left behind joins the deep ocean (180 m deep here)
-    @test close(r.dTo[2, 1], mix * (10 / (180 - 50)) * (290 - 280) + turb * (290 - 280) / (180 - 50))
-    @test close(r.dT_ocean[2, 1], turb * (280 - 290) / 50)
+    @test near(r.dTo[2, 1], mix * (10 / (180 - 50)) * (290 - 280) + turb * (290 - 280) / (180 - 50))
+    @test near(r.dT_ocean[2, 1], turb * (280 - 290) / 50)
     # Under sea ice: mixing against the temperature at which the ice ends
-    @test close(r.dT_ocean[3, 1], turb * (280 - G.To_ice2) / 50)
-    @test close(r.dTo[3, 1], turb * (G.To_ice2 - 280) / (150 - 50))
+    @test near(r.dT_ocean[3, 1], turb * (280 - To_ice2) / 50)
+    @test near(r.dTo[3, 1], turb * (To_ice2 - 280) / (150 - 50))
     # Land
     @test r.dT_ocean[4, 1] == 0 && r.dTo[4, 1] == 0
 
@@ -307,9 +305,6 @@ end
         @test all(iszero, off.dT_ocean) && all(iszero, off.dTo)
     end
 end
-
-# The allocation budget for SWradiation! (and every other kernel) lives in
-# test_invariants.jl, alongside the return-type checks.
 
 @testset "hydrology = :none: humidity stays put, whatever the humidity correction" begin
     # Evaporation, rain and transport are zero with the water cycle off, so the

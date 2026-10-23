@@ -21,13 +21,13 @@ end
     flat = ET.polar_amplification(ones_map)
     @test flat.north ≈ 1 && flat.south ≈ 1
 
-    pole = [abs(GREBClimate.lat_grid[j]) >= 60 ? 2.0f0 : 1.0f0 for _ in 1:X, j in 1:Y]
+    pole = [abs(lat_grid[j]) >= 60 ? 2.0f0 : 1.0f0 for _ in 1:X, j in 1:Y]
     amp = ET.polar_amplification(pole)
     @test amp.north ≈ amp.south > 1
     @test amp.north ≈ 2 / ET.area_mean(pole)
 
     z_topo = synthetic_fields().z_topo
-    land = Float32.(GREBClimate.is_land.(z_topo))
+    land = Float32.(is_land.(z_topo))
     @test any(land .== 1) && any(land .== 0)
     lo = ET.land_ocean(land, z_topo)
     @test lo.land ≈ 1 && abs(lo.ocean) < 1e-12
@@ -49,7 +49,7 @@ end
 end
 
 @testset "annual means group by record time" begin
-    times = [(year = 1950 + (m - 1) ÷ 12, month = mod1(m, 12)) for m in 1:30]
+    times = record_times(1950, 30)
     records = [uniform_record(Float32(m)) for m in 1:30]
     years, values = ET.annual_means(records, times, :Ts)
     @test years == [1950, 1951]                      # 1952 has six months only
@@ -59,7 +59,7 @@ end
 end
 
 @testset "in_range_report" begin
-    times = [(year = 1950, month = m) for m in 1:3]
+    times = record_times(1950, 3)
     fine = [uniform_record(280f0; q = 0.01f0) for _ in 1:3]
     @test ET.in_range_report(fine, times, false) === nothing
     runaway = [fine[1], uniform_record(280f0; q = 0.01f0, Ts = 1f24), fine[3]]

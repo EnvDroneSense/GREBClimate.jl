@@ -20,8 +20,18 @@ This is deliberate, not overhead to shave off: the code indexes ghost-cell
 buffers by hand under `@inbounds`/`@turbo`, exactly where bounds checking
 earns its cost. Do not disable or "optimize" it away.
 
+The names the tests call besides the exports (the kernels, the run loop, the
+calendar, the constants the kernel tests calculate with) are imported once in
+`test/support/imports.jl`; add a name there rather than writing
+`GREBClimate.name` in many places. `_`-prefixed internals keep the prefix.
+
 Shared fixtures live in `test/support/testutils.jl` (`synthetic_fields`,
-`constant_fields`, `uniform_record`, `quiet`, `with_tempdir`, `gmean`, `run_synthetic`).
+`constant_fields`, `uniform_record`, `field`, `quiet`, `with_tempdir`,
+`with_dataset`, `gmean`, `run_synthetic`, `record_times`). Input files are
+written with `write_field`, `write_flux_corrections`, `write_ipcc_scenarios` and
+`write_solar_scenarios`. One model step is `initial_state(ini)` plus
+`step!(t, CO2, s, fields, r)`, which supplies the record buffers and fresh
+`state`, `ws` and `acc` unless given.
 `run_synthetic(run, config; fields, kwargs...)` is a muted `greb_model!` on
 `synthetic_fields()` with `allow_uninitialized`: use it for short model runs
 that do not need the dataset.

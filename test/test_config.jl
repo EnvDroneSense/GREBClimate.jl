@@ -2,9 +2,9 @@
 # tables a scenario reads.
 
 @testset "grid constants" begin
-    @test GREBClimate.xdim == 96
-    @test GREBClimate.ydim == 48
-    @test GREBClimate.nstep_yr == 730
+    @test xdim == 96
+    @test ydim == 48
+    @test nstep_yr == 730
 end
 
 @testset "RunSpec" begin

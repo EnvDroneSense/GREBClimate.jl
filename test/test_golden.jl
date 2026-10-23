@@ -9,11 +9,8 @@ include(joinpath("data", "golden_reference.jl"))
     # between runs; exact equality is checked by tools/validation/bit_identity.jl.
     # RUN_GOLDEN=0 skips it locally. CI has no dataset and always skips it, so
     # a golden break is local-red and CI-green.
-    if !isdir(DATA_DIR)
-        @test_skip "greb_input_data/ not present"
-    elseif get(ENV, "RUN_GOLDEN", "1") == "0"
-        @test_skip "RUN_GOLDEN=0"
-    else
+    with_dataset() do
+        get(ENV, "RUN_GOLDEN", "1") == "0" && return @test_skip "RUN_GOLDEN=0"
         fields = load_climatology(DATA_DIR; dataset = :ncep)
         result = quiet() do
             greb_model!(RunSpec(), preset(:full_model; corrections = Stored()); jld2_dir = DATA_DIR, fields = fields)
@@ -62,9 +59,7 @@ end
 @testset "MSCM configuration reproduces the MSCM 2xCO2 response" begin
     # MSCM (Monash Simple Climate Model) database, 2xCO2 with every process on:
     # year-1 global-mean surface temperature response 0.594636 K.
-    if !isdir(DATA_DIR)
-        @test_skip "greb_input_data/ not present"
-    else
+    with_dataset() do
         cfg = preset(:co2_double; processes = (moisture_convergence = false,), hydrology = mscm_hydrology())
         result = quiet() do
             greb_model!(RunSpec(ctrl = 1, scnr = 1), cfg; jld2_dir = DATA_DIR,
@@ -77,9 +72,7 @@ end
 @testset "mean-climate deconstruction: a switched-off process changes the control climate" begin
     # On computed corrections every configuration is pulled back to the
     # observed climate; on the stored ones the switch shows.
-    if !isdir(DATA_DIR)
-        @test_skip "greb_input_data/ not present"
-    else
+    with_dataset() do
         fields = load_climatology(DATA_DIR; dataset = :ncep)
         control(processes) = quiet() do
             greb_model!(RunSpec(ctrl = 1, scnr = 0), preset(:decon_mean_climate; processes);
@@ -93,9 +86,7 @@ end
     # 0.0052 kg/kg is above saturation over cold, high ground. The fitted rain
     # scheme rains that out within the spin-up and the run goes non-finite;
     # the preset's MSCM physics does not.
-    if !isdir(DATA_DIR)
-        @test_skip "greb_input_data/ not present"
-    else
+    with_dataset() do
         result = quiet() do
             greb_model!(RunSpec(ctrl = 1, scnr = 1), preset(:decon_2xco2; processes = (humidity = :uniform,));
                         jld2_dir = DATA_DIR, fields = load_climatology(DATA_DIR; dataset = :ncep))
@@ -106,9 +97,7 @@ end
 end
 
 @testset "orbital tables: the default rows are near modern; the rcp85 CO2 table loads" begin
-    if !isdir(DATA_DIR)
-        @test_skip "greb_input_data/ not present"
-    else
+    with_dataset() do
         modern = quiet(() -> load_climatology(DATA_DIR; dataset = :ncep)).sw_solar
         rms(a) = sqrt(sum(abs2, a .- modern) / length(a))
         for p in (:eccentricity, :obliquity)

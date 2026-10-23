@@ -7,7 +7,6 @@
 # One fixture for both testsets: an unloaded (all-zero) climatology, since
 # these tests measure allocations and inferred types, not physics.
 function _kernel_fixture()
-    X, Y = GREBClimate.xdim, GREBClimate.ydim
     fields = ClimateFields()
     r = resolve(preset(:full_model))
     quiet() do
@@ -46,9 +45,9 @@ end
         ("seaice!", () -> seaice!(f.Ts, f.fields, f.slice, f.p), 0),
         ("deep_ocean!", () -> deep_ocean!(f.Ts, f.To, f.fields, f.slice, f.p, f.ws), 64),
         ("convergence!", () -> convergence!(f.T1, f.fields, f.slice, f.ws), 0),
-        ("diffusion!", () -> diffusion!(f.T1, GREBClimate.z_air, f.fields, f.ws), 0),
-        ("advection!", () -> advection!(f.T1, GREBClimate.z_air, f.fields, f.ws, f.slice, f.p), 0),
-        ("circulation!", () -> circulation!(f.T1, GREBClimate.z_air, f.dX, f.fields, f.ws, f.slice, f.p), 0),
+        ("diffusion!", () -> diffusion!(f.T1, z_air, f.fields, f.ws), 0),
+        ("advection!", () -> advection!(f.T1, z_air, f.fields, f.ws, f.slice, f.p), 0),
+        ("circulation!", () -> circulation!(f.T1, z_air, f.dX, f.fields, f.ws, f.slice, f.p), 0),
         ("tendencies!", () -> tendencies!(340.0f0, f.Ts, f.Ta, f.To, f.q, f.fields, f.state, f.ws, f.slice, f.r), 256),
         ("to_ghosted!", () -> GREBClimate.to_ghosted!(f.ws.X_work, f.T1), 0),
         ("refresh_ghosts!", () -> GREBClimate.refresh_ghosts!(f.ws.X_work), 0),

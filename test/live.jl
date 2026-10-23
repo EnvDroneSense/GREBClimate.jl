@@ -17,12 +17,7 @@ catch
     @info "Revise not available; restart Julia after editing src/"
 end
 
-using GREBClimate
-using GREBClimate: SWradiation!, LWradiation!, hydro!, convergence!, seaice!, deep_ocean!,
-    diffusion!, advection!, circulation!, tendencies!, time_loop!, output!, diagnostics!,
-    qflux_correction!, init_model!
-using Test
-
+include(joinpath(@__DIR__, "support", "imports.jl"))
 include(joinpath(@__DIR__, "support", "testutils.jl"))
 include(joinpath(@__DIR__, "support", "selection.jl"))
 

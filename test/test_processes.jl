@@ -30,8 +30,8 @@ end
     @test all(==(0.7f0), init((clouds = :uniform,))[1].cloud_clim)
     @test all(==(0.0f0), init((hydrology = :none,))[1].q_clim)
     @test all(==(0.0052f0), init((hydrology = :none, humidity = :uniform))[1].q_clim)   # uniform wins
-    @test all(==(GREBClimate.d_ocean), init((ocean = :mixed_layer,))[1].mld_clim)
-    @test all(==(GREBClimate.cap_land), init((ocean = :none,))[1].cap_surf)
+    @test all(==(d_ocean), init((ocean = :mixed_layer,))[1].mld_clim)
+    @test all(==(cap_land), init((ocean = :none,))[1].cap_surf)
     @test init((topography = :flat,))[1].z_topo[1, 1] == 1.0f0
     @test init((co2 = false,))[2].CO2_ctrl == 0
     @test all(==(0.0f0), init((;); corrections = NoCorrections())[1].Ts_flux_correction)

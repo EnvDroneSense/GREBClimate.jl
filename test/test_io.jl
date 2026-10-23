@@ -1,32 +1,25 @@
 # JLD2 loading, dataset resolution, and converter/archive consistency.
 
 @testset "load_climatology: every file is read; a missing flux-corrections file or table is an error" begin
-    write2(path, v) = (mkpath(dirname(path)); GREBClimate.jldopen(path, "w") do f
-        f["data"] = fill(v, GREBClimate.xdim, GREBClimate.ydim); f["dim_names"] = ["lon", "lat"]
-    end)
-    write3(path, v) = (mkpath(dirname(path)); GREBClimate.jldopen(path, "w") do f
-        f["data"] = fill(v, GREBClimate.xdim, GREBClimate.ydim, GREBClimate.nstep_yr); f["dim_names"] = ["lon", "lat", "time"]
-    end)
-    write_solar(path, v) = (mkpath(dirname(path)); GREBClimate.jldopen(path, "w") do f
-        f["data"] = fill(v, GREBClimate.ydim, GREBClimate.nstep_yr); f["dim_names"] = ["lat", "time"]
-    end)
-
-    tmpdir = mktempdir()
-    try
-        write2(joinpath(tmpdir, "static", "global.topography.jld2"), 1.0)
-        write2(joinpath(tmpdir, "static", "greb.glaciers.jld2"), 2.0)
-        write3(joinpath(tmpdir, "climatology", "ncep.tsurf.1948-2007.clim.jld2"), 3.0)
-        write3(joinpath(tmpdir, "climatology", "ncep.zonal_wind.850hpa.clim.jld2"), 4.0)
-        write3(joinpath(tmpdir, "climatology", "ncep.meridional_wind.850hpa.clim.jld2"), 5.0)
-        write3(joinpath(tmpdir, "climatology", "ncep.atmospheric_humidity.clim.jld2"), 6.0)
-        write3(joinpath(tmpdir, "climatology", "ncep.soil_moisture.clim.jld2"), 7.0)
-        write3(joinpath(tmpdir, "climatology", "isccp.cloud_cover.clim.jld2"), 8.0)
-        write3(joinpath(tmpdir, "climatology", "woce.ocean_mixed_layer_depth.clim.jld2"), 9.0)
-        write3(joinpath(tmpdir, "climatology", "Tocean.clim.jld2"), 10.0)
-        write3(joinpath(tmpdir, "climatology", "erainterim.omega.vertmean.clim.jld2"), 11.0)
-        write3(joinpath(tmpdir, "climatology", "erainterim.omega_std.vertmean.clim.jld2"), 12.0)
-        write3(joinpath(tmpdir, "climatology", "erainterim.windspeed.850hpa.clim.jld2"), 13.0)
-        write_solar(joinpath(tmpdir, "solar", "solar_radiation.clim.jld2"), 14.0)
+    with_tempdir() do tmpdir
+        map2(name, v) = write_field(joinpath(tmpdir, "static", name), v, (X, Y))
+        clim(name, v) = write_field(joinpath(tmpdir, "climatology", name), v)
+        solar(v, dims = (Y, N)) = write_field(joinpath(tmpdir, "solar", "solar_radiation.clim.jld2"), v, dims;
+                                              dim_names = ["lat", "time"])
+        map2("global.topography.jld2", 1.0)
+        map2("greb.glaciers.jld2", 2.0)
+        clim("ncep.tsurf.1948-2007.clim.jld2", 3.0)
+        clim("ncep.zonal_wind.850hpa.clim.jld2", 4.0)
+        clim("ncep.meridional_wind.850hpa.clim.jld2", 5.0)
+        clim("ncep.atmospheric_humidity.clim.jld2", 6.0)
+        clim("ncep.soil_moisture.clim.jld2", 7.0)
+        clim("isccp.cloud_cover.clim.jld2", 8.0)
+        clim("woce.ocean_mixed_layer_depth.clim.jld2", 9.0)
+        clim("Tocean.clim.jld2", 10.0)
+        clim("erainterim.omega.vertmean.clim.jld2", 11.0)
+        clim("erainterim.omega_std.vertmean.clim.jld2", 12.0)
+        clim("erainterim.windspeed.850hpa.clim.jld2", 13.0)
+        solar(14.0)
 
         # No flux-corrections file yet: an error that names it, not zeros
         @test_throws "flux_corrections.jld2" load_climatology(tmpdir; dataset = :ncep)
@@ -40,17 +33,10 @@
         @test_throws ArgumentError load_climatology(tmpdir; dataset = :era5)
 
         # A file that lacks one of the three tables is an error too
-        corrections = joinpath(tmpdir, "climatology", "flux_corrections.jld2")
-        GREBClimate.jldopen(corrections, "w") do f
-            f["Tsurf_flux_correction"] = fill(15.0, GREBClimate.xdim, GREBClimate.ydim, GREBClimate.nstep_yr)
-        end
+        write_flux_corrections(tmpdir; Ts = 15.0, q = nothing, To = nothing)
         @test_throws "vapour_flux_correction" load_climatology(tmpdir; dataset = :ncep)
 
-        GREBClimate.jldopen(corrections, "w") do f
-            f["Tsurf_flux_correction"] = fill(15.0, GREBClimate.xdim, GREBClimate.ydim, GREBClimate.nstep_yr)
-            f["vapour_flux_correction"] = fill(16.0, GREBClimate.xdim, GREBClimate.ydim, GREBClimate.nstep_yr)
-            f["Tocean_flux_correction"] = fill(17.0, GREBClimate.xdim, GREBClimate.ydim, GREBClimate.nstep_yr)
-        end
+        write_flux_corrections(tmpdir; Ts = 15.0, q = 16.0, To = 17.0)
 
         fields = load_climatology(tmpdir; dataset = :ncep)
         @test all(==(1.0), fields.z_topo)
@@ -68,60 +54,55 @@
         @test all(t -> all(==(10.0), fetch(t)), reads)
 
         # A solar table of the wrong shape is reported, with the file's name
-        GREBClimate.jldopen(joinpath(tmpdir, "solar", "solar_radiation.clim.jld2"), "w") do f
-            f["data"] = zeros(GREBClimate.ydim, 2); f["dim_names"] = ["lat", "time"]
-        end
+        solar(0.0, (Y, 2))
         @test_throws "solar_radiation.clim.jld2" load_climatology(tmpdir; dataset = :ncep)
-    finally
-        rm(tmpdir; recursive = true, force = true)
     end
 
-    missing_parent = mktempdir()
-    @test_throws ErrorException load_climatology(joinpath(missing_parent, "nonexistent"))
-    rm(missing_parent; recursive = true, force = true)
+    with_tempdir() do missing_parent
+        @test_throws ErrorException load_climatology(joinpath(missing_parent, "nonexistent"))
+    end
 end
 
 @testset "greb_data_dir resolution order" begin
-    tmp_a, tmp_b = mktempdir(), mktempdir()
-    saved = get(ENV, "GREB_DATA", nothing)
-    try
-        # explicit path wins over everything
-        ENV["GREB_DATA"] = tmp_b
-        @test greb_data_dir(tmp_a) == tmp_a
-        # ...and over the environment even with allow_download off
-        @test greb_data_dir(tmp_a; allow_download = false) == tmp_a
-        # GREB_DATA wins over the repo-local dataset
-        @test greb_data_dir() == tmp_b
-        delete!(ENV, "GREB_DATA")
+    with_tempdir() do tmp_a
+        with_tempdir() do tmp_b
+            withenv("GREB_DATA" => tmp_b) do
+                # explicit path wins over everything
+                @test greb_data_dir(tmp_a) == tmp_a
+                # ...and over the environment even with allow_download off
+                @test greb_data_dir(tmp_a; allow_download = false) == tmp_a
+                # GREB_DATA wins over the repo-local dataset
+                @test greb_data_dir() == tmp_b
+            end
 
-        # a non-existent explicit path is an error, not a silent fallback
-        @test_throws ErrorException greb_data_dir(joinpath(tmp_a, "nope"))
-        # so is a GREB_DATA pointing nowhere
-        ENV["GREB_DATA"] = joinpath(tmp_a, "nope")
-        @test_throws ErrorException greb_data_dir()
-        delete!(ENV, "GREB_DATA")
+            withenv("GREB_DATA" => nothing) do
+                # a non-existent explicit path is an error, not a silent fallback
+                @test_throws ErrorException greb_data_dir(joinpath(tmp_a, "nope"))
+            end
+            # so is a GREB_DATA pointing nowhere
+            withenv("GREB_DATA" => joinpath(tmp_a, "nope")) do
+                @test_throws ErrorException greb_data_dir()
+            end
 
-        # A downloaded dataset is the directory `<load path>/GREB-input-data`.
-        # Stand one up so the cache step runs on machines that never downloaded it.
-        # DataDeps splits DATADEPS_LOAD_PATH on ':', which cuts a Windows drive
-        # letter off, so the load path is given relative to the working directory.
-        cd(tmp_b) do
-            withenv("DATADEPS_LOAD_PATH" => ".", "DATADEPS_NO_STANDARD_LOAD_PATH" => "true") do
-                @test GREBClimate._cached_datadep_path() === nothing
-                cache = mkpath(joinpath(pwd(), GREBClimate.DATA_DEP_NAME))
-                @test abspath(GREBClimate._cached_datadep_path()) == cache
-                # the repo-local dataset wins over the cache; without it the cache is used
-                local_dir = normpath(joinpath(@__DIR__, "..", "greb_input_data"))
-                @test abspath(greb_data_dir(; allow_download = false)) == (isdir(local_dir) ? local_dir : cache)
+            # A downloaded dataset is the directory `<load path>/GREB-input-data`.
+            # Stand one up so the cache step runs on machines that never downloaded it.
+            # DataDeps splits DATADEPS_LOAD_PATH on ':', which cuts a Windows drive
+            # letter off, so the load path is given relative to the working directory.
+            cd(tmp_b) do
+                withenv("GREB_DATA" => nothing, "DATADEPS_LOAD_PATH" => ".", "DATADEPS_NO_STANDARD_LOAD_PATH" => "true") do
+                    @test GREBClimate._cached_datadep_path() === nothing
+                    cache = mkpath(joinpath(pwd(), GREBClimate.DATA_DEP_NAME))
+                    @test abspath(GREBClimate._cached_datadep_path()) == cache
+                    # the repo-local dataset wins over the cache; without it the cache is used
+                    local_dir = normpath(joinpath(@__DIR__, "..", "greb_input_data"))
+                    @test abspath(greb_data_dir(; allow_download = false)) == (isdir(local_dir) ? local_dir : cache)
+                end
+            end
+
+            withenv("GREB_DATA" => nothing) do
+                @test greb_data_dir(""; allow_download = false) == greb_data_dir(; allow_download = false)
             end
         end
-
-        @test greb_data_dir(""; allow_download = false) ==
-              greb_data_dir(; allow_download = false)
-    finally
-        saved === nothing ? delete!(ENV, "GREB_DATA") : (ENV["GREB_DATA"] = saved)
-        rm(tmp_a; recursive = true, force = true)
-        rm(tmp_b; recursive = true, force = true)
     end
 end
 
@@ -144,7 +125,7 @@ end
              GREBClimate._FLUX_CORRECTION_KEYS)
     @test all(l -> all(f -> hasfield(ClimateFields, f), keys(l)), lists)
     # Every source of a boundary anomaly names one file per anomaly array
-    @test all(s -> keys(GREBClimate._boundary_anomaly_files(s)) == fieldnames(GREBClimate.BoundaryAnomalyFields),
+    @test all(s -> keys(GREBClimate._boundary_anomaly_files(s)) == fieldnames(BoundaryAnomalyFields),
               GREBClimate._BOUNDARY_ANOMALY_SOURCES)
 
     # The tools keep their own list: it may hold more, never less
