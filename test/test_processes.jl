@@ -36,3 +36,22 @@ end
     @test init((co2 = false,))[2].CO2_ctrl == 0
     @test all(==(0.0f0), init((;); corrections = NoCorrections())[1].Ts_flux_correction)
 end
+
+@testset "init_model! changes only fields that greb_model! restores or derives" begin
+    # A write that the override table and `_mutated_fields` do not know would leak into a reused `fields`
+    derived = (:dTrad, :z_ocean, :wz_air, :wz_vapor, :rain_limit, :cap_surf,
+               :u_clim_pos, :u_clim_neg, :v_clim_pos, :v_clim_neg, :co2_part)
+    options = ((;), (topography = :flat,), (clouds = :none,), (clouds = :uniform,), (hydrology = :none,),
+               (humidity = :uniform,), (ocean = :mixed_layer,),
+               (topography = :flat, clouds = :uniform, hydrology = :none, humidity = :uniform, ocean = :mixed_layer))
+    for processes in options, corrections in (SpinUp(1), NoCorrections())
+        config = Config(; processes = Processes(; processes...), corrections)
+        f = synthetic_fields()
+        f.z_topo[1, 1] = 500.0f0
+        f.Ts_flux_correction .= 1.0f0
+        before = Dict(n => copy(getfield(f, n)) for n in fieldnames(ClimateFields) if getfield(f, n) isa Array)
+        quiet(() -> init_model!(resolve(config), f))
+        changed = [n for (n, a) in before if getfield(f, n) != a]
+        @test issubset(changed, union(derived, _mutated_fields(config)))
+    end
+end

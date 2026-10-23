@@ -132,6 +132,23 @@ _time_loop_fields() = constant_fields(z_topo = -1.0, swet = 0.5, u = 2.0, v = 1.
     @test isempty(out.records) && isempty(out.times)
 end
 
+@testset "time_loop! writes the step's precipitation, evaporation and moisture circulation to ws" begin
+    fields = _time_loop_fields()
+    cfg = resolve(preset(:full_model))
+    ini = init_model!(cfg, fields)
+    s = initial_state(ini)
+    ws = ModelWorkspace()
+    seen = Ref{Any}(nothing)
+    step!(control_time(), ini.CO2_ctrl, s, fields, cfg; ws, observer = (point, view) ->
+        point === :after_step && (seen[] = (dq_eva = copy(view.tend.dq_eva), dq_rain = copy(view.tend.dq_rain),
+                                            dq_crcl = copy(view.tend.dq_crcl))))
+    tend = seen[]
+    @test ws.qcrcl == tend.dq_crcl
+    @test ws.evap == tend.dq_eva .* fields.wz_vapor .* q_to_mm_per_day
+    @test ws.precip == -tend.dq_rain .* fields.wz_vapor .* q_to_mm_per_day
+    @test any(!=(0.0f0), ws.qcrcl) && any(!=(0.0f0), ws.evap)
+end
+
 @testset "time_loop!'s min_T_K floor leaves NaN as NaN" begin
     # A max-based floor inside @turbo turns NaN into min_T_K, which hides a
     # failed run behind a plausible-looking cold planet.

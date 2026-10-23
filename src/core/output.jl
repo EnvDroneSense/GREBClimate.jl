@@ -63,7 +63,7 @@ function output!(t::ModelTime, surf::SurfaceState, tend, ws::ModelWorkspace,
 end
 
 """
-    time_loop!(t::ModelTime, CO2, Ts, Ta, q, To, output_buf, times, fields, state, ws, acc, r::ResolvedConfig;
+    time_loop!(t::ModelTime, CO2, Ts, Ta, To, q, output_buf, times, fields, state, ws, acc, r::ResolvedConfig;
                ws_a=ws, ws_q=ws, observer=nothing)
 
 One full model timestep at time `t`: computes [`tendencies!`](@ref),
@@ -74,7 +74,7 @@ integrates `Ts`/`Ta`/`To`/`q` forward with flux corrections applied, runs
 enable. `observer` is called before and after the update (see
 [`greb_model!`](@ref)).
 """
-function time_loop!(t::ModelTime, CO2, Ts, Ta, q, To, output_buf, times,
+function time_loop!(t::ModelTime, CO2, Ts, Ta, To, q, output_buf, times,
     fields::ClimateFields, state::ModelState, ws::ModelWorkspace, acc::MonthlyAccumulator,
     r::ResolvedConfig; ws_a::ModelWorkspace=ws, ws_q::ModelWorkspace=ws,
     observer=nothing)
@@ -93,16 +93,13 @@ function time_loop!(t::ModelTime, CO2, Ts, Ta, q, To, output_buf, times,
     cap_surf = fields.cap_surf
     wz_vapor = fields.wz_vapor
 
-    # Humidity tendency buffer selection
-    dq_eva_use = tend.dq_eva
-    dq_rain_use = tend.dq_rain
-    dq_crcl_use = tend.dq_crcl
     hydro_on = r.config.processes.hydrology !== :none ? 1.0f0 : 0.0f0
 
     SW = tend.SW; LW_surf = tend.LW_surf; LW_down = tend.LW_down
     Q_lat = tend.Q_lat; Q_sens = tend.Q_sens; dTa_crcl = tend.dTa_crcl
     LW_up = tend.LW_up; em = tend.em; Q_lat_air = tend.Q_lat_air
     dTo = tend.dTo; dT_ocean = tend.dT_ocean
+    dq_eva = tend.dq_eva; dq_rain = tend.dq_rain; dq_crcl = tend.dq_crcl
     precip = ws.precip; evap = ws.evap; qcrcl = ws.qcrcl
 
     # Surface/air temperature, deep ocean, and humidity update
@@ -116,15 +113,15 @@ function time_loop!(t::ModelTime, CO2, Ts, Ta, q, To, output_buf, times,
 
             To[i, j] = To[i, j] + dTo[i, j] + ToF_corr[i, j]
 
-            tb = Δt * (dq_eva_use[i, j] + dq_rain_use[i, j]) + dq_crcl_use[i, j] + qF_corr[i, j]
+            tb = Δt * (dq_eva[i, j] + dq_rain[i, j]) + dq_crcl[i, j] + qF_corr[i, j]
             tb = ifelse(tb <= -q[i, j], -min_humidity_change * q[i, j], tb)
             tb = ifelse(tb > max_humidity_change, max_humidity_change, tb)
             tb = hydro_on * tb
             q[i, j] = q[i, j] + tb
 
-            precip[i, j] = (-dq_rain_use[i, j]) * wz_vapor[i, j] * q_to_mm_per_day
-            evap[i, j] = dq_eva_use[i, j] * wz_vapor[i, j] * q_to_mm_per_day
-            qcrcl[i, j] = dq_crcl_use[i, j]
+            precip[i, j] = (-dq_rain[i, j]) * wz_vapor[i, j] * q_to_mm_per_day
+            evap[i, j] = dq_eva[i, j] * wz_vapor[i, j] * q_to_mm_per_day
+            qcrcl[i, j] = dq_crcl[i, j]
         end
     end
 

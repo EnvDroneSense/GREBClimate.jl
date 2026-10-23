@@ -326,7 +326,7 @@ end
     fields = synthetic_fields()
     fields.q_flux_correction .= 1.0f-4
     cfg = preset(:full_model; processes = (hydrology = :none,), corrections = SpinUp(0))
-    q_ini = quiet(() -> init_model!(resolve(cfg), deepcopy(fields))).q_ini
+    q_ini = quiet(() -> init_model!(resolve(cfg), deepcopy(fields))).surf.q
     result = run_synthetic(RunSpec(scnr = 0), cfg; fields)
     for rec in result.ctrl
         @test rec.q == q_ini

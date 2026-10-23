@@ -26,7 +26,7 @@ end
     q = fill(0.010, X, Y)
     To = fill(285.0, X, Y)
 
-    qflux_correction!(340.0, Ts, Ta, q, To, fields, state, r, ws, 1)
+    qflux_correction!(340.0, Ts, Ta, To, q, fields, state, r, ws, 1)
 
     for name in (:Ts_flux_correction, :To_flux_correction, :q_flux_correction)
         @test any(!=(0.0), getfield(fields, name))
@@ -67,6 +67,13 @@ end
     @test all(isone, part(control, RunSpec(ctrl = 1, scnr = 0)))
     scnr = part(scenario, RunSpec(ctrl = 0, scnr = 1))
     @test all(==(0.5f0), scnr[:, 1:24]) && all(isone, scnr[:, 25:48])
+end
+
+@testset "the scenario starts from the state the control started from" begin
+    cfg = preset(:full_model; corrections = NoCorrections())
+    first_state(phase) = at_first_step(v -> (copy(v.Ts), copy(v.Ta), copy(v.To), copy(v.q)),
+                                       RunSpec(ctrl = 1, scnr = 1), cfg; phase, point = :after_tendencies, jld2_dir = "")
+    @test first_state(scenario) == first_state(control)
 end
 
 @testset "what a run logs: spin-up years are labelled, an empty scenario is not announced" begin
@@ -219,7 +226,7 @@ end
     cap0 = copy(f.cap_surf)   # seaice! changes it during the spin-up year
     s = initial_state(ini)
     quiet() do
-        qflux_correction!(ini.CO2_ctrl, s.Ts, s.Ta, s.q, s.To, f, ModelState(), r, ModelWorkspace(), 1)
+        qflux_correction!(ini.CO2_ctrl, s.Ts, s.Ta, s.To, s.q, f, ModelState(), r, ModelWorkspace(), 1)
     end
     function run_step()
         f.cap_surf .= cap0

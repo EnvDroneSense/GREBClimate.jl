@@ -1,6 +1,6 @@
 # The per-step observer of greb_model! and the budget check built on it.
 
-function _budget_run(; steps, setup! = (Ts, Ta, q, To, fields) -> nothing, config = preset(:full_model))
+function _budget_run(; steps, setup! = (Ts, Ta, To, q, fields) -> nothing, config = preset(:full_model))
     fields = synthetic_fields()
     r = resolve(config)
     ini = quiet(() -> init_model!(r, fields))
@@ -8,7 +8,7 @@ function _budget_run(; steps, setup! = (Ts, Ta, q, To, fields) -> nothing, confi
     fields.To_flux_correction .= 0.01f0
     fields.q_flux_correction .= 1.0f-7
     s = initial_state(ini)
-    setup!(s.Ts, s.Ta, s.q, s.To, fields)
+    setup!(s.Ts, s.Ta, s.To, s.q, fields)
     check = BudgetCheck()
     state, ws, acc = ModelState(), ModelWorkspace(), MonthlyAccumulator()
     for step in 1:steps
@@ -38,9 +38,9 @@ end
     s = initial_state(ini)
     seen = Dict{Symbol,Matrix{Float32}}()
     step!(control_time(), ini.CO2_ctrl, s, fields, r; observer = (point, view) -> (seen[point] = copy(view.Ts)))
-    @test seen[:after_tendencies] == ini.Ts_ini
+    @test seen[:after_tendencies] == ini.surf.Ts
     @test seen[:after_step] == s.Ts
-    @test s.Ts != ini.Ts_ini
+    @test s.Ts != ini.surf.Ts
 end
 
 @testset "BudgetCheck: each store changes by the sum of its flows" begin
@@ -60,17 +60,17 @@ end
 
 @testset "BudgetCheck counts the cells a limiter held" begin
     # Far enough below the floor that one step cannot lift them back over it
-    cold = _budget_run(steps = 1, setup! = function (Ts, Ta, q, To, fields)
+    cold = _budget_run(steps = 1, setup! = function (Ts, Ta, To, q, fields)
         Ts[60, 4] = min_T_K - 0.5f0
         fields.cap_surf[60, 4] = 1.0f12
     end)
     @test (cold.floor_Ts, cold.floor_Ta) == (1, 0)
     @test cold.surface < 1e-4          # the floor is part of the expected value
-    cold = _budget_run(steps = 1, setup! = (Ts, Ta, q, To, fields) -> (Ta[5, 6] = -5000.0f0))
+    cold = _budget_run(steps = 1, setup! = (Ts, Ta, To, q, fields) -> (Ta[5, 6] = -5000.0f0))
     @test (cold.floor_Ts, cold.floor_Ta) == (0, 1)
 
     wet = _budget_run(steps = 1,
-        setup! = (Ts, Ta, q, To, fields) -> (fields.q_flux_correction[7, 8, 1] = 0.5f0; fields.q_flux_correction[9, 10, 1] = -0.5f0))
+        setup! = (Ts, Ta, To, q, fields) -> (fields.q_flux_correction[7, 8, 1] = 0.5f0; fields.q_flux_correction[9, 10, 1] = -0.5f0))
     # The fixture's coldest row rains out more than it holds on its own
     base = _budget_run(steps = 1)
     @test wet.humidity_high == base.humidity_high + 1
@@ -78,7 +78,7 @@ end
     @test wet.water < 1e-8
 
     limited = _budget_run(steps = 1, config = preset(:full_model; hydrology = Hydrology(rain = :rh)),
-        setup! = (Ts, Ta, q, To, fields) -> (fields.rain_limit .= -1.0f0))
+        setup! = (Ts, Ta, To, q, fields) -> (fields.rain_limit .= -1.0f0))
     @test limited.rain_limit == X * Y
 end
 

@@ -540,7 +540,7 @@ function profile_dispatch(jld2_dir::AbstractString; out_dir=nothing)
     times = GREBClimate.RecordTime[]
     time = ModelTime(GREBClimate.control, 1970, 1)
 
-    step = () -> GREBClimate.time_loop!(time, CO2, Ts, Ta, q, To, records, times, fields, state, ws, acc, r)
+    step = () -> GREBClimate.time_loop!(time, CO2, Ts, Ta, To, q, records, times, fields, state, ws, acc, r)
     result = Base.invokelatest(JET.report_opt, step, (); target_modules=(GREBClimate,))
     n = length(Base.invokelatest(JET.get_reports, result))
 

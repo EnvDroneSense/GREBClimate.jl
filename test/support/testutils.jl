@@ -164,7 +164,7 @@ control_time(step = 1) = ModelTime(control, 1970, step)
 record_times(start, n) = [(year = start + (i - 1) ÷ 12, month = mod1(i, 12)) for i in 1:n]
 
 "A fresh copy of the four state arrays `init_model!` returned in `ini`."
-initial_state(ini) = (Ts = copy(ini.Ts_ini), Ta = copy(ini.Ta_ini), q = copy(ini.q_ini), To = copy(ini.To_ini))
+initial_state(ini) = (Ts = copy(ini.surf.Ts), Ta = copy(ini.surf.Ta), q = copy(ini.surf.q), To = copy(ini.surf.To))
 
 """
 Run the model step at time `t` on the state `s` (as from `initial_state`), muted.
@@ -175,7 +175,7 @@ function step!(t, CO2, s, fields, r; state = ModelState(), ws = ModelWorkspace()
                acc = MonthlyAccumulator(), observer = nothing)
     records, times = MonthlyRecord[], RecordTime[]
     quiet() do
-        time_loop!(t, CO2, s.Ts, s.Ta, s.q, s.To, records, times, fields, state, ws, acc, r; observer)
+        time_loop!(t, CO2, s.Ts, s.Ta, s.To, s.q, records, times, fields, state, ws, acc, r; observer)
     end
     return (; records, times)
 end

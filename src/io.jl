@@ -168,6 +168,9 @@ function load_co2_custom(path::String)
     return table
 end
 
+# The file of stored flux corrections in the dataset directory `dir`
+_flux_file(dir::AbstractString) = joinpath(String(dir), "climatology", "flux_corrections.jld2")
+
 """
     load_flux_corrections!(jld2_dir::String, fields::ClimateFields)
 
@@ -175,7 +178,7 @@ Load the flux corrections from the combined `climatology/flux_corrections.jld2`
 into `fields`. A missing file or a missing table in it is an `ArgumentError`.
 """
 function load_flux_corrections!(jld2_dir::String, fields::ClimateFields)
-    filepath = joinpath(jld2_dir, "climatology", "flux_corrections.jld2")
+    filepath = _flux_file(jld2_dir)
     isfile(filepath) || throw(ArgumentError("flux corrections file not found: $filepath"))
     @lock _JLD2_LOCK jldopen(filepath, "r") do file
         for (field, key) in pairs(_FLUX_CORRECTION_KEYS)
