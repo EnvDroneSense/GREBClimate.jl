@@ -85,6 +85,25 @@ function write_solar_scenarios(dir; sentinel = 999.0)
 end
 
 """
+Write the boundary-anomaly files of the three sources into `dir/climatology`,
+each array filled with its own value, and return those values by source and
+array. The file names are written out here, not taken from the package.
+"""
+function write_boundary_anomalies(dir)
+    cmip5 = (Ts_clim = 2.0, u_clim = 3.0, v_clim = 4.0, omega_clim = 5.0, wind_speed_clim = 6.0)
+    era = (Ts_clim = 7.0, u_clim = 8.0, v_clim = 9.0, omega_clim = 10.0, wind_speed_clim = 11.0)
+    anomalies = Dict(:cmip5_rcp85 => cmip5, :elnino => era, :lanina => era)
+    part = (Ts_clim = "tsurf", u_clim = "zonal.wind", v_clim = "meridional.wind", omega_clim = "omega",
+            wind_speed_clim = "windspeed")
+    file(source, name) = source === :cmip5_rcp85 ? "cmip5.$(part[name]).rcp85.ensmean.forcing.jld2" :
+                         "erainterim.$(part[name]).$source.forcing.jld2"
+    for (source, v) in anomalies, name in keys(part)
+        write_field(joinpath(dir, "climatology", file(source, name)), v[name])
+    end
+    return anomalies
+end
+
+"""
 A `ClimateFields` non-degenerate enough to exercise the full physics pipeline
 without the real dataset: finite mixed-layer depth, land in the western half,
 and non-zero winds/humidity so circulation actually transports something.

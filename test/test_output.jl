@@ -118,6 +118,8 @@ _time_loop_fields() = constant_fields(z_topo = -1.0, swet = 0.5, u = 2.0, v = 1.
     fields = _time_loop_fields()
     cfg = resolve(preset(:full_model))
     ini = init_model!(cfg, fields)
+    # A heat capacity so large that one step cannot lift Ts back over the floor
+    fields.cap_surf .= 1.0f12
     s = (; initial_state(ini)..., Ts = fill(min_T_K - 0.5, X, Y))
     out = step!(control_time(), ini.CO2_ctrl, s, fields, cfg)
 

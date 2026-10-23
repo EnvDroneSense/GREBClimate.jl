@@ -83,3 +83,52 @@ end
     @test count(==(680.0f0), co2.(1:nstep_yr)) == nstep_yr ÷ 2
     @test co2(731) == 680.0f0     # the second year starts in winter again
 end
+
+@testset "CO2 masks: latitude bands, surface masks from the annual-mean ice cover" begin
+    f = ClimateFields()
+    apply_co2_mask!(LatitudeMask(:nh), f)
+    @test all(==(0.5f0), f.co2_part[:, 1:24]) && all(isone, f.co2_part[:, 25:48])
+    apply_co2_mask!(UniformMask(), f)          # resets a reused fields
+    @test all(isone, f.co2_part)
+    # Each band keeps the full CO2 at the latitudes it names (longitude 1 is
+    # clear of the edge rows' every-fourth-longitude exception)
+    lat = lat_grid
+    full(band) = (apply_co2_mask!(LatitudeMask(band), f); lat[f.co2_part[1, :] .== 1.0f0])
+    @test full(:nh) == lat[lat .> 0]
+    @test full(:sh) == lat[lat .< 0]
+    @test full(:tropics) == lat[-33.75 .< lat .< 30]
+    @test full(:extratropics) == lat[(lat .< -33.75) .| (lat .> 30)]
+    # Every fourth longitude of the two halved rows at the band edge keeps
+    # the full CO2
+    apply_co2_mask!(LatitudeMask(:tropics), f)
+    @test findall(isone, f.co2_part[:, 15]) == 4:4:X && findall(isone, f.co2_part[:, 33]) == 4:4:X
+    apply_co2_mask!(LatitudeMask(:extratropics), f)
+    @test findall(isone, f.co2_part[:, 16]) == 4:4:X && findall(isone, f.co2_part[:, 32]) == 4:4:X
+
+    fields = ClimateFields()  # z_topo defaults to 0 everywhere -> land branch never fires
+    icmn_ctrl = zeros(Float64, X, Y, 12)
+    # Cell A: January alone >= 0.5, but the other 11 months are 0 ->
+    # annual mean ~0.083, NOT ice under the Fortran-matching rule.
+    icmn_ctrl[1, 1, 1] = 1.0
+    # Cell B: January alone < 0.5, but the other 11 months are 1.0 ->
+    # annual mean ~0.917, IS ice under the Fortran-matching rule.
+    icmn_ctrl[2, 1, 1] = 0.0
+    icmn_ctrl[2, 1, 2:12] .= 1.0
+
+    apply_surface_mask!(SurfaceMask(:ocean), fields, icmn_ctrl)
+    @test fields.co2_part[1, 1] == 1.0  # January said "ice"; annual mean says no
+    @test fields.co2_part[2, 1] == 0.5  # January said "no ice"; annual mean says yes
+
+    # The land/ice variant inverts the ocean mask and exempts ice cells.
+    f_li = ClimateFields()
+    apply_surface_mask!(SurfaceMask(:land_ice), f_li, icmn_ctrl)
+    @test f_li.co2_part[1, 1] == 0.5  # ocean cell, not annual-mean ice
+    @test f_li.co2_part[2, 1] == 1.0  # annual-mean ice -> exempted back to 1.0
+
+    # Every other mask is a no-op here.
+    for mask in (UniformMask(), LatitudeMask(:sh))
+        f_noop = ClimateFields()
+        apply_surface_mask!(mask, f_noop, icmn_ctrl)
+        @test all(isone, f_noop.co2_part)
+    end
+end

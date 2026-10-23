@@ -28,8 +28,8 @@ calendar, the constants the kernel tests calculate with) are imported once in
 Shared fixtures live in `test/support/testutils.jl` (`synthetic_fields`,
 `constant_fields`, `uniform_record`, `field`, `quiet`, `with_tempdir`,
 `with_dataset`, `gmean`, `run_synthetic`, `record_times`). Input files are
-written with `write_field`, `write_flux_corrections`, `write_ipcc_scenarios` and
-`write_solar_scenarios`. One model step is `initial_state(ini)` plus
+written with `write_field`, `write_flux_corrections`, `write_boundary_anomalies`,
+`write_ipcc_scenarios` and `write_solar_scenarios`. One model step is `initial_state(ini)` plus
 `step!(t, CO2, s, fields, r)`, which supplies the record buffers and fresh
 `state`, `ws` and `acc` unless given.
 `run_synthetic(run, config; fields, kwargs...)` is a muted `greb_model!` on

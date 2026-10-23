@@ -1,4 +1,5 @@
-# greb_model! integration: presets end to end, scenario tables, CO2 masks, flux corrections.
+# greb_model! integration: runs end to end, what a run applies and when, and the
+# flux corrections of the spin-up.
 
 @testset "greb_model! baseline: default config runs to completion with the right output shape" begin
     result = quiet() do
@@ -9,33 +10,12 @@
     @test result.ctrl[1] isa MonthlyRecord
 end
 
-@testset "hydro! is finite under every evaporation and rain scheme" begin
-    # Each evaporation scheme is a separate `@turbo` block in `hydro!`; the
-    # default pair runs end to end in the baseline testset.
-    fields = synthetic_fields()
-    Ts = fill(288.0f0, X, Y)
-    q = fill(0.005f0, X, Y)
-    for (evaporation, rain) in ((:original, :original), (:skin, :rh), (:original_gust, :omega), (:skin_gust, :rh_omega))
-        r = resolve(preset(:full_model; hydrology = (; evaporation, rain)))
-        quiet() do
-            init_model!(r, fields)
-        end
-        out = hydro!(Ts, q, fields, 1, Processes(), r.hydrology, ModelWorkspace())
-        @test all(isfinite, out.Q_lat)
-        @test all(isfinite, out.dq_rain)
-    end
-end
-
 @testset "qflux_correction! pulls Ts/To/q to climatology; Ta gets no correction" begin
-    # All ocean (topography 0 m), so it needs a mixed layer
-    fields = ClimateFields()
-    fields.mld_clim .= 50.0
+    # All ocean, with a Ts climatology that varies from cell to cell
+    fields = constant_fields(z_topo = -1.0)
     fields.cap_surf .= cap_ocean * 50.0f0
-    for j in 1:Y, i in 1:X
-        fields.Ts_clim[i, j, :] .= 280.0 + 5.0 * sin(i / 10.0) * cos(j / 8.0)
-        fields.To_clim[i, j, :] .= 279.0
-        fields.q_clim[i, j, :] .= 0.006
-    end
+    fields.Ts_clim .= [280.0 + 5.0 * sin(i / 10.0) * cos(j / 8.0) for i in 1:X, j in 1:Y]
+    fields.To_clim .= 279.0
     # Rain coefficients (1, 0, 0, 0): this hand-made climatology has no omega
     r = resolve(preset(:full_model; hydrology = (rain = :original,)))
     state = ModelState()
@@ -48,12 +28,10 @@ end
 
     qflux_correction!(340.0, Ts, Ta, q, To, fields, state, r, ws, 1)
 
-    @test any(!=(0.0), fields.Ts_flux_correction)
-    @test any(!=(0.0), fields.To_flux_correction)
-    @test any(!=(0.0), fields.q_flux_correction)
-    @test all(isfinite, fields.Ts_flux_correction)
-    @test all(isfinite, fields.To_flux_correction)
-    @test all(isfinite, fields.q_flux_correction)
+    for name in (:Ts_flux_correction, :To_flux_correction, :q_flux_correction)
+        @test any(!=(0.0), getfield(fields, name))
+        @test all(isfinite, getfield(fields, name))
+    end
 
     @test Ts ≈ fields.Ts_clim[:, :, 1]
     @test To ≈ fields.To_clim[:, :, 1]
@@ -91,55 +69,6 @@ end
     @test all(==(0.5f0), scnr[:, 1:24]) && all(isone, scnr[:, 25:48])
 end
 
-@testset "CO2 masks: latitude bands, surface masks from the annual-mean ice cover" begin
-    f = ClimateFields()
-    apply_co2_mask!(LatitudeMask(:nh), f)
-    @test all(==(0.5f0), f.co2_part[:, 1:24]) && all(isone, f.co2_part[:, 25:48])
-    apply_co2_mask!(UniformMask(), f)          # resets a reused fields
-    @test all(isone, f.co2_part)
-    # Each band keeps the full CO2 at the latitudes it names (longitude 1 is
-    # clear of the edge rows' every-fourth-longitude exception)
-    lat = lat_grid
-    full(band) = (apply_co2_mask!(LatitudeMask(band), f); lat[f.co2_part[1, :] .== 1.0f0])
-    @test full(:nh) == lat[lat .> 0]
-    @test full(:sh) == lat[lat .< 0]
-    @test full(:tropics) == lat[-33.75 .< lat .< 30]
-    @test full(:extratropics) == lat[(lat .< -33.75) .| (lat .> 30)]
-    # Every fourth longitude of the two halved rows at the band edge keeps
-    # the full CO2
-    apply_co2_mask!(LatitudeMask(:tropics), f)
-    @test findall(isone, f.co2_part[:, 15]) == 4:4:X && findall(isone, f.co2_part[:, 33]) == 4:4:X
-    apply_co2_mask!(LatitudeMask(:extratropics), f)
-    @test findall(isone, f.co2_part[:, 16]) == 4:4:X && findall(isone, f.co2_part[:, 32]) == 4:4:X
-
-    fields = ClimateFields()  # z_topo defaults to 0 everywhere -> land branch never fires
-    icmn_ctrl = zeros(Float64, X, Y, 12)
-    # Cell A: January alone >= 0.5, but the other 11 months are 0 ->
-    # annual mean ~0.083, NOT ice under the Fortran-matching rule.
-    icmn_ctrl[1, 1, 1] = 1.0
-    # Cell B: January alone < 0.5, but the other 11 months are 1.0 ->
-    # annual mean ~0.917, IS ice under the Fortran-matching rule.
-    icmn_ctrl[2, 1, 1] = 0.0
-    icmn_ctrl[2, 1, 2:12] .= 1.0
-
-    apply_surface_mask!(SurfaceMask(:ocean), fields, icmn_ctrl)
-    @test fields.co2_part[1, 1] == 1.0  # January said "ice"; annual mean says no
-    @test fields.co2_part[2, 1] == 0.5  # January said "no ice"; annual mean says yes
-
-    # The land/ice variant inverts the ocean mask and exempts ice cells.
-    f_li = ClimateFields()
-    apply_surface_mask!(SurfaceMask(:land_ice), f_li, icmn_ctrl)
-    @test f_li.co2_part[1, 1] == 0.5  # ocean cell, not annual-mean ice
-    @test f_li.co2_part[2, 1] == 1.0  # annual-mean ice -> exempted back to 1.0
-
-    # Every other mask is a no-op here.
-    for mask in (UniformMask(), LatitudeMask(:sh))
-        f_noop = ClimateFields()
-        apply_surface_mask!(mask, f_noop, icmn_ctrl)
-        @test all(isone, f_noop.co2_part)
-    end
-end
-
 @testset "what a run logs: spin-up years are labelled, an empty scenario is not announced" begin
     cfg = preset(:full_model; corrections = SpinUp(1))
     logs(run) = Test.collect_test_logs() do
@@ -151,69 +80,21 @@ end
     @test any(startswith("Control run"), messages) && !any(startswith("Scenario run"), messages)
 end
 
-@testset "IPCC scenario CO2 tables load under the right on-disk key" begin
-    # The resolve step loads each table once. Assert the loader against every
-    # preset's key instead of paying a simulated year each.
-    expected = Dict(:rcp26 => 400.0, :rcp45 => 401.0, :rcp60 => 402.0,
-                    :ssp119 => 300.0, :ssp126 => 301.0, :ssp245 => 302.0,
-                    :ssp460 => 303.0, :ssp585 => 304.0, :historical_co2 => 280.73)
-    key(p) = preset(p).scenario.co2.key
-    on_disk(p) = p === :rcp60 ? "rcp6" : string(key(p))   # the dataset's name for RCP6.0
+@testset "a scenario runs on the CO2 or solar table its preset loads" begin
     with_tempdir() do dir
-        write_ipcc_scenarios(dir, Dict(on_disk(p) => Dict(1950 => co2) for (p, co2) in expected))
-        for (p, co2) in expected
-            @test isapprox(load_co2_scenario(dir, key(p))[1950], co2; atol = 1e-3)
-        end
-
-        # The table's name is :rcp60; the dataset's own key is not accepted
-        @test key(:rcp60) === :rcp60
-        @test_throws ArgumentError load_co2_scenario(dir, :rcp6)
-
-        # The scenario runs on the table's value
+        write_ipcc_scenarios(dir, Dict("rcp45" => Dict(1950 => 401.0)))
         @test at_first_step(v -> v.CO2, RunSpec(ctrl = 0, scnr = 1),
-                            preset(:rcp45; corrections = NoCorrections()); jld2_dir = dir) == Float32(expected[:rcp45])
-    end
-end
+                            preset(:rcp45; corrections = NoCorrections()); jld2_dir = dir) == 401.0f0
 
-@testset "custom CO2 trajectory loads from a plain-text file" begin
-    with_tempdir() do dir
         co2_path = joinpath(dir, "my_co2.txt")
-        write(co2_path, "# comment line, should be skipped\n1950 300.0\n1951 301.0\n\n")
-
-        # The parser is the thing under test - assert it directly.
-        @test load_co2_custom(co2_path) == Dict(1950 => 300.0, 1951 => 301.0)
-
-        # A malformed line must raise without leaving the file open: on
-        # Windows an open handle makes the rm below fail.
-        bad_path = joinpath(dir, "bad_co2.txt")
-        write(bad_path, "1950 300.0\n1951\n")
-        @test_throws ErrorException load_co2_custom(bad_path)
-        rm(bad_path)
-        @test !isfile(bad_path)
-
-        # ...and the scenario runs on the file's value.
+        write(co2_path, "1950 300.0\n")
         cfg = preset(:custom_co2; path = co2_path, corrections = NoCorrections())
         @test at_first_step(v -> v.CO2, RunSpec(ctrl = 0, scnr = 1), cfg; jld2_dir = "") == 300.0f0
-
         # A missing path must raise a clear error, not silently default.
         @test_throws ArgumentError greb_model!(RunSpec(ctrl = 0, scnr = 1),
             preset(:custom_co2); jld2_dir = "", allow_uninitialized = true)
-    end
-end
 
-@testset "paleo/orbital solar tables load; an orbital scenario runs on its table" begin
-    with_tempdir() do dir
         write_solar_scenarios(dir)
-        # The loader is the mechanism; assert all three tables directly.
-        for kind in (:paleo, :obliquity, :eccentricity)
-            table = load_solar_forcing(dir, kind, 0)
-            @test size(table) == (Y, N)
-            @test all(==(999.0f0), table)
-        end
-        # An orbital index that is not in the table
-        @test_throws ArgumentError load_solar_forcing(dir, :obliquity, 7)
-        @test_throws ArgumentError load_solar_forcing(dir, :eccentricity, 7)
-
         cfg = preset(:obliquity; index = 0, corrections = NoCorrections())
         @test all(==(999.0f0), at_first_step(v -> copy(v.fields.sw_solar), RunSpec(ctrl = 0, scnr = 1), cfg; jld2_dir = dir))
     end
@@ -261,57 +142,24 @@ end
         preset(:regional_co2_ocean; corrections = NoCorrections()); jld2_dir = "", allow_uninitialized = true)
 end
 
-@testset "boundary anomalies: the files load and are added to the climatology, in the scenario only" begin
-    with_tempdir() do tmpdir_anom
-        clim_dir = joinpath(tmpdir_anom, "climatology")
-        anomaly(name, value) = write_field(joinpath(clim_dir, name), value)
-
-        # :rcp85_boundary: CMIP5 RCP8.5 ensemble-mean anomaly
-        anomaly("cmip5.tsurf.rcp85.ensmean.forcing.jld2", 2.0)
-        anomaly("cmip5.zonal.wind.rcp85.ensmean.forcing.jld2", 3.0)
-        anomaly("cmip5.meridional.wind.rcp85.ensmean.forcing.jld2", 4.0)
-        anomaly("cmip5.omega.rcp85.ensmean.forcing.jld2", 5.0)
-        anomaly("cmip5.windspeed.rcp85.ensmean.forcing.jld2", 6.0)
-
-        # :elnino / :lanina: ERA-Interim composite-mean anomaly
-        for suffix in ("elnino", "lanina")
-            anomaly("erainterim.tsurf.$suffix.forcing.jld2", 7.0)
-            anomaly("erainterim.zonal.wind.$suffix.forcing.jld2", 8.0)
-            anomaly("erainterim.meridional.wind.$suffix.forcing.jld2", 9.0)
-            anomaly("erainterim.omega.$suffix.forcing.jld2", 10.0)
-            anomaly("erainterim.windspeed.$suffix.forcing.jld2", 11.0)
-        end
-
+@testset "boundary anomalies: the add step adds the loaded anomaly, and no other" begin
+    with_tempdir() do dir
+        write_boundary_anomalies(dir)
         fields = ClimateFields()
-        @test fields.boundary_anomaly === nothing      # no anomaly arrays until one is loaded
-        load_boundary_anomaly!(tmpdir_anom, fields, :cmip5_rcp85)
-        @test fields.boundary_anomaly isa BoundaryAnomalyFields
-        @test fields.boundary_anomaly_source == (tmpdir_anom, :cmip5_rcp85)
-        @test all(==(2.0), fields.boundary_anomaly.Ts_clim)
-        @test all(==(3.0), fields.boundary_anomaly.u_clim)
-        @test all(==(4.0), fields.boundary_anomaly.v_clim)
-        @test all(==(5.0), fields.boundary_anomaly.omega_clim)
-        @test all(==(6.0), fields.boundary_anomaly.wind_speed_clim)
+        load_boundary_anomaly!(dir, fields, :cmip5_rcp85)
         # Adding an anomaly that is not the loaded one is an error, not a silent mix-up
         @test_throws ErrorException GREBClimate._add_boundary_anomaly!(BoundaryAnomaly(:elnino), fields)
         @test_throws ErrorException GREBClimate._add_boundary_anomaly!(BoundaryAnomaly(:elnino), ClimateFields())
 
-        # The scenario-start step applies the anomaly on top of the (here
-        # all-zero) base climatology - Ts_clim must reflect it, not stay at zero.
+        # The anomaly is added on top of the (here all-zero) base climatology
         quiet() do
             GREBClimate._add_boundary_anomaly!(BoundaryAnomaly(:cmip5_rcp85), fields)
         end
         @test all(==(2.0), fields.Ts_clim)
 
-        for (sym, suffix) in ((:elnino, "elnino"), (:lanina, "lanina"))
+        for sym in (:elnino, :lanina)
             fields2 = ClimateFields()
-            load_boundary_anomaly!(tmpdir_anom, fields2, sym)
-            @test all(==(7.0), fields2.boundary_anomaly.Ts_clim)
-            @test all(==(8.0), fields2.boundary_anomaly.u_clim)
-            @test all(==(9.0), fields2.boundary_anomaly.v_clim)
-            @test all(==(10.0), fields2.boundary_anomaly.omega_clim)
-            @test all(==(11.0), fields2.boundary_anomaly.wind_speed_clim)
-
+            load_boundary_anomaly!(dir, fields2, sym)
             # Both composite files already carry their sign (the La Nina one is
             # a cold anomaly), so both experiments add them, as the Fortran does.
             quiet() do
@@ -320,41 +168,44 @@ end
             @test all(==(7.0), fields2.Ts_clim)
             @test all(==(8.0), fields2.u_clim)
         end
+    end
+end
 
-        # In a run the anomaly reaches the climatology at the start of the
-        # scenario; the control runs on the plain one.
+@testset "boundary anomalies: a run adds them at the scenario start; the control runs on the plain climatology" begin
+    with_tempdir() do dir
+        write_boundary_anomalies(dir)
         for (p, value) in ((:rcp85_boundary, 2.0f0), (:lanina, 7.0f0))
             cfg = preset(p; corrections = NoCorrections())
             tclim(phase, run) = at_first_step(v -> copy(v.fields.Ts_clim), run, cfg; phase,
-                                              jld2_dir = tmpdir_anom, fields = ClimateFields())
+                                              jld2_dir = dir, fields = ClimateFields())
             @test all(iszero, tclim(control, RunSpec(ctrl = 1, scnr = 0)))
             @test all(==(value), tclim(scenario, RunSpec(ctrl = 0, scnr = 1)))
         end
+    end
+end
 
-        # A second run on the same fields, directory and source does not read the
-        # files again; another source or another directory does, into the same arrays.
+@testset "boundary anomalies: a second run reuses the loaded arrays; another source or directory reloads" begin
+    # A second run on the same fields, directory and source does not read the
+    # files again; another source or another directory does, into the same arrays.
+    with_tempdir() do dir
+        write_boundary_anomalies(dir)
         reused = ClimateFields()
-        first_tclim(p, dir) = at_first_step(v -> copy(v.fields.Ts_clim), RunSpec(ctrl = 0, scnr = 1),
+        first_tclim(p, from) = at_first_step(v -> copy(v.fields.Ts_clim), RunSpec(ctrl = 0, scnr = 1),
                                             preset(p; corrections = NoCorrections()); phase = scenario,
-                                            jld2_dir = dir, fields = reused)
-        @test all(==(7.0f0), first_tclim(:lanina, tmpdir_anom))
-        @test reused.boundary_anomaly_source == (tmpdir_anom, :lanina)
+                                            jld2_dir = from, fields = reused)
+        @test all(==(7.0f0), first_tclim(:lanina, dir))
+        @test reused.boundary_anomaly_source == (dir, :lanina)
         arrays = reused.boundary_anomaly
         reused.boundary_anomaly.Ts_clim .= 70.0f0              # a mark a reload would erase
-        @test all(==(70.0f0), first_tclim(:lanina, tmpdir_anom))
-        @test all(==(7.0f0), first_tclim(:elnino, tmpdir_anom))
-        @test reused.boundary_anomaly_source == (tmpdir_anom, :elnino)
-        @test all(==(2.0f0), first_tclim(:rcp85_boundary, tmpdir_anom))
+        @test all(==(70.0f0), first_tclim(:lanina, dir))
+        @test all(==(7.0f0), first_tclim(:elnino, dir))
+        @test reused.boundary_anomaly_source == (dir, :elnino)
+        @test all(==(2.0f0), first_tclim(:rcp85_boundary, dir))
         @test reused.boundary_anomaly === arrays               # another source reuses the five arrays
         reused.boundary_anomaly.Ts_clim .= 20.0f0
-        @test all(==(20.0f0), first_tclim(:rcp85_boundary, tmpdir_anom))
-        @test_throws ErrorException first_tclim(:rcp85_boundary, joinpath(tmpdir_anom, "elsewhere"))
+        @test all(==(20.0f0), first_tclim(:rcp85_boundary, dir))
+        @test_throws ErrorException first_tclim(:rcp85_boundary, joinpath(dir, "elsewhere"))
         @test reused.boundary_anomaly_source == ("", :none)    # a failed load leaves no source
-
-        # A missing required file must error loudly, not silently zero.
-        rm(joinpath(clim_dir, "cmip5.tsurf.rcp85.ensmean.forcing.jld2"))
-        @test_throws ErrorException load_boundary_anomaly!(tmpdir_anom, ClimateFields(), :cmip5_rcp85)
-        @test_throws ArgumentError load_boundary_anomaly!(tmpdir_anom, ClimateFields(), :neutral)
     end
 end
 

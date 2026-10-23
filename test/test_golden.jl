@@ -2,6 +2,16 @@
 
 include(joinpath("data", "golden_reference.jl"))
 
+"The monthly global means of `records` match the snapshot `reference`, record by record."
+function matches_reference(records, reference)
+    @test length(records) == length(reference)
+    for (rec, ref) in zip(records, reference)
+        @test isapprox(gmean(rec.Ts), ref.Ts; atol = 1e-3)
+        @test isapprox(gmean(rec.Ta), ref.Ta; atol = 1e-3)
+        @test isapprox(gmean(rec.q), ref.q; atol = 1e-6)
+    end
+end
+
 @testset "golden regression: real dataset control+scenario run matches snapshot" begin
     # A 1-year control and 1-year scenario on the NCEP dataset, stored as
     # monthly global-mean Ts/Ta/q, plus a control year after a one-year spin-up.
@@ -15,24 +25,8 @@ include(joinpath("data", "golden_reference.jl"))
         result = quiet() do
             greb_model!(RunSpec(), preset(:full_model; corrections = Stored()); jld2_dir = DATA_DIR, fields = fields)
         end
-
-        gmean(x) = sum(x) / length(x)
-        summarize(rec) = (Ts = gmean(rec.Ts), Ta = gmean(rec.Ta), q = gmean(rec.q))
-
-        @test length(result.ctrl) == length(GOLDEN_CTRL)
-        @test length(result.scnr) == length(GOLDEN_SCNR)
-        for (rec, ref) in zip(result.ctrl, GOLDEN_CTRL)
-            s = summarize(rec)
-            @test isapprox(s.Ts, ref.Ts; atol = 1e-3)
-            @test isapprox(s.Ta, ref.Ta; atol = 1e-3)
-            @test isapprox(s.q, ref.q; atol = 1e-6)
-        end
-        for (rec, ref) in zip(result.scnr, GOLDEN_SCNR)
-            s = summarize(rec)
-            @test isapprox(s.Ts, ref.Ts; atol = 1e-3)
-            @test isapprox(s.Ta, ref.Ta; atol = 1e-3)
-            @test isapprox(s.q, ref.q; atol = 1e-6)
-        end
+        matches_reference(result.ctrl, GOLDEN_CTRL)
+        matches_reference(result.scnr, GOLDEN_SCNR)
 
         # One spin-up year, then the control: exercises qflux_correction!.
         # Reuses `fields`, which greb_model! restores after the run above.
@@ -40,19 +34,13 @@ include(joinpath("data", "golden_reference.jl"))
             greb_model!(RunSpec(ctrl = 1, scnr = 0), preset(:full_model; corrections = SpinUp(1));
                         jld2_dir = DATA_DIR, fields = fields)
         end
-        @test length(flux_result.ctrl) == length(GOLDEN_FLUX)
-        for (rec, ref) in zip(flux_result.ctrl, GOLDEN_FLUX)
-            s = summarize(rec)
-            @test isapprox(s.Ts, ref.Ts; atol = 1e-3)
-            @test isapprox(s.Ta, ref.Ta; atol = 1e-3)
-            @test isapprox(s.q, ref.q; atol = 1e-6)
-        end
+        matches_reference(flux_result.ctrl, GOLDEN_FLUX)
     end
 end
 
 # Area-weighted global mean of a monthly-record field, averaged over `recs`
 function area_mean(recs, var = :Ts)
-    w = cosd.(range(-88.125, 88.125; length = Y))
+    w = cosd.(Float64.(lat_grid))
     return sum(sum(getfield(r, var) .* w') for r in recs) / (length(recs) * X * sum(w))
 end
 

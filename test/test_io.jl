@@ -63,6 +63,82 @@
     end
 end
 
+@testset "IPCC scenario CO2 tables load under the right on-disk key" begin
+    # The resolve step loads each table once. Assert the loader against every
+    # preset's key instead of paying a simulated year each.
+    expected = Dict(:rcp26 => 400.0, :rcp45 => 401.0, :rcp60 => 402.0,
+                    :ssp119 => 300.0, :ssp126 => 301.0, :ssp245 => 302.0,
+                    :ssp460 => 303.0, :ssp585 => 304.0, :historical_co2 => 280.73)
+    key(p) = preset(p).scenario.co2.key
+    on_disk(p) = p === :rcp60 ? "rcp6" : string(key(p))   # the dataset's name for RCP6.0
+    with_tempdir() do dir
+        write_ipcc_scenarios(dir, Dict(on_disk(p) => Dict(1950 => co2) for (p, co2) in expected))
+        for (p, co2) in expected
+            @test isapprox(load_co2_scenario(dir, key(p))[1950], co2; atol = 1e-3)
+        end
+
+        # The table's name is :rcp60; the dataset's own key is not accepted
+        @test key(:rcp60) === :rcp60
+        @test_throws ArgumentError load_co2_scenario(dir, :rcp6)
+    end
+end
+
+@testset "custom CO2 trajectory loads from a plain-text file" begin
+    with_tempdir() do dir
+        co2_path = joinpath(dir, "my_co2.txt")
+        write(co2_path, "# comment line, should be skipped\n1950 300.0\n1951 301.0\n\n")
+
+        # The parser is the thing under test - assert it directly.
+        @test load_co2_custom(co2_path) == Dict(1950 => 300.0, 1951 => 301.0)
+
+        # A malformed line must raise without leaving the file open: on
+        # Windows an open handle makes the rm below fail.
+        bad_path = joinpath(dir, "bad_co2.txt")
+        write(bad_path, "1950 300.0\n1951\n")
+        @test_throws ErrorException load_co2_custom(bad_path)
+        rm(bad_path)
+        @test !isfile(bad_path)
+    end
+end
+
+@testset "paleo/orbital solar tables load" begin
+    with_tempdir() do dir
+        write_solar_scenarios(dir)
+        # The loader is the mechanism; assert all three tables directly.
+        for kind in (:paleo, :obliquity, :eccentricity)
+            table = load_solar_forcing(dir, kind, 0)
+            @test size(table) == (Y, N)
+            @test all(==(999.0f0), table)
+        end
+        # An orbital index that is not in the table
+        @test_throws ArgumentError load_solar_forcing(dir, :obliquity, 7)
+        @test_throws ArgumentError load_solar_forcing(dir, :eccentricity, 7)
+    end
+end
+
+@testset "boundary anomalies: each source's files load into BoundaryAnomalyFields; a missing file is an error" begin
+    with_tempdir() do dir
+        expected = write_boundary_anomalies(dir)
+        fields = ClimateFields()
+        @test fields.boundary_anomaly === nothing      # no anomaly arrays until one is loaded
+        load_boundary_anomaly!(dir, fields, :cmip5_rcp85)
+        @test fields.boundary_anomaly isa BoundaryAnomalyFields
+        @test fields.boundary_anomaly_source == (dir, :cmip5_rcp85)
+        for (source, want) in expected
+            loaded = ClimateFields()
+            load_boundary_anomaly!(dir, loaded, source)
+            for name in fieldnames(BoundaryAnomalyFields)
+                @test all(==(want[name]), getfield(loaded.boundary_anomaly, name))
+            end
+        end
+
+        # A missing required file must error loudly, not silently zero.
+        rm(joinpath(dir, "climatology", "cmip5.tsurf.rcp85.ensmean.forcing.jld2"))
+        @test_throws ErrorException load_boundary_anomaly!(dir, ClimateFields(), :cmip5_rcp85)
+        @test_throws ArgumentError load_boundary_anomaly!(dir, ClimateFields(), :neutral)
+    end
+end
+
 @testset "greb_data_dir resolution order" begin
     with_tempdir() do tmp_a
         with_tempdir() do tmp_b
