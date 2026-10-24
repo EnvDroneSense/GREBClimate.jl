@@ -134,7 +134,7 @@ end
         result = run_synthetic(RunSpec(ctrl = 1, scnr = 0), cfg; fields = f)
         expected = ClimateFields()
         expected.z_topo .= f.z_topo
-        apply_surface_mask!(cfg.scenario.co2_mask, expected, ice_climatology(result.ctrl))
+        apply_surface_mask!(expected, cfg.scenario.co2_mask, ice_climatology(result.ctrl))
         return (got = copy(f.co2_part), expected = expected.co2_part)
     end
     ocean = run_mask(:regional_co2_ocean)
@@ -153,7 +153,7 @@ end
     with_tempdir() do dir
         write_boundary_anomalies(dir)
         fields = ClimateFields()
-        load_boundary_anomaly!(dir, fields, :cmip5_rcp85)
+        load_boundary_anomaly!(fields, dir, :cmip5_rcp85)
         # Adding an anomaly that is not the loaded one is an error, not a silent mix-up
         @test_throws ErrorException GREBClimate._add_boundary_anomaly!(BoundaryAnomaly(:elnino), fields)
         @test_throws ErrorException GREBClimate._add_boundary_anomaly!(BoundaryAnomaly(:elnino), ClimateFields())
@@ -166,7 +166,7 @@ end
 
         for sym in (:elnino, :lanina)
             fields2 = ClimateFields()
-            load_boundary_anomaly!(dir, fields2, sym)
+            load_boundary_anomaly!(fields2, dir, sym)
             # Both composite files already carry their sign (the La Nina one is
             # a cold anomaly), so both experiments add them, as the Fortran does.
             quiet() do
@@ -211,7 +211,7 @@ end
         @test reused.boundary_anomaly === arrays               # another source reuses the five arrays
         reused.boundary_anomaly.Ts_clim .= 20.0f0
         @test all(==(20.0f0), first_tclim(:rcp85_boundary, dir))
-        @test_throws ErrorException first_tclim(:rcp85_boundary, joinpath(dir, "elsewhere"))
+        @test_throws ArgumentError first_tclim(:rcp85_boundary, joinpath(dir, "elsewhere"))
         @test reused.boundary_anomaly_source == ("", :none)    # a failed load leaves no source
     end
 end
@@ -222,7 +222,7 @@ end
     # one of the two update loops but not the other moves Ts off Ts_clim here.
     f = synthetic_fields()
     r = resolve(preset(:full_model))
-    ini = quiet(() -> init_model!(r, f))
+    ini = quiet(() -> init_model!(f, r))
     cap0 = copy(f.cap_surf)   # seaice! changes it during the spin-up year
     s = initial_state(ini)
     quiet() do
@@ -315,7 +315,7 @@ end
 
         # Loaded explicitly, the marker is set and a run keeps the arrays
         quiet() do
-            load_flux_corrections!(dir, f)
+            load_flux_corrections!(f, dir)
         end
         @test f.flux_source == file
         @test isequal(first_ts(f), fresh)

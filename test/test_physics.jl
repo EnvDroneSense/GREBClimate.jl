@@ -125,7 +125,7 @@ end
     for (evaporation, rain) in ((:original, :original), (:skin, :rh), (:original_gust, :omega), (:skin_gust, :rh_omega))
         r = resolve(preset(:full_model; hydrology = (; evaporation, rain)))
         quiet() do
-            init_model!(r, fields)
+            init_model!(fields, r)
         end
         out = hydro!(ModelWorkspace(), Ts, q, fields, 1, Processes(), r.hydrology)
         @test all(isfinite, out.Q_lat)
@@ -142,7 +142,7 @@ end
 
 @testset "hydro! fitted rain: dq_rain and Q_lat_air values, with no limit on rain" begin
     fields = constant_fields(z_topo = 1.0)
-    init_model!(resolve(preset(:full_model)), fields)
+    init_model!(fields, resolve(preset(:full_model)))
     # A rain limit that any applied limit would hit (the clamp sets rain at or
     # above the limit to the limit): the fitted scheme applies none
     fields.rain_limit .= -1.0f0
@@ -326,7 +326,7 @@ end
     fields = synthetic_fields()
     fields.q_flux_correction .= 1.0f-4
     cfg = preset(:full_model; processes = (hydrology = :none,), corrections = SpinUp(0))
-    q_ini = quiet(() -> init_model!(resolve(cfg), deepcopy(fields))).surf.q
+    q_ini = quiet(() -> init_model!(deepcopy(fields), resolve(cfg))).surf.q
     result = run_synthetic(RunSpec(scnr = 0), cfg; fields)
     for rec in result.ctrl
         @test rec.q == q_ini

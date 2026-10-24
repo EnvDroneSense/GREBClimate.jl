@@ -108,7 +108,7 @@ function time_stages(jld2_dir::AbstractString; cfg=preset(:full_model), reps::In
     fields = load_climatology(jld2_dir; dataset=:ncep)
     r = resolve(cfg; jld2_dir)
     p = r.config.processes
-    CO2 = init_model!(r, fields).CO2_ctrl
+    CO2 = init_model!(fields, r).CO2_ctrl
     state = ModelState()
     ws = ModelWorkspace()
     slice = 1
@@ -199,7 +199,7 @@ function check_allocations(jld2_dir::AbstractString)
 
     r = resolve(preset(:full_model))
     fields = load_climatology(jld2_dir; dataset=:ncep)
-    CO2 = init_model!(r, fields).CO2_ctrl
+    CO2 = init_model!(fields, r).CO2_ctrl
     state = ModelState()
     ws = ModelWorkspace()
     slice = 1

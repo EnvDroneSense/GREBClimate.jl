@@ -2,14 +2,14 @@
 
 @testset "init_model! clears the CO2 mask an earlier run left in the same fields" begin
     fields = ClimateFields()
-    apply_co2_mask!(LatitudeMask(:nh), fields)
+    apply_co2_mask!(fields, LatitudeMask(:nh))
     @test any(!=(1.0f0), fields.co2_part)  # what a regional scenario leaves behind
 
     # Full CO2 again, also for a regional preset: its mask is for the scenario
     for p in (:full_model, :regional_co2_nh)
         fields.co2_part[1, 1] = 0.5f0
         quiet() do
-            init_model!(resolve(preset(p)), fields)
+            init_model!(fields, resolve(preset(p)))
         end
         @test all(==(1.0f0), fields.co2_part)
     end
@@ -80,7 +80,7 @@ end
 
 @testset "derive_fields! follows the input maps" begin
     fields = synthetic_fields()
-    quiet(() -> init_model!(resolve(preset(:full_model)), fields))
+    quiet(() -> init_model!(fields, resolve(preset(:full_model))))
     @test fields.cap_surf[60, 10] == cap_ocean * fields.mld_clim[60, 10, 1]
 
     fields.z_topo[60, 10] = 500.0f0          # an ocean cell becomes land

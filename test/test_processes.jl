@@ -21,7 +21,7 @@ end
         f.z_topo[1, 1] = 500.0f0
         f.Ts_flux_correction .= 1.0f0
         config = Config(; processes = Processes(; processes...), corrections)
-        ini = quiet(() -> init_model!(resolve(config), f))
+        ini = quiet(() -> init_model!(f, resolve(config)))
         return f, ini
     end
     f, ini = init((;))
@@ -50,7 +50,7 @@ end
         f.z_topo[1, 1] = 500.0f0
         f.Ts_flux_correction .= 1.0f0
         before = Dict(n => copy(getfield(f, n)) for n in fieldnames(ClimateFields) if getfield(f, n) isa Array)
-        quiet(() -> init_model!(resolve(config), f))
+        quiet(() -> init_model!(f, resolve(config)))
         changed = [n for (n, a) in before if getfield(f, n) != a]
         @test issubset(changed, union(derived, _mutated_fields(config)))
     end

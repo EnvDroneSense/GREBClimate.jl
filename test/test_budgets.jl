@@ -3,7 +3,7 @@
 function _budget_run(; steps, setup! = (Ts, Ta, To, q, fields) -> nothing, config = preset(:full_model))
     fields = synthetic_fields()
     r = resolve(config)
-    ini = quiet(() -> init_model!(r, fields))
+    ini = quiet(() -> init_model!(fields, r))
     fields.Ts_flux_correction .= 0.25f0
     fields.To_flux_correction .= 0.01f0
     fields.q_flux_correction .= 1.0f-7
@@ -34,7 +34,7 @@ end
 @testset "the observer sees the state before the update, then after it" begin
     fields = synthetic_fields()
     r = resolve(preset(:full_model))
-    ini = quiet(() -> init_model!(r, fields))
+    ini = quiet(() -> init_model!(fields, r))
     s = initial_state(ini)
     seen = Dict{Symbol,Matrix{Float32}}()
     step!(control_time(), ini.CO2_ctrl, s, fields, r; observer = (point, view) -> (seen[point] = copy(view.Ts)))

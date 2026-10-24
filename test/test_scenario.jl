@@ -46,7 +46,7 @@ end
     fields = ClimateFields()
     for p in (:decon_mean_climate, :full_model, :co2_double, :rcp45, :sst_plus1)
         r = resolved(preset(p; processes = (co2 = false,)))
-        @test quiet(() -> init_model!(r, fields)).CO2_ctrl == 0
+        @test quiet(() -> init_model!(fields, r)).CO2_ctrl == 0
         @test forcing(scenario_time(1950, 1), r).CO2 == 0
     end
     # The solar part of the forcing is untouched
@@ -86,23 +86,23 @@ end
 
 @testset "CO2 masks: latitude bands, surface masks from the annual-mean ice cover" begin
     f = ClimateFields()
-    apply_co2_mask!(LatitudeMask(:nh), f)
+    apply_co2_mask!(f, LatitudeMask(:nh))
     @test all(==(0.5f0), f.co2_part[:, 1:24]) && all(isone, f.co2_part[:, 25:48])
-    apply_co2_mask!(UniformMask(), f)          # resets a reused fields
+    apply_co2_mask!(f, UniformMask())          # resets a reused fields
     @test all(isone, f.co2_part)
     # Each band keeps the full CO2 at the latitudes it names (longitude 1 is
     # clear of the edge rows' every-fourth-longitude exception)
     lat = lat_grid
-    full(band) = (apply_co2_mask!(LatitudeMask(band), f); lat[f.co2_part[1, :] .== 1.0f0])
+    full(band) = (apply_co2_mask!(f, LatitudeMask(band)); lat[f.co2_part[1, :] .== 1.0f0])
     @test full(:nh) == lat[lat .> 0]
     @test full(:sh) == lat[lat .< 0]
     @test full(:tropics) == lat[-33.75 .< lat .< 30]
     @test full(:extratropics) == lat[(lat .< -33.75) .| (lat .> 30)]
     # Every fourth longitude of the two halved rows at the band edge keeps
     # the full CO2
-    apply_co2_mask!(LatitudeMask(:tropics), f)
+    apply_co2_mask!(f, LatitudeMask(:tropics))
     @test findall(isone, f.co2_part[:, 15]) == 4:4:X && findall(isone, f.co2_part[:, 33]) == 4:4:X
-    apply_co2_mask!(LatitudeMask(:extratropics), f)
+    apply_co2_mask!(f, LatitudeMask(:extratropics))
     @test findall(isone, f.co2_part[:, 16]) == 4:4:X && findall(isone, f.co2_part[:, 32]) == 4:4:X
 
     fields = ClimateFields()  # z_topo defaults to 0 everywhere -> land branch never fires
@@ -115,20 +115,20 @@ end
     icmn_ctrl[2, 1, 1] = 0.0
     icmn_ctrl[2, 1, 2:12] .= 1.0
 
-    apply_surface_mask!(SurfaceMask(:ocean), fields, icmn_ctrl)
+    apply_surface_mask!(fields, SurfaceMask(:ocean), icmn_ctrl)
     @test fields.co2_part[1, 1] == 1.0  # January said "ice"; annual mean says no
     @test fields.co2_part[2, 1] == 0.5  # January said "no ice"; annual mean says yes
 
     # The land/ice variant inverts the ocean mask and exempts ice cells.
     f_li = ClimateFields()
-    apply_surface_mask!(SurfaceMask(:land_ice), f_li, icmn_ctrl)
+    apply_surface_mask!(f_li, SurfaceMask(:land_ice), icmn_ctrl)
     @test f_li.co2_part[1, 1] == 0.5  # ocean cell, not annual-mean ice
     @test f_li.co2_part[2, 1] == 1.0  # annual-mean ice -> exempted back to 1.0
 
     # Every other mask is a no-op here.
     for mask in (UniformMask(), LatitudeMask(:sh))
         f_noop = ClimateFields()
-        apply_surface_mask!(mask, f_noop, icmn_ctrl)
+        apply_surface_mask!(f_noop, mask, icmn_ctrl)
         @test all(isone, f_noop.co2_part)
     end
 end

@@ -10,7 +10,7 @@ function _kernel_fixture()
     fields = ClimateFields()
     r = resolve(preset(:full_model))
     quiet() do
-        init_model!(r, fields)
+        init_model!(fields, r)
     end
     return (
         fields = fields,

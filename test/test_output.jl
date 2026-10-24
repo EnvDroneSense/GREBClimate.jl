@@ -117,7 +117,7 @@ _time_loop_fields() = constant_fields(z_topo = -1.0, swet = 0.5, u = 2.0, v = 1.
 @testset "time_loop! integrates one timestep and clamps at min_T_K" begin
     fields = _time_loop_fields()
     cfg = resolve(preset(:full_model))
-    ini = init_model!(cfg, fields)
+    ini = init_model!(fields, cfg)
     # A heat capacity so large that one step cannot lift Ts back over the floor
     fields.cap_surf .= 1.0f12
     s = (; initial_state(ini)..., Ts = fill(min_T_K - 0.5, X, Y))
@@ -135,7 +135,7 @@ end
 @testset "time_loop! writes the step's precipitation, evaporation and moisture circulation to ws" begin
     fields = _time_loop_fields()
     cfg = resolve(preset(:full_model))
-    ini = init_model!(cfg, fields)
+    ini = init_model!(fields, cfg)
     s = initial_state(ini)
     ws = ModelWorkspace()
     seen = Ref{Any}(nothing)
@@ -154,7 +154,7 @@ end
     # failed run behind a plausible-looking cold planet.
     fields = _time_loop_fields()
     cfg = resolve(preset(:full_model))
-    ini = init_model!(cfg, fields)
+    ini = init_model!(fields, cfg)
     s = initial_state(ini)
     s.Ts[5, 5] = NaN32
     s.Ta[40, 30] = NaN32

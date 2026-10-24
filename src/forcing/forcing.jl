@@ -60,7 +60,7 @@ _solar_factor(s::SolarCycle, t) = (1365.0f0 + s.amplitude * sin(2f0*Float32(π) 
 _solar_factor(s::EarthSunDistance, t) = (1.0f0 / (1.0f0 + 0.01f0 * s.percent))^2
 
 """
-    apply_co2_mask!(mask::CO2Mask, fields::ClimateFields)
+    apply_co2_mask!(fields::ClimateFields, mask::CO2Mask)
 
 Sets `fields.co2_part`, the fraction of the scenario CO2 each cell gets: 1
 everywhere, then 0.5 outside a [`LatitudeMask`](@ref) band. `greb_model!`
@@ -68,7 +68,7 @@ calls it at the start of the scenario; the spin-up and the control run on the
 full CO2 everywhere. A [`SurfaceMask`](@ref) needs the control run's ice cover
 and is set by `apply_surface_mask!`.
 """
-function apply_co2_mask!(mask::CO2Mask, fields::ClimateFields)
+function apply_co2_mask!(fields::ClimateFields, mask::CO2Mask)
     fields.co2_part .= 1.0f0
     _latitude_mask!(fields.co2_part, mask)
     return nothing
@@ -100,46 +100,26 @@ function _latitude_mask!(co2_part, m::LatitudeMask)
 end
 
 """
-    apply_surface_mask!(mask::CO2Mask, fields::ClimateFields, icmn_ctrl)
+    apply_surface_mask!(fields::ClimateFields, mask::CO2Mask, icmn_ctrl)
 
 Sets `fields.co2_part` for a [`SurfaceMask`](@ref) from the control run's
 annual-mean ice cover `icmn_ctrl`: `:ocean` halves CO2 over land and over ice,
 `:land_ice` halves it over ice-free ocean. A no-op for every other mask.
 """
-apply_surface_mask!(::CO2Mask, fields::ClimateFields, icmn_ctrl) = nothing
+apply_surface_mask!(fields::ClimateFields, ::CO2Mask, icmn_ctrl) = nothing
 
-function apply_surface_mask!(mask::SurfaceMask, fields::ClimateFields, icmn_ctrl)
-    co2_part = fields.co2_part
-    z_topo = fields.z_topo
-    co2_part .= 1.0f0
-
+function apply_surface_mask!(fields::ClimateFields, mask::SurfaceMask, icmn_ctrl)
     # Annual-mean ice cover, not month 1
     icmn_ctrl1 = dropdims(sum(icmn_ctrl, dims=3), dims=3) ./ size(icmn_ctrl, 3)
+    land = is_land.(fields.z_topo)
+    ice = icmn_ctrl1 .>= 0.5f0
 
+    # :ocean (2xCO2 ocean only) halves CO2 over land and over annual-mean ice;
+    # :land_ice (2xCO2 land/ice only) halves it over ocean without ice
     if mask.surface === :ocean
-        # 2×CO2 ocean only: halve CO2 over land, and over annual-mean ice.
-        for j in 1:ydim, i in 1:xdim
-            if is_land(z_topo[i, j])
-                co2_part[i, j] = 0.5f0
-            end
-        end
-        for j in 1:ydim, i in 1:xdim
-            if icmn_ctrl1[i, j] >= 0.5f0
-                co2_part[i, j] = 0.5f0
-            end
-        end
+        @. fields.co2_part = ifelse(land | ice, 0.5f0, 1.0f0)
     else
-        # 2×CO2 land/ice only: halve CO2 over ocean, then exempt annual-mean ice.
-        for j in 1:ydim, i in 1:xdim
-            if !is_land(z_topo[i, j])
-                co2_part[i, j] = 0.5f0
-            end
-        end
-        for j in 1:ydim, i in 1:xdim
-            if icmn_ctrl1[i, j] >= 0.5f0
-                co2_part[i, j] = 1.0f0
-            end
-        end
+        @. fields.co2_part = ifelse(land | ice, 1.0f0, 0.5f0)
     end
     return nothing
 end

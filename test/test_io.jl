@@ -23,7 +23,7 @@
 
         # No flux-corrections file yet: an error that names it, not zeros
         @test_throws "flux_corrections.jld2" load_climatology(tmpdir; dataset = :ncep)
-        @test_throws ArgumentError load_flux_corrections!(tmpdir, ClimateFields())
+        @test_throws ArgumentError load_flux_corrections!(ClimateFields(), tmpdir)
         # `corrections = false` loads the rest and leaves the corrections at zero
         without = load_climatology(tmpdir; dataset = :ncep, corrections = false)
         @test without.loaded && all(==(3.0), without.Ts_clim)
@@ -59,7 +59,7 @@
     end
 
     with_tempdir() do missing_parent
-        @test_throws ErrorException load_climatology(joinpath(missing_parent, "nonexistent"))
+        @test_throws ArgumentError load_climatology(joinpath(missing_parent, "nonexistent"))
     end
 end
 
@@ -95,7 +95,7 @@ end
         # Windows an open handle makes the rm below fail.
         bad_path = joinpath(dir, "bad_co2.txt")
         write(bad_path, "1950 300.0\n1951\n")
-        @test_throws ErrorException load_co2_custom(bad_path)
+        @test_throws ArgumentError load_co2_custom(bad_path)
         rm(bad_path)
         @test !isfile(bad_path)
     end
@@ -113,6 +113,7 @@ end
         # An orbital index that is not in the table
         @test_throws ArgumentError load_solar_forcing(dir, :obliquity, 7)
         @test_throws ArgumentError load_solar_forcing(dir, :eccentricity, 7)
+        @test_throws ArgumentError load_solar_forcing(dir, :bogus)
     end
 end
 
@@ -121,12 +122,12 @@ end
         expected = write_boundary_anomalies(dir)
         fields = ClimateFields()
         @test fields.boundary_anomaly === nothing      # no anomaly arrays until one is loaded
-        load_boundary_anomaly!(dir, fields, :cmip5_rcp85)
+        load_boundary_anomaly!(fields, dir, :cmip5_rcp85)
         @test fields.boundary_anomaly isa BoundaryAnomalyFields
         @test fields.boundary_anomaly_source == (dir, :cmip5_rcp85)
         for (source, want) in expected
             loaded = ClimateFields()
-            load_boundary_anomaly!(dir, loaded, source)
+            load_boundary_anomaly!(loaded, dir, source)
             for name in fieldnames(BoundaryAnomalyFields)
                 @test all(==(want[name]), getfield(loaded.boundary_anomaly, name))
             end
@@ -134,8 +135,8 @@ end
 
         # A missing required file must error loudly, not silently zero.
         rm(joinpath(dir, "climatology", "cmip5.tsurf.rcp85.ensmean.forcing.jld2"))
-        @test_throws ErrorException load_boundary_anomaly!(dir, ClimateFields(), :cmip5_rcp85)
-        @test_throws ArgumentError load_boundary_anomaly!(dir, ClimateFields(), :neutral)
+        @test_throws ArgumentError load_boundary_anomaly!(ClimateFields(), dir, :cmip5_rcp85)
+        @test_throws ArgumentError load_boundary_anomaly!(ClimateFields(), dir, :neutral)
     end
 end
 

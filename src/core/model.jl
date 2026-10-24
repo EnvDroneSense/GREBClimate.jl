@@ -15,7 +15,7 @@ const _OVERRIDES = (
 )
 
 """
-    init_model!(r::ResolvedConfig, fields::ClimateFields)
+    init_model!(fields::ClimateFields, r::ResolvedConfig)
 
 One-time per-run setup: resets the CO2 mask to full CO2, applies the climatologies the
 [`Processes`](@ref) options replace (flat topography, cloud cover, humidity,
@@ -25,7 +25,7 @@ control-run initial state. Returns `(surf, CO2_ctrl)`: `surf` is the
 [`SurfaceState`](@ref) at the last step of the climatology (the air starts at the
 surface temperature), `CO2_ctrl` the control CO2.
 """
-function init_model!(r::ResolvedConfig, fields::ClimateFields)
+function init_model!(fields::ClimateFields, r::ResolvedConfig)
     c = r.config
     p = c.processes
 
@@ -169,7 +169,7 @@ function _use_stored_corrections!(fields::ClimateFields, jld2_dir::AbstractStrin
     isfile(file) || throw(ArgumentError("Stored() found no flux corrections at $file"))
     if !in_place
         @info "Loading the stored flux corrections"
-        load_flux_corrections!(String(jld2_dir), fields)
+        load_flux_corrections!(fields, String(jld2_dir))
     end
     return nothing
 end
@@ -205,8 +205,8 @@ function _scenario_run!(r::ResolvedConfig, fields::ClimateFields, surf_ini::Surf
     # Regional CO2 masks belong to the scenario: the spin-up and the control
     # ran on the full CO2 everywhere
     ice_forcing = ice_climatology(ctrl_output)
-    apply_co2_mask!(s.co2_mask, fields)
-    apply_surface_mask!(s.co2_mask, fields, ice_forcing)
+    apply_co2_mask!(fields, s.co2_mask)
+    apply_surface_mask!(fields, s.co2_mask, ice_forcing)
 
     years > 0 && @info "Scenario run: $years yr"
 
@@ -315,10 +315,10 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
         # The anomaly files are read once per `fields`, directory and source
         if s.surface isa BoundaryAnomaly
             dir, source = String(jld2_dir), s.surface.source
-            fields.boundary_anomaly_source == (dir, source) || load_boundary_anomaly!(dir, fields, source)
+            fields.boundary_anomaly_source == (dir, source) || load_boundary_anomaly!(fields, dir, source)
         end
 
-        ini = init_model!(r, fields)
+        ini = init_model!(fields, r)
         surf_ini, CO2_ctrl = ini.surf, ini.CO2_ctrl
 
         # Workspace and accumulator. `ws_a`/`ws_q` are separate `circulation!`

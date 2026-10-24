@@ -44,14 +44,14 @@ function capture_preset(p::Symbol)
     r = ResolvedConfig(config, resolve(config.hydrology), table, nothing)
     fields = synthetic_fields()
     ini = quiet() do
-        init_model!(r, fields)
+        init_model!(fields, r)
     end
     # The two mask steps of the scenario start
-    GREBClimate.apply_co2_mask!(s.co2_mask, fields)
+    GREBClimate.apply_co2_mask!(fields, s.co2_mask)
     static_mask = copy(fields.co2_part)
     ice = zeros(Float32, X, Y, 12)
     ice[:, abs.(GREBClimate.lat_grid) .> 60, :] .= 1.0f0
-    GREBClimate.apply_surface_mask!(s.co2_mask, fields, ice)
+    GREBClimate.apply_surface_mask!(fields, s.co2_mask, ice)
 
     co2, solar = Float32[], Float32[]
     for y in 0:(NYEARS - 1), step in SAMPLE_STEPS
