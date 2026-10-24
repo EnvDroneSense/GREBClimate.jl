@@ -27,8 +27,6 @@ Base.@kwdef struct ModelWorkspace
     q0::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Humidity output
 
     # LW radiation buffers
-    e_co2::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial CO2 buffer
-    e_vapor::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial water vapor buffer
     em::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial emissivity buffer
     LW_surf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface longwave
     LW_down::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Downwelling longwave

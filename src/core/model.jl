@@ -143,7 +143,7 @@ function qflux_correction!(CO2_ctrl, Ts, Ta, To, q, fields::ClimateFields, state
         end
 
         # Sea ice (updates cap_surf in place)
-        seaice!(ws.Ts0, fields, slice, r.config.processes)
+        seaice!(fields, ws.Ts0, slice, r.config.processes)
 
         surf = SurfaceState(ws.Ts0, ws.Ta0, ws.To0, ws.q0)
         diagnostics!(t, surf, state)

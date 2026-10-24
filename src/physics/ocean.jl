@@ -1,11 +1,11 @@
 """
-    seaice!(Ts0, fields::ClimateFields, slice, p::Processes)
+    seaice!(fields::ClimateFields, Ts0, slice, p::Processes)
 
 Updates `fields.cap_surf` (surface heat capacity) for ocean points based on
 `Ts0`-derived ice fraction, blending land/open-ocean/ice capacities. No-op
 with `p.ocean = :none`; skips the ice blend with `p.ice_albedo = false`.
 """
-function seaice!(Ts0, fields::ClimateFields, slice::Int, p::Processes)
+function seaice!(fields::ClimateFields, Ts0, slice::Int, p::Processes)
     mld = clim_slice(fields.mld_clim, slice)
     z_topo = fields.z_topo
     glacier = fields.glacier
@@ -45,15 +45,15 @@ function seaice!(Ts0, fields::ClimateFields, slice::Int, p::Processes)
 end
 
 """
-    deep_ocean!(Ts, To, fields::ClimateFields, slice, p::Processes, ws::ModelWorkspace)
+    deep_ocean!(ws::ModelWorkspace, Ts, To, fields::ClimateFields, slice, p::Processes)
 
 Computes surface/deep-ocean coupling tendencies (`dT_ocean`, `dTo`) from
 mixed-layer-depth entrainment/detrainment and turbulent mixing, active only
 where the point is ocean and above the sea-ice threshold. Returns zeros
 unless `p.ocean` is `:full`.
 """
-function deep_ocean!(Ts, To, fields::ClimateFields, slice::Int, p::Processes, ws::ModelWorkspace)
-    # Use pre-allocated zero buffers
+function deep_ocean!(ws::ModelWorkspace, Ts, To, fields::ClimateFields, slice::Int, p::Processes)
+    # Pre-allocated buffers; the loop below writes every cell
     dT_ocean = ws.dT_ocean
     dTo = ws.dTo
 
@@ -70,10 +70,6 @@ function deep_ocean!(Ts, To, fields::ClimateFields, slice::Int, p::Processes, ws
     # ── Change in mixed-layer depth ─────────────────────────
     mld_now = clim_slice(fields.mld_clim, slice)
     mld_prev = clim_slice(fields.mld_clim, previous_slice(slice))
-
-    # Zero buffers first
-    fill!(dT_ocean, 0.0f0)
-    fill!(dTo, 0.0f0)
 
     # ── Entrainment & detrainment & turbulent mixing ──────
     @turbo for i in 1:xdim, j in 1:ydim
@@ -97,7 +93,7 @@ function deep_ocean!(Ts, To, fields::ClimateFields, slice::Int, p::Processes, ws
         dTo_turb = ifelse(is_ocean, turb_coeff * (Tx - To[i, j]) / z_rem, 0.0f0)
         dT_ocean_turb = ifelse(is_ocean, turb_coeff * (To[i, j] - Tx) / h_now, 0.0f0)
 
-        # Combine (buffer was zeroed before loop)
+        # Combine
         dTo[i, j] = dTo_entr + dTo_turb
         dT_ocean[i, j] = dT_ocean_entr + dT_ocean_turb
     end

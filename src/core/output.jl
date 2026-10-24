@@ -126,7 +126,7 @@ function time_loop!(t::ModelTime, CO2, Ts, Ta, To, q, output_buf, times,
     end
 
     # Sea ice heat capacity
-    seaice!(Ts, fields, slice, r.config.processes)
+    seaice!(fields, Ts, slice, r.config.processes)
 
     observer === nothing ||
         observer(:after_step, _step_view(t, CO2, Ts, Ta, To, q, tend, fields, r))

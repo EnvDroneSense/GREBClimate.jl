@@ -39,15 +39,15 @@ end
     # two. tendencies! is larger because it returns a 16-field tuple; its two
     # circulation! calls run serially here, so nothing pays for @spawn.
     kernels = [
-        ("SWradiation!", () -> SWradiation!(f.Ts, f.fields, f.state, f.slice, f.p, f.ws), 64),
-        ("LWradiation!", () -> LWradiation!(f.Ts, f.Ta, f.q, 340.0f0, f.fields, f.slice, f.p, f.ws), 64),
-        ("hydro!", () -> hydro!(f.Ts, f.q, f.fields, f.slice, f.p, f.h, f.ws), 64),
-        ("seaice!", () -> seaice!(f.Ts, f.fields, f.slice, f.p), 0),
-        ("deep_ocean!", () -> deep_ocean!(f.Ts, f.To, f.fields, f.slice, f.p, f.ws), 64),
-        ("convergence!", () -> convergence!(f.T1, f.fields, f.slice, f.ws), 0),
-        ("diffusion!", () -> diffusion!(f.T1, z_air, f.fields, f.ws), 0),
-        ("advection!", () -> advection!(f.T1, z_air, f.fields, f.ws, f.slice, f.p), 0),
-        ("circulation!", () -> circulation!(f.T1, z_air, f.dX, f.fields, f.ws, f.slice, f.p), 0),
+        ("SWradiation!", () -> SWradiation!(f.ws, f.Ts, f.fields, f.state, f.slice, f.p), 64),
+        ("LWradiation!", () -> LWradiation!(f.ws, f.Ts, f.Ta, f.q, 340.0f0, f.fields, f.slice, f.p), 64),
+        ("hydro!", () -> hydro!(f.ws, f.Ts, f.q, f.fields, f.slice, f.p, f.h), 64),
+        ("seaice!", () -> seaice!(f.fields, f.Ts, f.slice, f.p), 0),
+        ("deep_ocean!", () -> deep_ocean!(f.ws, f.Ts, f.To, f.fields, f.slice, f.p), 64),
+        ("convergence!", () -> convergence!(f.ws, f.T1, f.fields, f.slice), 0),
+        ("diffusion!", () -> diffusion!(f.ws, f.T1, z_air, f.fields), 0),
+        ("advection!", () -> advection!(f.ws, f.T1, z_air, f.fields, f.slice, f.p), 0),
+        ("circulation!", () -> circulation!(f.dX, f.T1, z_air, f.fields, f.ws, f.slice, f.p), 0),
         ("tendencies!", () -> tendencies!(340.0f0, f.Ts, f.Ta, f.To, f.q, f.fields, f.state, f.ws, f.slice, f.r), 256),
         ("to_ghosted!", () -> GREBClimate.to_ghosted!(f.ws.X_work, f.T1), 0),
         ("refresh_ghosts!", () -> GREBClimate.refresh_ghosts!(f.ws.X_work), 0),
@@ -88,15 +88,15 @@ end
 
     F32 = Matrix{Float32}
     signatures = [
-        (SWradiation!, (F32, ClimateFields, ModelState, Int, Processes, ModelWorkspace)),
-        (LWradiation!, (F32, F32, F32, Float32, ClimateFields, Int, Processes, ModelWorkspace)),
-        (hydro!, (F32, F32, ClimateFields, Int, Processes, ResolvedHydrology, ModelWorkspace)),
-        (seaice!, (F32, ClimateFields, Int, Processes)),
-        (deep_ocean!, (F32, F32, ClimateFields, Int, Processes, ModelWorkspace)),
-        (convergence!, (F32, ClimateFields, Int, ModelWorkspace)),
-        (diffusion!, (F32, Float32, ClimateFields, ModelWorkspace)),
-        (advection!, (F32, Float32, ClimateFields, ModelWorkspace, Int, Processes)),
-        (circulation!, (F32, Float32, F32, ClimateFields, ModelWorkspace, Int, Processes)),
+        (SWradiation!, (ModelWorkspace, F32, ClimateFields, ModelState, Int, Processes)),
+        (LWradiation!, (ModelWorkspace, F32, F32, F32, Float32, ClimateFields, Int, Processes)),
+        (hydro!, (ModelWorkspace, F32, F32, ClimateFields, Int, Processes, ResolvedHydrology)),
+        (seaice!, (ClimateFields, F32, Int, Processes)),
+        (deep_ocean!, (ModelWorkspace, F32, F32, ClimateFields, Int, Processes)),
+        (convergence!, (ModelWorkspace, F32, ClimateFields, Int)),
+        (diffusion!, (ModelWorkspace, F32, Float32, ClimateFields)),
+        (advection!, (ModelWorkspace, F32, Float32, ClimateFields, Int, Processes)),
+        (circulation!, (F32, F32, Float32, ClimateFields, ModelWorkspace, Int, Processes)),
     ]
 
     for (kernel, argtypes) in signatures

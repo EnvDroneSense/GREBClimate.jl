@@ -39,21 +39,20 @@ function to_ghosted!(P::AbstractMatrix{Float32}, A::AbstractMatrix{<:Real})
 end
 
 """
-    convergence!(T1, fields::ClimateFields, slice, ws::ModelWorkspace)
+    convergence!(ws::ModelWorkspace, T1, fields::ClimateFields, slice)
 
 Moisture flux convergence from `T1` (specific humidity, `[kg/kg]`) and the
 current `fields.omega_clim` (vertical velocity), writing the tendency into
 `ws.dX_conv`. Implements Eq. 18 from Stassen et al. (2019).
 """
-function convergence!(T1, fields::ClimateFields, slice::Int, ws::ModelWorkspace)
-    omega = clim_slice(fields.omega_clim, slice)
-
-    @. ws.dX_conv = -T1 * omega * convergence_factor
+function convergence!(ws::ModelWorkspace, T1, fields::ClimateFields, slice::Int)
+    to_ghosted!(ws.X_work, T1)
+    _convergence!(ws, ws.X_work, fields, slice)
     return nothing
 end
 
 # Same tendency, reading a ghosted field.
-function _convergence!(Xp::Matrix{Float32}, fields::ClimateFields, slice::Int, ws::ModelWorkspace)
+function _convergence!(ws::ModelWorkspace, Xp::Matrix{Float32}, fields::ClimateFields, slice::Int)
     omega = clim_slice(fields.omega_clim, slice)
     dX_conv = ws.dX_conv
 
@@ -77,23 +76,23 @@ end
 end
 
 """
-    diffusion!(T1, h_scl, fields::ClimateFields, ws::ModelWorkspace)
+    diffusion!(ws::ModelWorkspace, T1, h_scl, fields::ClimateFields)
 
 Meridional + zonal diffusion of `T1` (temperature or humidity), writing the
 tendency into `ws.dX_diff`. `h_scl` (`z_air` or `z_vapor`) selects the
 topographic weighting field.
 """
-function diffusion!(T1, h_scl, fields::ClimateFields, ws::ModelWorkspace)
+function diffusion!(ws::ModelWorkspace, T1, h_scl, fields::ClimateFields)
     wz = _wz_for(h_scl, fields)
     to_ghosted!(ws.X_work, T1)
     to_ghosted!(ws.wz_ghost, wz)
-    _diffusion!(ws.X_work, ws.wz_ghost, ws)
+    _diffusion!(ws, ws.X_work, ws.wz_ghost)
     return nothing
 end
 
 # Core kernel. `Tp`/`wzp` are ghosted with valid ghost rows; the tendency lands in
 # the plain `(xdim, ydim)` `ws.dX_diff`.
-function _diffusion!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, ws::ModelWorkspace)
+function _diffusion!(ws::ModelWorkspace, Tp::Matrix{Float32}, wzp::Matrix{Float32})
     dX_diff = ws.dX_diff
 
     # Precomputed geometry/coefficients
@@ -201,28 +200,27 @@ function _diffusion!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, ws::ModelWorkspa
 end
 
 """
-    advection!(T1, h_scl, fields::ClimateFields, ws::ModelWorkspace, slice, p::Processes)
+    advection!(ws::ModelWorkspace, T1, h_scl, fields::ClimateFields, slice, p::Processes)
 
 Meridional + zonal advection of `T1` (temperature or humidity), writing the
 tendency into `ws.dX_adv`. Gated by `p.heat_advection`/`p.vapor_advection`
 depending on `h_scl`.
 """
-function advection!(T1, h_scl, fields::ClimateFields, ws::ModelWorkspace, slice::Int, p::Processes)
+function advection!(ws::ModelWorkspace, T1, h_scl, fields::ClimateFields, slice::Int, p::Processes)
+    wz = _wz_for(h_scl, fields)
     # Disable advection for water vapor or heat according to switches
-    if (h_scl == z_vapor && !p.vapor_advection) || (h_scl == z_air && !p.heat_advection)
+    if !(h_scl == z_vapor ? p.vapor_advection : p.heat_advection)
         fill!(ws.dX_adv, 0.0f0)
         return nothing
     end
-    wz = _wz_for(h_scl, fields)
     to_ghosted!(ws.X_work, T1)
     to_ghosted!(ws.wz_ghost, wz)
-    _advection!(ws.X_work, ws.wz_ghost, fields, ws, slice)
+    _advection!(ws, ws.X_work, ws.wz_ghost, fields, slice)
     return nothing
 end
 
 # Core kernel. `Tp`/`wzp` are ghosted; the switch check has already run.
-function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateFields,
-                     ws::ModelWorkspace, slice::Int)
+function _advection!(ws::ModelWorkspace, Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateFields, slice::Int)
     dX_adv = ws.dX_adv
 
     # Extract 2D views for current time step
@@ -360,7 +358,7 @@ function _advection!(Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateF
 end
 
 """
-    circulation!(X_in, h_scl, dX_out, fields::ClimateFields, ws::ModelWorkspace, slice, p::Processes)
+    circulation!(dX_out, X_in, h_scl, fields::ClimateFields, ws::ModelWorkspace, slice, p::Processes)
 
 Sub-steps `X_in` through `ntime` iterations of [`diffusion!`](@ref),
 [`advection!`](@ref), and [`convergence!`](@ref) (each gated by its
@@ -368,24 +366,24 @@ Sub-steps `X_in` through `ntime` iterations of [`diffusion!`](@ref),
 without an atmosphere or transport. The sub-step loop is a genuine sequential
 recurrence and is not parallelized.
 """
-function circulation!(X_in, h_scl, dX_out, fields::ClimateFields, ws::ModelWorkspace, slice::Int, p::Processes)
+function circulation!(dX_out, X_in, h_scl, fields::ClimateFields, ws::ModelWorkspace, slice::Int, p::Processes)
     # Early exit if atmospheric processes disabled
     if !p.atmosphere || !p.transport
         fill!(dX_out, 0.0f0)
         return nothing
     end
 
-    # Precompute flags
-    do_diff_v = p.vapor_diffusion && h_scl == z_vapor
-    do_diff_h = p.heat_diffusion && h_scl == z_air
-    do_adv_v = p.vapor_advection && h_scl == z_vapor
-    do_adv_h = p.heat_advection && h_scl == z_air
-    do_conv = p.moisture_convergence && h_scl == z_vapor
-
     # `wz` is static for the whole run, so its ghosted copy is built once per
-    # call and reused across all `ntime` sub-steps.
+    # call and reused across all `ntime` sub-steps. Selecting it also rejects
+    # a `h_scl` that is neither scale height.
     wzp = ws.wz_ghost
     to_ghosted!(wzp, _wz_for(h_scl, fields))
+
+    # Which terms run: humidity and temperature have their own switches
+    vapor = h_scl == z_vapor
+    do_diff = vapor ? p.vapor_diffusion : p.heat_diffusion
+    do_adv = vapor ? p.vapor_advection : p.heat_advection
+    do_conv = vapor && p.moisture_convergence
 
     Xp = ws.X_work
     to_ghosted!(Xp, X_in)
@@ -398,9 +396,9 @@ function circulation!(X_in, h_scl, dX_out, fields::ClimateFields, ws::ModelWorks
     fill!(dX_conv, 0.0f0)
 
     for _tt in 1:ntime
-        (do_diff_v || do_diff_h) && _diffusion!(Xp, wzp, ws)
-        (do_adv_v || do_adv_h) && _advection!(Xp, wzp, fields, ws, slice)
-        do_conv && _convergence!(Xp, fields, slice, ws)
+        do_diff && _diffusion!(ws, Xp, wzp)
+        do_adv && _advection!(ws, Xp, wzp, fields, slice)
+        do_conv && _convergence!(ws, Xp, fields, slice)
 
         @inbounds for j in 1:ydim
             @turbo for i in 1:xdim

@@ -118,12 +118,12 @@ function time_stages(jld2_dir::AbstractString; cfg=preset(:full_model), reps::In
     q = copy(fields.q_clim[:, :, slice])
 
     stages = [
-        ("circulation!(Ta)", () -> circulation!(Ta, GREBClimate.z_air, ws.dTa_crcl, fields, ws, slice, p)),
-        ("circulation!(q)", () -> circulation!(q, GREBClimate.z_vapor, ws.dq_crcl, fields, ws, slice, p)),
-        ("SWradiation!", () -> SWradiation!(Ts, fields, state, slice, p, ws)),
-        ("LWradiation!", () -> LWradiation!(Ts, Ta, q, CO2, fields, slice, p, ws)),
-        ("hydro!", () -> hydro!(Ts, q, fields, slice, p, r.hydrology, ws)),
-        ("deep_ocean!", () -> deep_ocean!(Ts, To, fields, slice, p, ws)),
+        ("circulation!(Ta)", () -> circulation!(ws.dTa_crcl, Ta, GREBClimate.z_air, fields, ws, slice, p)),
+        ("circulation!(q)", () -> circulation!(ws.dq_crcl, q, GREBClimate.z_vapor, fields, ws, slice, p)),
+        ("SWradiation!", () -> SWradiation!(ws, Ts, fields, state, slice, p)),
+        ("LWradiation!", () -> LWradiation!(ws, Ts, Ta, q, CO2, fields, slice, p)),
+        ("hydro!", () -> hydro!(ws, Ts, q, fields, slice, p, r.hydrology)),
+        ("deep_ocean!", () -> deep_ocean!(ws, Ts, To, fields, slice, p)),
     ]
 
     for (_, f) in stages
