@@ -91,7 +91,7 @@ const _control_start_year = 1970
 """
     qflux_correction!(CO2_ctrl, Ts, Ta, To, q, fields, state, r::ResolvedConfig, ws, years; ws_a=ws, ws_q=ws)
 
-Runs `years` years of `tendencies!` to derive the ocean/atmosphere flux
+Run `years` years of `tendencies!` to derive the ocean/atmosphere flux
 corrections (`fields.Ts_flux_correction`/`q_flux_correction`/`To_flux_correction`) that make the
 control climate match observed climatology. Mutates `Ts`/`Ta`/`To`/`q` in
 place as it integrates. `ws_a`/`ws_q` are forwarded to [`tendencies!`](@ref).

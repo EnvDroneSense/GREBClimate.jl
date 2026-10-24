@@ -21,7 +21,7 @@ const _skin_coeff_ocean = 0.79f0
 """
     hydro!(ws::ModelWorkspace, Ts, q, fields::ClimateFields, slice, p::Processes, h::ResolvedHydrology)
 
-Computes latent heat flux and evaporation/rain tendencies. `h.evaporation`
+Compute latent heat flux and evaporation/rain tendencies. `h.evaporation`
 selects the evaporation scheme; `h.rain` and its coefficients
 (`c_q`/`c_rq`/`c_omega`/`c_omega_std`) the rain regression. Returns zeros
 without an atmosphere or with `p.hydrology` other than `:full`.

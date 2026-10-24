@@ -82,7 +82,7 @@ end
         name -= expr
     end
 
-Declares the monthly output fields, one row per field. A row says what one
+Declare the monthly output fields, one row per field. A row says what one
 timestep adds to the monthly sum of `name`; each `struct.field` in `expr` is an
 `(xdim, ydim)` array, read cell by cell. `args` are the arguments of
 `accumulate!` after the accumulator.

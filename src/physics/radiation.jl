@@ -1,7 +1,7 @@
 """
     SWradiation!(ws::ModelWorkspace, Ts, fields::ClimateFields, state::ModelState, slice, p::Processes)
 
-Computes ice cover, surface/atmospheric/combined albedo, and net shortwave
+Compute ice cover, surface/atmospheric/combined albedo, and net shortwave
 flux from `Ts` and the current cloud climatology. Returns
 `(SW, albedo, ice_cover)`.
 """
@@ -54,7 +54,7 @@ end
 """
     LWradiation!(ws::ModelWorkspace, Ts, Ta, q, CO2, fields::ClimateFields, slice, p::Processes)
 
-Computes atmospheric emissivity from CO2/water-vapor/cloud columns, then
+Compute atmospheric emissivity from CO2/water-vapor/cloud columns, then
 surface/upward/downward longwave flux. Without an atmosphere (`p.atmosphere = false`) only
 `LW_down` is zeroed: `LW_up` is written equal to the downward emission first
 and keeps that value (decouples surface from atmospheric downwelling feedback

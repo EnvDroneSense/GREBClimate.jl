@@ -1,7 +1,7 @@
 """
     seaice!(fields::ClimateFields, Ts0, slice, p::Processes)
 
-Updates `fields.cap_surf` (surface heat capacity) for ocean points based on
+Update `fields.cap_surf` (surface heat capacity) for ocean points based on
 `Ts0`-derived ice fraction, blending land/open-ocean/ice capacities. No-op
 with `p.ocean = :none`; skips the ice blend with `p.ice_albedo = false`.
 """
@@ -47,7 +47,7 @@ end
 """
     deep_ocean!(ws::ModelWorkspace, Ts, To, fields::ClimateFields, slice, p::Processes)
 
-Computes surface/deep-ocean coupling tendencies (`dT_ocean`, `dTo`) from
+Compute surface/deep-ocean coupling tendencies (`dT_ocean`, `dTo`) from
 mixed-layer-depth entrainment/detrainment and turbulent mixing, active only
 where the point is ocean and above the sea-ice threshold. Returns zeros
 unless `p.ocean` is `:full`.

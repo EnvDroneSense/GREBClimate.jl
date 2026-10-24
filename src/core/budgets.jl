@@ -27,7 +27,7 @@ end
 # model's own, not copies.
 _step_view(t::ModelTime, CO2, Ts, Ta, To, q, tend, fields, r) =
     (; time=t, phase=t.phase, step=t.step, year=year(t), step_of_year=step_of_year(t),
-        CO2, Ts, Ta, To, q, tend, fields, config=r)
+        CO2, Ts, Ta, To, q, tend, fields, resolved=r)
 
 """
     BudgetCheck()
@@ -83,10 +83,10 @@ _floor(T) = ifelse(T < min_T_K, min_T_K, T)
 
 function _check_step!(b::BudgetCheck, view)
     tend, fields, slice = view.tend, view.fields, view.step_of_year
-    config = view.config
-    hydro_on = config.config.processes.hydrology !== :none
-    rain_limited = config.config.processes.hydrology === :full && config.config.processes.atmosphere &&
-                   config.hydrology.rain === :rh
+    r = view.resolved
+    p = r.config.processes
+    hydro_on = p.hydrology !== :none
+    rain_limited = p.hydrology === :full && p.atmosphere && r.hydrology.rain === :rh
     for j in 1:ydim, i in 1:xdim
         Ts = b.Ts[i, j] + tend.dT_ocean[i, j] +
              Δt * (surface_flux(tend, i, j) + fields.Ts_flux_correction[i, j, slice]) / b.cap_surf[i, j]

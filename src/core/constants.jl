@@ -118,7 +118,7 @@ the other:
     row    1 … 3  │  4 … 99         │  100 … 102
     holds  94…96  │  1 … 96 (real)  │  1 … 3
 
-So `A[j-1, k]` is just `P[j+2, k]`.
+So `A[j-1, k]` is `P[j+2, k]`.
 
 `nghost` is the zonal stencils' reach, so it is 3 and they spell their offsets
 out literally (`j` … `j+6`); widening the stencil means widening both.

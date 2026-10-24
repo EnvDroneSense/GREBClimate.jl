@@ -8,7 +8,7 @@ const _SAMPLE_CELLS = (("178 E 9 N", 48, 27), ("58 E 51 N", 16, 38))
 """
     diagnostics!(t::ModelTime, surf::SurfaceState, state)
 
-Accumulates the current timestep into `state`'s annual-mean buffers; at the
+Accumulate the current timestep into `state`'s annual-mean buffers; at the
 last timestep of the year, averages them, logs the annual summary line
 (the area-weighted global mean and two sample cells, in °C) with `@info`, and
 resets the accumulators for the next year.
@@ -43,7 +43,7 @@ end
 """
     output!(t::ModelTime, surf::SurfaceState, tend, ws, output_buf, times, acc)
 
-Accumulates the current timestep into `acc`; on the last timestep of a month,
+Accumulate the current timestep into `acc`; on the last timestep of a month,
 pushes the monthly-mean [`MonthlyRecord`](@ref) onto `output_buf` and its
 [`RecordTime`](@ref) onto `times`, and resets `acc`. `tend` is the
 `NamedTuple` [`tendencies!`](@ref) returns; `ws.precip`/`evap`/

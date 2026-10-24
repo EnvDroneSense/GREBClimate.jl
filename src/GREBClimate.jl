@@ -10,16 +10,14 @@ module GREBClimate
 # lives in `viz/notebooks/GREB_explorer.jl`; see the package docs or README for
 # usage.
 #
-# Files below are included in dependency order: constants -> calendar ->
-# config/{processes,scenario,presets} -> data -> state -> io -> config/resolve
-# -> physics/{radiation,hydrology,ocean,circulation} -> tendencies -> budgets
-# -> forcing -> output -> postprocess -> model -> ensemble.
 # =============================================================================
 
-using LoopVectorization: LoopVectorization, @turbo   # SIMD
-using JLD2: JLD2, jldopen
 using Logging: with_logger, NullLogger
+
 using DataDeps: DataDeps, DataDep, register, unpack, @datadep_str
+using JLD2: JLD2, jldopen
+using LoopVectorization: LoopVectorization, @turbo   # SIMD
+using PrecompileTools: @compile_workload
 
 export Config, preset, preset_names, Scenario, Processes, Hydrology, mscm_hydrology
 export resolve, ResolvedConfig, ResolvedHydrology
@@ -66,8 +64,6 @@ function __init__()
     register_greb_datadep()
     return nothing
 end
-
-using PrecompileTools: @compile_workload
 
 @compile_workload begin
     with_logger(NullLogger()) do

@@ -1,11 +1,11 @@
 """
     tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, slice, r::ResolvedConfig; ws_a=ws, ws_q=ws)
 
-Runs one timestep's physics pipeline: [`SWradiation!`](@ref) →
-[`LWradiation!`](@ref) → sensible heat → [`hydro!`](@ref) →
-[`circulation!`](@ref) (temperature, then humidity) → [`deep_ocean!`](@ref)
-and returns a named tuple of every intermediate flux/tendency needed by
-[`diagnostics!`](@ref) and the caller's own state update.
+Run one timestep's physics pipeline and return a named tuple of every
+intermediate flux/tendency needed by [`diagnostics!`](@ref) and the caller's own
+state update. [`circulation!`](@ref) (temperature, then humidity) starts first,
+then [`SWradiation!`](@ref) → [`LWradiation!`](@ref) → sensible heat →
+[`hydro!`](@ref) → [`deep_ocean!`](@ref) run on `ws`.
 
 The two `circulation!` calls are independent of each other and of every
 other stage (each reads only pre-timestep state and writes disjoint

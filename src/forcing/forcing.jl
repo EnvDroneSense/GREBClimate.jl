@@ -39,7 +39,7 @@ function _co2_at(::A1BRamp, t, r)
     return 700.0f0
 end
 
-_co2_at(::CO2SineWave, t, r) = 510.0f0 + 170.0f0 * cos(2f0*Float32(π) * (year(t) - 13.0f0) / 30.0f0)
+_co2_at(::CO2SineWave, t, r) = 510.0f0 + 170.0f0 * cos(2f0*pi_f32 * (year(t) - 13.0f0) / 30.0f0)
 
 _co2_at(c::CO2Step, t, r) = year(t) >= c.year ? c.after : c.before
 
@@ -56,13 +56,13 @@ end
 
 _solar_factor(::Union{ModernSolar,SolarTable}, t) = 1.0f0
 _solar_factor(s::SolarConstant, t) = (1365.0f0 + s.offset) / 1365.0f0
-_solar_factor(s::SolarCycle, t) = (1365.0f0 + s.amplitude * sin(2f0*Float32(π) * year(t) / s.period)) / 1365.0f0
+_solar_factor(s::SolarCycle, t) = (1365.0f0 + s.amplitude * sin(2f0*pi_f32 * year(t) / s.period)) / 1365.0f0
 _solar_factor(s::EarthSunDistance, t) = (1.0f0 / (1.0f0 + 0.01f0 * s.percent))^2
 
 """
     apply_co2_mask!(fields::ClimateFields, mask::CO2Mask)
 
-Sets `fields.co2_part`, the fraction of the scenario CO2 each cell gets: 1
+Set `fields.co2_part`, the fraction of the scenario CO2 each cell gets: 1
 everywhere, then 0.5 outside a [`LatitudeMask`](@ref) band. `greb_model!`
 calls it at the start of the scenario; the spin-up and the control run on the
 full CO2 everywhere. A [`SurfaceMask`](@ref) needs the control run's ice cover
@@ -102,7 +102,7 @@ end
 """
     apply_surface_mask!(fields::ClimateFields, mask::CO2Mask, icmn_ctrl)
 
-Sets `fields.co2_part` for a [`SurfaceMask`](@ref) from the control run's
+Set `fields.co2_part` for a [`SurfaceMask`](@ref) from the control run's
 annual-mean ice cover `icmn_ctrl`: `:ocean` halves CO2 over land and over ice,
 `:land_ice` halves it over ice-free ocean. A no-op for every other mask.
 """
