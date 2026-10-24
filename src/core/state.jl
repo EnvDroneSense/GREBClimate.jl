@@ -138,8 +138,7 @@ macro output_fields(args, rows)
             return nothing
         end
 
-        monthly_means(acc::MonthlyAccumulator, nstep) =
-            $(Expr(:tuple, (Expr(:(=), name, :(acc.$name ./ nstep)) for name in names)...))
+        monthly_means(acc::MonthlyAccumulator, nstep) = $(Expr(:tuple, (Expr(:(=), name, :(acc.$name ./ nstep)) for name in names)...))
 
         function reset!(acc::MonthlyAccumulator)
             $((:(fill!(acc.$name, 0.0f0)) for name in names)...)
@@ -150,20 +149,20 @@ end
 
 # `tend` is what `tendencies!` returns
 @output_fields (surf::SurfaceState, tend, ws::ModelWorkspace) begin
-    Ts     += surf.Ts
-    Ta     += surf.Ta
-    To     += surf.To
-    q      += surf.q
+    Ts += surf.Ts
+    Ta += surf.Ta
+    To += surf.To
+    q += surf.q
     albedo += tend.albedo
-    ice    += tend.ice_cover
+    ice += tend.ice_cover
     precip += ws.precip
-    evap   += ws.evap
-    qcrcl  += ws.qcrcl
-    sw     += tend.SW
-    lw     += tend.LW_surf
-    qlat   += tend.Q_lat
-    qsens  += tend.Q_sens
-    olr    -= tend.LW_up + (1.0f0 - tend.em) * tend.LW_surf
+    evap += ws.evap
+    qcrcl += ws.qcrcl
+    sw += tend.SW
+    lw += tend.LW_surf
+    qlat += tend.Q_lat
+    qsens += tend.Q_sens
+    olr -= tend.LW_up + (1.0f0 - tend.em) * tend.LW_surf
     lwdown -= tend.LW_down
 end
 
@@ -328,6 +327,7 @@ function derive_fields!(fields::ClimateFields, p::Processes)
 
     cap_surf = fields.cap_surf
     for j in 1:ydim, i in 1:xdim
+
         cap_surf[i, j] = is_land(z_topo[i, j]) || p.ocean === :none ? cap_land : cap_ocean * mld_clim[i, j, 1]
     end
 

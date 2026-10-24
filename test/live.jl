@@ -23,10 +23,10 @@ include(joinpath(@__DIR__, "support", "selection.jl"))
 
 """Run the named test files, or a whole tier (`t(:smoke)`), in this session."""
 function t(names::AbstractString...)
-    files = select_tests(; names = collect(names))
+    files = select_tests(; names=collect(names))
     return _run(files)
 end
-t(tier::Symbol) = _run(select_tests(; tier = String(tier)))
+t(tier::Symbol) = _run(select_tests(; tier=String(tier)))
 
 function _run(files)
     isempty(files) && return nothing
@@ -37,6 +37,6 @@ function _run(files)
             end
         end
     end
-    println("ran ", join(files, ", "), " in ", round(elapsed; digits = 1), " s (subset only, not the gate)")
+    println("ran ", join(files, ", "), " in ", round(elapsed; digits=1), " s (subset only, not the gate)")
     return nothing
 end

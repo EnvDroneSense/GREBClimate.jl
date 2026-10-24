@@ -73,8 +73,7 @@ month_of_step(it::Integer) = month_of_day(day_of_year(it))
 is_day_end(it::Integer) = it % steps_per_day == 0
 
 "True at the last step of a month."
-is_month_end(it::Integer) =
-    is_day_end(it) && day_of_year(it) == last_day_of_month[month_of_step(it)]
+is_month_end(it::Integer) = is_day_end(it) && day_of_year(it) == last_day_of_month[month_of_step(it)]
 
 "True at the last step of a year."
 is_year_end(it::Integer) = step_of_year(it) == nstep_yr
@@ -176,8 +175,7 @@ steps(phase::Phase, start_year::Integer, nyears::Integer) = PhaseSteps(phase, st
 
 Base.length(s::PhaseSteps) = s.nsteps
 Base.eltype(::Type{PhaseSteps}) = ModelTime
-Base.iterate(s::PhaseSteps, step::Int=1) =
-    step > s.nsteps ? nothing : (ModelTime(s.phase, s.start_year, step), step + 1)
+Base.iterate(s::PhaseSteps, step::Int=1) = step > s.nsteps ? nothing : (ModelTime(s.phase, s.start_year, step), step + 1)
 
 """
     RecordTime

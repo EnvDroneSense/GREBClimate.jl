@@ -11,23 +11,23 @@
 # uses it only to balance the groups it runs side by side, so a stale value
 # costs balance, not correctness.
 const SHARD = [
-    ("test_config.jl",     "light", "smoke",      8),
-    ("test_calendar.jl",   "light", "smoke",      3),
-    ("test_processes.jl",  "light", "smoke",      3),
-    ("test_scenario.jl",   "light", "smoke",      4),
-    ("test_state.jl",      "light", "smoke",      3),
-    ("test_output.jl",     "light", "smoke",      9),
-    ("test_io.jl",         "light", "smoke",     14),
-    ("test_invariants.jl", "light", "smoke",     10),
-    ("test_presets.jl",    "light", "standard",  16),
-    ("test_budgets.jl",    "light", "standard",  11),
+    ("test_config.jl", "light", "smoke", 8),
+    ("test_calendar.jl", "light", "smoke", 3),
+    ("test_processes.jl", "light", "smoke", 3),
+    ("test_scenario.jl", "light", "smoke", 4),
+    ("test_state.jl", "light", "smoke", 3),
+    ("test_output.jl", "light", "smoke", 9),
+    ("test_io.jl", "light", "smoke", 14),
+    ("test_invariants.jl", "light", "smoke", 10),
+    ("test_presets.jl", "light", "standard", 16),
+    ("test_budgets.jl", "light", "standard", 11),
     ("test_experiment_tools.jl", "light", "standard", 5),
-    ("test_physics.jl",    "light", "standard",  26),
-    ("test_threading.jl",  "light", "full",      25),
-    ("test_model.jl",      "heavy", "full",      49),
-    ("test_ensemble.jl",   "heavy", "full",      30),
-    ("test_golden.jl",     "heavy", "full",      21),
-    ("test_aqua.jl",       "heavy", "full",      13),
+    ("test_physics.jl", "light", "standard", 26),
+    ("test_threading.jl", "light", "full", 25),
+    ("test_model.jl", "heavy", "full", 49),
+    ("test_ensemble.jl", "heavy", "full", 30),
+    ("test_golden.jl", "heavy", "full", 21),
+    ("test_aqua.jl", "heavy", "full", 13)
 ]
 
 const TIERS = ["smoke", "standard", "full"]
@@ -50,7 +50,7 @@ The files to run, in `SHARD` order. `names` (from `GREB_TEST_FILES` or the
 `Pkg.test(test_args = ...)` arguments) wins over `tier`, which wins over
 `shard`. All empty means everything.
 """
-function select_tests(; names = String[], tier = "", shard = "all")
+function select_tests(; names=String[], tier="", shard="all")
     if !isempty(names)
         wanted = Set(resolve_test_file.(names))
         return [row[1] for row in SHARD if row[1] in wanted]

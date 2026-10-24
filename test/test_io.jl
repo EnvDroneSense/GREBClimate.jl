@@ -4,8 +4,8 @@
     with_tempdir() do tmpdir
         map2(name, v) = write_field(joinpath(tmpdir, "static", name), v, (X, Y))
         clim(name, v) = write_field(joinpath(tmpdir, "climatology", name), v)
-        solar(v, dims = (Y, N)) = write_field(joinpath(tmpdir, "solar", "solar_radiation.clim.jld2"), v, dims;
-                                              dim_names = ["lat", "time"])
+        solar(v, dims=(Y, N)) = write_field(joinpath(tmpdir, "solar", "solar_radiation.clim.jld2"), v, dims;
+            dim_names=["lat", "time"])
         map2("global.topography.jld2", 1.0)
         map2("greb.glaciers.jld2", 2.0)
         clim("ncep.tsurf.1948-2007.clim.jld2", 3.0)
@@ -22,23 +22,23 @@
         solar(14.0)
 
         # No flux-corrections file yet: an error that names it, not zeros
-        @test_throws "flux_corrections.jld2" load_climatology(tmpdir; dataset = :ncep)
+        @test_throws "flux_corrections.jld2" load_climatology(tmpdir; dataset=:ncep)
         @test_throws ArgumentError load_flux_corrections!(ClimateFields(), tmpdir)
         # `corrections = false` loads the rest and leaves the corrections at zero
-        without = load_climatology(tmpdir; dataset = :ncep, corrections = false)
+        without = load_climatology(tmpdir; dataset=:ncep, corrections=false)
         @test without.loaded && all(==(3.0), without.Ts_clim)
         @test all(iszero, without.Ts_flux_correction) && all(iszero, without.q_flux_correction) && all(iszero, without.To_flux_correction)
 
         # A dataset name the loader does not know is an error, not NCEP
-        @test_throws ArgumentError load_climatology(tmpdir; dataset = :era5)
+        @test_throws ArgumentError load_climatology(tmpdir; dataset=:era5)
 
         # A file that lacks one of the three tables is an error too
-        write_flux_corrections(tmpdir; Ts = 15.0, q = nothing, To = nothing)
-        @test_throws "vapour_flux_correction" load_climatology(tmpdir; dataset = :ncep)
+        write_flux_corrections(tmpdir; Ts=15.0, q=nothing, To=nothing)
+        @test_throws "vapour_flux_correction" load_climatology(tmpdir; dataset=:ncep)
 
-        write_flux_corrections(tmpdir; Ts = 15.0, q = 16.0, To = 17.0)
+        write_flux_corrections(tmpdir; Ts=15.0, q=16.0, To=17.0)
 
-        fields = load_climatology(tmpdir; dataset = :ncep)
+        fields = load_climatology(tmpdir; dataset=:ncep)
         @test all(==(1.0), fields.z_topo)
         @test all(==(2.0), fields.glacier)
         @test all(==(3.0), fields.Ts_clim)
@@ -55,7 +55,7 @@
 
         # A solar table of the wrong shape is reported, with the file's name
         solar(0.0, (Y, 2))
-        @test_throws "solar_radiation.clim.jld2" load_climatology(tmpdir; dataset = :ncep)
+        @test_throws "solar_radiation.clim.jld2" load_climatology(tmpdir; dataset=:ncep)
     end
 
     with_tempdir() do missing_parent
@@ -67,14 +67,14 @@ end
     # The resolve step loads each table once. Assert the loader against every
     # preset's key instead of paying a simulated year each.
     expected = Dict(:rcp26 => 400.0, :rcp45 => 401.0, :rcp60 => 402.0,
-                    :ssp119 => 300.0, :ssp126 => 301.0, :ssp245 => 302.0,
-                    :ssp460 => 303.0, :ssp585 => 304.0, :historical_co2 => 280.73)
+        :ssp119 => 300.0, :ssp126 => 301.0, :ssp245 => 302.0,
+        :ssp460 => 303.0, :ssp585 => 304.0, :historical_co2 => 280.73)
     key(p) = preset(p).scenario.co2.key
     on_disk(p) = p === :rcp60 ? "rcp6" : string(key(p))   # the dataset's name for RCP6.0
     with_tempdir() do dir
         write_ipcc_scenarios(dir, Dict(on_disk(p) => Dict(1950 => co2) for (p, co2) in expected))
         for (p, co2) in expected
-            @test isapprox(load_co2_scenario(dir, key(p))[1950], co2; atol = 1e-3)
+            @test isapprox(load_co2_scenario(dir, key(p))[1950], co2; atol=1e-3)
         end
 
         # The table's name is :rcp60; the dataset's own key is not accepted
@@ -147,7 +147,7 @@ end
                 # explicit path wins over everything
                 @test greb_data_dir(tmp_a) == tmp_a
                 # ...and over the environment even with allow_download off
-                @test greb_data_dir(tmp_a; allow_download = false) == tmp_a
+                @test greb_data_dir(tmp_a; allow_download=false) == tmp_a
                 # GREB_DATA wins over the repo-local dataset
                 @test greb_data_dir() == tmp_b
             end
@@ -172,12 +172,12 @@ end
                     @test abspath(GREBClimate._cached_datadep_path()) == cache
                     # the repo-local dataset wins over the cache; without it the cache is used
                     local_dir = normpath(joinpath(@__DIR__, "..", "greb_input_data"))
-                    @test abspath(greb_data_dir(; allow_download = false)) == (isdir(local_dir) ? local_dir : cache)
+                    @test abspath(greb_data_dir(; allow_download=false)) == (isdir(local_dir) ? local_dir : cache)
                 end
             end
 
             withenv("GREB_DATA" => nothing) do
-                @test greb_data_dir(""; allow_download = false) == greb_data_dir(; allow_download = false)
+                @test greb_data_dir(""; allow_download=false) == greb_data_dir(; allow_download=false)
             end
         end
     end
@@ -199,11 +199,11 @@ end
     @test "ncep.tsurf.1948-2007.clim" in names && "erainterim.tsurf.1979-2015.clim" in names
     # Every name fills an array that ClimateFields has
     lists = (GREBClimate._STATIC_FILES, values(GREBClimate._CLIMATOLOGY_FILES)..., GREBClimate._COMMON_CLIMATOLOGY_FILES,
-             GREBClimate._FLUX_CORRECTION_KEYS)
+        GREBClimate._FLUX_CORRECTION_KEYS)
     @test all(l -> all(f -> hasfield(ClimateFields, f), keys(l)), lists)
     # Every source of a boundary anomaly names one file per anomaly array
     @test all(s -> keys(GREBClimate._boundary_anomaly_files(s)) == fieldnames(BoundaryAnomalyFields),
-              GREBClimate._BOUNDARY_ANOMALY_SOURCES)
+        GREBClimate._BOUNDARY_ANOMALY_SOURCES)
 
     # The tools keep their own list: it may hold more, never less
     tools = Module()

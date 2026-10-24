@@ -68,8 +68,8 @@ fields = load_climatology(dir; dataset = :ncep)
 result = greb_model!(RunSpec(), preset(:co2_double); jld2_dir = dir, fields = fields)
 ```
 """
-function greb_data_dir(path::Union{Nothing,AbstractString} = nothing;
-                       allow_download::Bool = true)
+function greb_data_dir(path::Union{Nothing,AbstractString}=nothing;
+        allow_download::Bool=true)
     if path !== nothing && !isempty(path)
         isdir(path) || error("GREB dataset directory not found: $path")
         return String(path)
@@ -121,6 +121,6 @@ registration itself is cheap and downloads nothing.
 """
 function register_greb_datadep()
     register(DataDep(DATA_DEP_NAME, _DATA_MESSAGE, DATA_URL, DATA_SHA256;
-                     post_fetch_method = unpack))
+        post_fetch_method=unpack))
     return nothing
 end

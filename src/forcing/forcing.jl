@@ -39,7 +39,7 @@ function _co2_at(::A1BRamp, t, r)
     return 700.0f0
 end
 
-_co2_at(::CO2SineWave, t, r) = 510.0f0 + 170.0f0 * cos(2f0*pi_f32 * (year(t) - 13.0f0) / 30.0f0)
+_co2_at(::CO2SineWave, t, r) = 510.0f0 + 170.0f0 * cos(2.0f0 * pi_f32 * (year(t) - 13.0f0) / 30.0f0)
 
 _co2_at(c::CO2Step, t, r) = year(t) >= c.year ? c.after : c.before
 
@@ -56,7 +56,7 @@ end
 
 _solar_factor(::Union{ModernSolar,SolarTable}, t) = 1.0f0
 _solar_factor(s::SolarConstant, t) = (1365.0f0 + s.offset) / 1365.0f0
-_solar_factor(s::SolarCycle, t) = (1365.0f0 + s.amplitude * sin(2f0*pi_f32 * year(t) / s.period)) / 1365.0f0
+_solar_factor(s::SolarCycle, t) = (1365.0f0 + s.amplitude * sin(2.0f0 * pi_f32 * year(t) / s.period)) / 1365.0f0
 _solar_factor(s::EarthSunDistance, t) = (1.0f0 / (1.0f0 + 0.01f0 * s.percent))^2
 
 """

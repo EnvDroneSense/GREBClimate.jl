@@ -1,6 +1,5 @@
 # How the annual summary line names the year: the spin-up counts its years from 1
-_year_label(t::ModelTime) =
-    t.phase === spinup ? "spin-up year $(year(t) - t.start_year + 1)" : string(year(t))
+_year_label(t::ModelTime) = t.phase === spinup ? "spin-up year $(year(t) - t.start_year + 1)" : string(year(t))
 
 # The two cells of the annual summary line: label, longitude index, latitude index
 const _SAMPLE_CELLS = (("178 E 9 N", 48, 27), ("58 E 51 N", 16, 38))
@@ -51,7 +50,7 @@ pushes the monthly-mean [`MonthlyRecord`](@ref) onto `output_buf` and its
 circulation output.
 """
 function output!(t::ModelTime, surf::SurfaceState, tend, ws::ModelWorkspace,
-    output_buf::Vector{MonthlyRecord}, times::Vector{RecordTime}, acc::MonthlyAccumulator)
+        output_buf::Vector{MonthlyRecord}, times::Vector{RecordTime}, acc::MonthlyAccumulator)
     accumulate!(acc, surf, tend, ws)
 
     if is_month_end(t)
@@ -75,9 +74,9 @@ enable. `observer` is called before and after the update (see
 [`greb_model!`](@ref)).
 """
 function time_loop!(t::ModelTime, CO2, Ts, Ta, To, q, output_buf, times,
-    fields::ClimateFields, state::ModelState, ws::ModelWorkspace, acc::MonthlyAccumulator,
-    r::ResolvedConfig; ws_a::ModelWorkspace=ws, ws_q::ModelWorkspace=ws,
-    observer=nothing)
+        fields::ClimateFields, state::ModelState, ws::ModelWorkspace, acc::MonthlyAccumulator,
+        r::ResolvedConfig; ws_a::ModelWorkspace=ws, ws_q::ModelWorkspace=ws,
+        observer=nothing)
     slice = data_slice(t)
 
     # Compute tendencies
@@ -95,12 +94,23 @@ function time_loop!(t::ModelTime, CO2, Ts, Ta, To, q, output_buf, times,
 
     hydro_on = r.config.processes.hydrology !== :none ? 1.0f0 : 0.0f0
 
-    SW = tend.SW; LW_surf = tend.LW_surf; LW_down = tend.LW_down
-    Q_lat = tend.Q_lat; Q_sens = tend.Q_sens; dTa_crcl = tend.dTa_crcl
-    LW_up = tend.LW_up; em = tend.em; Q_lat_air = tend.Q_lat_air
-    dTo = tend.dTo; dT_ocean = tend.dT_ocean
-    dq_eva = tend.dq_eva; dq_rain = tend.dq_rain; dq_crcl = tend.dq_crcl
-    precip = ws.precip; evap = ws.evap; qcrcl = ws.qcrcl
+    SW = tend.SW
+    LW_surf = tend.LW_surf
+    LW_down = tend.LW_down
+    Q_lat = tend.Q_lat
+    Q_sens = tend.Q_sens
+    dTa_crcl = tend.dTa_crcl
+    LW_up = tend.LW_up
+    em = tend.em
+    Q_lat_air = tend.Q_lat_air
+    dTo = tend.dTo
+    dT_ocean = tend.dT_ocean
+    dq_eva = tend.dq_eva
+    dq_rain = tend.dq_rain
+    dq_crcl = tend.dq_crcl
+    precip = ws.precip
+    evap = ws.evap
+    qcrcl = ws.qcrcl
 
     # Surface/air temperature, deep ocean, and humidity update
     @turbo for j in 1:ydim

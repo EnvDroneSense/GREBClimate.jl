@@ -13,19 +13,19 @@ function _kernel_fixture()
         init_model!(fields, r)
     end
     return (
-        fields = fields,
-        r = r,
-        p = r.config.processes,
-        h = r.hydrology,
-        state = ModelState(),
-        ws = ModelWorkspace(),
-        slice = 1,
-        Ts = fill(290.0f0, X, Y),
-        Ta = fill(280.0f0, X, Y),
-        To = fill(285.0f0, X, Y),
-        q = fill(0.006f0, X, Y),
-        T1 = fill(280.0f0, X, Y),
-        dX = zeros(Float32, X, Y),
+        fields=fields,
+        r=r,
+        p=r.config.processes,
+        h=r.hydrology,
+        state=ModelState(),
+        ws=ModelWorkspace(),
+        slice=1,
+        Ts=fill(290.0f0, X, Y),
+        Ta=fill(280.0f0, X, Y),
+        To=fill(285.0f0, X, Y),
+        q=fill(0.006f0, X, Y),
+        T1=fill(280.0f0, X, Y),
+        dX=zeros(Float32, X, Y)
     )
 end
 
@@ -50,7 +50,7 @@ end
         ("circulation!", () -> circulation!(f.dX, f.T1, z_air, f.fields, f.ws, f.slice, f.p), 0),
         ("tendencies!", () -> tendencies!(340.0f0, f.Ts, f.Ta, f.To, f.q, f.fields, f.state, f.ws, f.slice, f.r), 256),
         ("to_ghosted!", () -> GREBClimate.to_ghosted!(f.ws.X_work, f.T1), 0),
-        ("refresh_ghosts!", () -> GREBClimate.refresh_ghosts!(f.ws.X_work), 0),
+        ("refresh_ghosts!", () -> GREBClimate.refresh_ghosts!(f.ws.X_work), 0)
     ]
 
     # The table is hand-written; this is what stops a new kernel slipping past
@@ -64,9 +64,9 @@ end
         any(kf -> endswith(path, kf), kernel_files)
     end
     all_kernels = Set(String(n) for n in names(GREBClimate; all=true)
-                      if endswith(String(n), "!") && !startswith(String(n), r"[_#]") &&
-                         getproperty(GREBClimate, n) isa Function &&
-                         defined_in_kernel_file(getproperty(GREBClimate, n)))
+    if endswith(String(n), "!") && !startswith(String(n), r"[_#]") &&
+           getproperty(GREBClimate, n) isa Function &&
+           defined_in_kernel_file(getproperty(GREBClimate, n)))
     @test !isempty(all_kernels)   # an empty set would make the next check pass on anything
     @test setdiff(all_kernels, Set(first.(kernels))) == Set{String}()
 
@@ -96,7 +96,7 @@ end
         (convergence!, (ModelWorkspace, F32, ClimateFields, Int)),
         (diffusion!, (ModelWorkspace, F32, Float32, ClimateFields)),
         (advection!, (ModelWorkspace, F32, Float32, ClimateFields, Int, Processes)),
-        (circulation!, (F32, F32, Float32, ClimateFields, ModelWorkspace, Int, Processes)),
+        (circulation!, (F32, F32, Float32, ClimateFields, ModelWorkspace, Int, Processes))
     ]
 
     for (kernel, argtypes) in signatures

@@ -10,9 +10,9 @@ include(joinpath("support", "selection.jl"))
 # Unset means everything, which is the pre-commit gate. A subset run proves
 # only the files it ran.
 selected = select_tests(;
-    names = isempty(ARGS) ? filter(!isempty, split(get(ENV, "GREB_TEST_FILES", ""), ',')) : ARGS,
-    tier = get(ENV, "GREB_TEST_TIER", ""),
-    shard = get(ENV, "GREB_TEST_SHARD", "all"),
+    names=isempty(ARGS) ? filter(!isempty, split(get(ENV, "GREB_TEST_FILES", ""), ',')) : ARGS,
+    tier=get(ENV, "GREB_TEST_TIER", ""),
+    shard=get(ENV, "GREB_TEST_SHARD", "all")
 )
 
 @testset "GREBClimate.jl" begin

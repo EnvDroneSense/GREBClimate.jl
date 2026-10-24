@@ -1,6 +1,6 @@
 # The per-step observer of greb_model! and the budget check built on it.
 
-function _budget_run(; steps, setup! = (Ts, Ta, To, q, fields) -> nothing, config = preset(:full_model))
+function _budget_run(; steps, (setup!)=(Ts, Ta, To, q, fields) -> nothing, config=preset(:full_model))
     fields = synthetic_fields()
     r = resolve(config)
     ini = quiet(() -> init_model!(fields, r))
@@ -12,7 +12,7 @@ function _budget_run(; steps, setup! = (Ts, Ta, To, q, fields) -> nothing, confi
     check = BudgetCheck()
     state, ws, acc = ModelState(), ModelWorkspace(), MonthlyAccumulator()
     for step in 1:steps
-        step!(control_time(step), ini.CO2_ctrl, s, fields, r; state, ws, acc, observer = check)
+        step!(control_time(step), ini.CO2_ctrl, s, fields, r; state, ws, acc, observer=check)
     end
     return check
 end
@@ -22,7 +22,7 @@ end
     its = Int[]
     times = ModelTime[]
     observer = (point, view) -> (push!(calls, (view.phase, point)); push!(its, view.step); push!(times, view.time))
-    run_synthetic(RunSpec(ctrl = 1, scnr = 1), preset(:full_model; corrections = NoCorrections()); observer)
+    run_synthetic(RunSpec(ctrl=1, scnr=1), preset(:full_model; corrections=NoCorrections()); observer)
     step = [:after_tendencies, :after_step]
     @test calls == [(phase, point) for phase in (control, scenario) for _ in 1:N for point in step]
     @test its == [it for _ in 1:2 for it in 1:N for _ in 1:2]
@@ -37,7 +37,7 @@ end
     ini = quiet(() -> init_model!(fields, r))
     s = initial_state(ini)
     seen = Dict{Symbol,Matrix{Float32}}()
-    step!(control_time(), ini.CO2_ctrl, s, fields, r; observer = (point, view) -> (seen[point] = copy(view.Ts)))
+    step!(control_time(), ini.CO2_ctrl, s, fields, r; observer=(point, view) -> (seen[point] = copy(view.Ts)))
     @test seen[:after_tendencies] == ini.surf.Ts
     @test seen[:after_step] == s.Ts
     @test s.Ts != ini.surf.Ts
@@ -46,7 +46,7 @@ end
 @testset "BudgetCheck: each store changes by the sum of its flows" begin
     # A few ulp: 1e-4 K at 280 K, 1e-8 kg/kg at 0.005. A flux error of 1 W/m2
     # over the ocean moves Ts by 2e-4 K in one step.
-    check = _budget_run(steps = 20)
+    check = _budget_run(steps=20)
     @test check.steps == 20
     @test check.surface < 1e-4
     @test check.atmosphere < 1e-4
@@ -60,37 +60,36 @@ end
 
 @testset "BudgetCheck counts the cells a limiter held" begin
     # Far enough below the floor that one step cannot lift them back over it
-    cold = _budget_run(steps = 1, setup! = function (Ts, Ta, To, q, fields)
+    cold = _budget_run(steps=1, (setup!)=function (Ts, Ta, To, q, fields)
         Ts[60, 4] = min_T_K - 0.5f0
         fields.cap_surf[60, 4] = 1.0f12
     end)
     @test (cold.floor_Ts, cold.floor_Ta) == (1, 0)
     @test cold.surface < 1e-4          # the floor is part of the expected value
-    cold = _budget_run(steps = 1, setup! = (Ts, Ta, To, q, fields) -> (Ta[5, 6] = -5000.0f0))
+    cold = _budget_run(steps=1, (setup!)=(Ts, Ta, To, q, fields) -> (Ta[5, 6] = -5000.0f0))
     @test (cold.floor_Ts, cold.floor_Ta) == (0, 1)
 
-    wet = _budget_run(steps = 1,
-        setup! = (Ts, Ta, To, q, fields) -> (fields.q_flux_correction[7, 8, 1] = 0.5f0; fields.q_flux_correction[9, 10, 1] = -0.5f0))
+    wet = _budget_run(steps=1,
+        (setup!)=(Ts, Ta, To, q, fields) -> (fields.q_flux_correction[7, 8, 1]=0.5f0; fields.q_flux_correction[9, 10, 1]=-0.5f0))
     # The fixture's coldest row rains out more than it holds on its own
-    base = _budget_run(steps = 1)
+    base = _budget_run(steps=1)
     @test wet.humidity_high == base.humidity_high + 1
     @test wet.humidity_low == base.humidity_low + 1
     @test wet.water < 1e-8
 
-    limited = _budget_run(steps = 1, config = preset(:full_model; hydrology = Hydrology(rain = :rh)),
-        setup! = (Ts, Ta, To, q, fields) -> (fields.rain_limit .= -1.0f0))
+    limited = _budget_run(steps=1, config=preset(:full_model; hydrology=Hydrology(rain=:rh)),
+        (setup!)=(Ts, Ta, To, q, fields) -> (fields.rain_limit .= -1.0f0))
     @test limited.rain_limit == X * Y
 end
 
 @testset "RangeCheck: the first step outside the physical range is recorded" begin
-    step_view(step; Ts = 280, Ta = 270, To = 285, q = 0.005) =
-        (; phase = control, step, year = 1950, Ts = field(Ts), Ta = field(Ta), To = field(To), q = field(q))
+    step_view(step; Ts=280, Ta=270, To=285, q=0.005) = (; phase=control, step, year=1950, Ts=field(Ts), Ta=field(Ta), To=field(To), q=field(q))
 
     check = RangeCheck()
-    check(:after_tendencies, step_view(1; Ts = 1e24))     # only the state after the step is checked
+    check(:after_tendencies, step_view(1; Ts=1e24))     # only the state after the step is checked
     @test check.steps == 0 && in_range(check)
     check(:after_step, step_view(1))
-    check(:after_step, step_view(2; Ta = 265))
+    check(:after_step, step_view(2; Ta=265))
     @test check.steps == 2 && in_range(check)
     @test check.seen.Ta == (265.0f0, 270.0f0) && check.seen.Ts == (280.0f0, 280.0f0)
 
@@ -98,21 +97,21 @@ end
     runaway = step_view(3)
     runaway.Ts[5, 7] = 1.0f24
     check(:after_step, runaway)
-    check(:after_step, step_view(4; q = -1))
+    check(:after_step, step_view(4; q=-1))
     @test !in_range(check)
-    @test check.first == (phase = control, step = 3, year = 1950, field = :Ts, value = 1.0f24)
+    @test check.first == (phase=control, step=3, year=1950, field=:Ts, value=1.0f24)
     @test check.seen.q[1] == -1.0f0
 
     # A NaN is outside; limits can be set
     nan = RangeCheck()
-    nan(:after_step, step_view(1; To = NaN))
+    nan(:after_step, step_view(1; To=NaN))
     @test !in_range(nan) && nan.first.field === :To
-    narrow = RangeCheck(Ts = (285, 300))
+    narrow = RangeCheck(Ts=(285, 300))
     narrow(:after_step, step_view(1))
     @test narrow.first.field === :Ts && narrow.first.value == 280.0f0
 
     # In a run it sees every step of the control and the scenario
-    seen = RangeCheck(Ts = (-Inf, Inf), Ta = (-Inf, Inf), To = (-Inf, Inf), q = (-Inf, Inf))
-    run_synthetic(RunSpec(ctrl = 1, scnr = 1), preset(:full_model; corrections = NoCorrections()); observer = seen)
+    seen = RangeCheck(Ts=(-Inf, Inf), Ta=(-Inf, Inf), To=(-Inf, Inf), q=(-Inf, Inf))
+    run_synthetic(RunSpec(ctrl=1, scnr=1), preset(:full_model; corrections=NoCorrections()); observer=seen)
     @test seen.steps == 2N
 end

@@ -254,7 +254,7 @@ struct Scenario
 end
 
 function Scenario(; co2=ConstantCO2(340), co2_mask=UniformMask(), solar=ModernSolar(),
-    surface=NoSurfaceForcing(), control_co2=340, start_year=1950, output=:anomaly)
+        surface=NoSurfaceForcing(), control_co2=340, start_year=1950, output=:anomaly)
     _check_option(:output, output, (:anomaly, :absolute))
     return Scenario(co2, co2_mask, solar, surface, control_co2, start_year, output)
 end

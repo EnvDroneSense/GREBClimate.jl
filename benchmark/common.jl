@@ -130,7 +130,7 @@ function machine_footer(before::Float64, times::Vector{Float64}=Float64[])
     worst > NOISE_LIMIT && push!(reasons, "calibration $(round(worst, digits=2))x the best")
     if length(times) >= 3
         sorted = sort(times)
-        spread = sorted[(end + 1) ÷ 2] / sorted[1]
+        spread = sorted[(end+1)÷2] / sorted[1]
         println("median / minimum of the runs: ", round(spread, digits=2))
         spread > NOISE_LIMIT && push!(reasons, "runs spread $(round(spread, digits=2))x")
     end

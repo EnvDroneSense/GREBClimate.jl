@@ -27,7 +27,7 @@ end
     # the Bool flag, the boundary anomaly and its source, and everything else 3D.
     cf = ClimateFields()
     cf_2d = (:z_topo, :glacier, :z_ocean, :cap_surf, :wz_air, :wz_vapor,
-             :rain_limit, :co2_part)
+        :rain_limit, :co2_part)
     for f in fieldnames(ClimateFields)
         v = getfield(cf, f)
         if f === :loaded

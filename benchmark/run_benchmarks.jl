@@ -12,7 +12,7 @@
 
 using GREBClimate
 using GREBClimate: SWradiation!, LWradiation!, hydro!, convergence!, seaice!, deep_ocean!,
-    circulation!, tendencies!, output!, diagnostics!, init_model!
+                   circulation!, tendencies!, output!, diagnostics!, init_model!
 
 include("common.jl")
 
@@ -123,7 +123,7 @@ function time_stages(jld2_dir::AbstractString; cfg=preset(:full_model), reps::In
         ("SWradiation!", () -> SWradiation!(ws, Ts, fields, state, slice, p)),
         ("LWradiation!", () -> LWradiation!(ws, Ts, Ta, q, CO2, fields, slice, p)),
         ("hydro!", () -> hydro!(ws, Ts, q, fields, slice, p, r.hydrology)),
-        ("deep_ocean!", () -> deep_ocean!(ws, Ts, To, fields, slice, p)),
+        ("deep_ocean!", () -> deep_ocean!(ws, Ts, To, fields, slice, p))
     ]
 
     for (_, f) in stages

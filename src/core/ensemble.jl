@@ -36,7 +36,7 @@ parallel; the gain depends on the machine. Things to keep in mind:
 - If a member throws, the other members finish and the error is rethrown.
 """
 function run_ensemble(reduce, run::RunSpec, configs; fields::ClimateFields, jld2_dir::AbstractString="",
-                      ntasks::Integer=Threads.nthreads(), logger=NullLogger(), kwargs...)
+        ntasks::Integer=Threads.nthreads(), logger=NullLogger(), kwargs...)
     ntasks >= 1 || throw(ArgumentError("ntasks must be at least 1, got $ntasks"))
     haskey(kwargs, :fields) && throw(ArgumentError("fields is given once, for all members"))
     members = collect(configs)

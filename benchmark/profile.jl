@@ -72,7 +72,7 @@ end
 label(fr::Frame) = string(fr.func, " ", basename(fr.file), ":", fr.line)
 
 "Add `by` to the count of `key`."
-bump!(counts::AbstractDict, key, by::Int=1) = (counts[key] = get(counts, key, 0) + by; nothing)
+bump!(counts::AbstractDict, key, by::Int=1) = (counts[key]=get(counts, key, 0) + by; nothing)
 
 "The entries of `counts`, largest first; equal counts in the order of their keys, so a report is reproducible."
 ranked(counts::AbstractDict) = sort!(collect(counts); by=kv -> (-last(kv), first(kv)))
@@ -88,7 +88,7 @@ function split_samples(data::Vector{UInt64})
     start = 1
     for i in eachindex(data)
         if data[i] == 0 && i - start + 1 >= META_WORDS && data[i-1] == 0
-            push!(samples, (start:i-META_WORDS, i-META_WORDS+1:i))
+            push!(samples, (start:(i-META_WORDS), (i-META_WORDS+1):i))
             start = i + 1
         end
     end
@@ -338,9 +338,9 @@ function open_report(mode::AbstractString, description::AbstractString, out_dir)
     end
     mkpath(dir)
     header = header_line("mode", "$mode ($description)") *
-        header_line("commit", commit * (dirty ? " (tracked files modified)" : "")) *
-        header_line("date", Dates.format(Dates.now(), "yyyy-mm-dd HH:MM")) *
-        header_line("julia", VERSION)
+             header_line("commit", commit * (dirty ? " (tracked files modified)" : "")) *
+             header_line("date", Dates.format(Dates.now(), "yyyy-mm-dd HH:MM")) *
+             header_line("julia", VERSION)
     return dir, header
 end
 
@@ -396,7 +396,7 @@ function profile_cpu(jld2_dir::AbstractString, mode::Symbol; years::Int=CPU_MODE
     elapsed = 0.0
     runs = 0
     while runs < CPU_MODES[mode].max_runs &&
-            (runs == 0 || length(split_samples(Profile.fetch(include_meta=true))) < target)
+          (runs == 0 || length(split_samples(Profile.fetch(include_meta=true))) < target)
         elapsed += @elapsed quiet() do
             @profile greb_model!(RunSpec(ctrl=years, scnr=0), cfg; jld2_dir=jld2_dir, fields=fields)
         end
@@ -413,10 +413,10 @@ function profile_cpu(jld2_dir::AbstractString, mode::Symbol; years::Int=CPU_MODE
 
     dir, header = open_report(string(mode), WORKLOAD, out_dir)
     header *= header_line("threads", "$(Threads.nthreads()) (sampled: $(join(threads_seen, ", ")))") *
-        header_line("runs", "$runs of $years simulated year(s)") *
-        header_line("elapsed", "$(round(elapsed, digits=2)) s ($(round(ms_per_run, digits=1)) ms per run)") *
-        header_line("samples", n) *
-        header_line("interval", "$(round(1000 * elapsed / n, digits=2)) ms per sample")
+              header_line("runs", "$runs of $years simulated year(s)") *
+              header_line("elapsed", "$(round(elapsed, digits=2)) s ($(round(ms_per_run, digits=1)) ms per run)") *
+              header_line("samples", n) *
+              header_line("interval", "$(round(1000 * elapsed / n, digits=2)) ms per sample")
 
     frames_at = Dict(ip => Frame.(frames) for (ip, frames) in lidict)
     trimmed = trim_to_package(data, samples, frames_at)
@@ -495,8 +495,8 @@ function profile_allocs(jld2_dir::AbstractString; years::Int=1, out_dir=nothing)
 
     dir, header = open_report("allocs", WORKLOAD, out_dir)
     header *= header_line("runs", "1 of $years simulated year(s)") *
-        header_line("allocations", amount(total)) *
-        header_line("in loop", amount(in_loop) * " (with `time_loop!` on the stack)")
+              header_line("allocations", amount(total)) *
+              header_line("in loop", amount(in_loop) * " (with `time_loop!` on the stack)")
 
     open(joinpath(dir, "allocs.txt"), "w") do io
         println(io, "Every allocation of one run, charged to the innermost package frame of its stack.")

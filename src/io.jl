@@ -8,17 +8,17 @@ const _JLD2_LOCK = ReentrantLock()
 const _STATIC_FILES = (z_topo="global.topography", glacier="greb.glaciers")
 const _CLIMATOLOGY_FILES = (
     ncep=(Ts_clim="ncep.tsurf.1948-2007.clim", u_clim="ncep.zonal_wind.850hpa.clim",
-          v_clim="ncep.meridional_wind.850hpa.clim", q_clim="ncep.atmospheric_humidity.clim",
-          soil_wetness_clim="ncep.soil_moisture.clim"),
+        v_clim="ncep.meridional_wind.850hpa.clim", q_clim="ncep.atmospheric_humidity.clim",
+        soil_wetness_clim="ncep.soil_moisture.clim"),
     # ERA-Interim has no soil moisture file; it uses the NCEP one
     era=(Ts_clim="erainterim.tsurf.1979-2015.clim", u_clim="erainterim.zonal_wind.850hpa.clim",
-         v_clim="erainterim.meridional_wind.850hpa.clim", q_clim="erainterim.atmospheric_humidity.clim",
-         soil_wetness_clim="ncep.soil_moisture.clim"),
+        v_clim="erainterim.meridional_wind.850hpa.clim", q_clim="erainterim.atmospheric_humidity.clim",
+        soil_wetness_clim="ncep.soil_moisture.clim")
 )
 const _COMMON_CLIMATOLOGY_FILES = (
     cloud_clim="isccp.cloud_cover.clim", mld_clim="woce.ocean_mixed_layer_depth.clim",
     To_clim="Tocean.clim", omega_clim="erainterim.omega.vertmean.clim",
-    omega_std_clim="erainterim.omega_std.vertmean.clim", wind_speed_clim="erainterim.windspeed.850hpa.clim",
+    omega_std_clim="erainterim.omega_std.vertmean.clim", wind_speed_clim="erainterim.windspeed.850hpa.clim"
 )
 const _SOLAR_FILE = "solar_radiation.clim"
 # The sources of a boundary anomaly, and the file of each anomaly by the
@@ -30,11 +30,11 @@ function _boundary_anomaly_files(source::Symbol)
     file(variable) = source === :cmip5_rcp85 ? "cmip5.$variable.rcp85.ensmean.forcing" :
                      "erainterim.$variable.$source.forcing"
     return (Ts_clim=file("tsurf"), u_clim=file("zonal.wind"), v_clim=file("meridional.wind"),
-            omega_clim=file("omega"), wind_speed_clim=file("windspeed"))
+        omega_clim=file("omega"), wind_speed_clim=file("windspeed"))
 end
 # The combined file `climatology/flux_corrections.jld2`: its keys, by the array each fills
 const _FLUX_CORRECTION_KEYS = (Ts_flux_correction="Tsurf_flux_correction", q_flux_correction="vapour_flux_correction",
-                               To_flux_correction="Tocean_flux_correction")
+    To_flux_correction="Tocean_flux_correction")
 # Files that hold several tables each and are read by their own loaders
 const _COMBINED_FILES = ("flux_corrections", "ipcc_scenarios", "solar_paleo", "solar_eccentricity", "solar_obliquity")
 
@@ -49,7 +49,7 @@ function dataset_field_files()
     names = Set{String}(values(_STATIC_FILES))
     push!(names, _SOLAR_FILE)
     for files in (values(_CLIMATOLOGY_FILES)..., _COMMON_CLIMATOLOGY_FILES,
-                  (_boundary_anomaly_files(source) for source in _BOUNDARY_ANOMALY_SOURCES)...)
+        (_boundary_anomaly_files(source) for source in _BOUNDARY_ANOMALY_SOURCES)...)
         union!(names, values(files))
     end
     return names
@@ -81,7 +81,7 @@ function read_field(filepath::AbstractString)
             data=file["data"],
             dim_names=file["dim_names"],
             coords=haskey(file, "coords") ? file["coords"] : nothing,
-            ctl=haskey(file, "ctl") ? file["ctl"] : nothing,
+            ctl=haskey(file, "ctl") ? file["ctl"] : nothing
         )
     end
 end

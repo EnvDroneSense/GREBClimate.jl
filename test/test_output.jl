@@ -38,14 +38,14 @@
     @test scenario_anomalies(scnr, times, MonthlyRecord[]) == scnr
 
     # The control month comes from the record's time, not from its position
-    july = scenario_anomalies(scnr[1:1], [(year = 1950, month = 7)], ctrl_clim)
+    july = scenario_anomalies(scnr[1:1], [(year=1950, month=7)], ctrl_clim)
     @test all(==(1.0 - 107.0), july[1].Ts)
 end
 
 @testset "ice_climatology" begin
     # Same record-index-encodes-value trick as the climatology test
     # above: final-year-only.
-    ice_record(v) = uniform_record(0; ice = v)
+    ice_record(v) = uniform_record(0; ice=v)
 
     @test all(iszero, ice_climatology(MonthlyRecord[]))
 
@@ -80,8 +80,8 @@ end
     ws = ModelWorkspace()
     acc = MonthlyAccumulator()
     surf = SurfaceState(field(280), field(270), field(285), field(0.005))
-    tend = (albedo = field(0.3), SW = field(100), ice_cover = field(0.1), LW_surf = field(-50),
-        Q_lat = field(-20), Q_sens = field(-5), LW_up = field(-200), LW_down = field(-210), em = field(0.75))
+    tend = (albedo=field(0.3), SW=field(100), ice_cover=field(0.1), LW_surf=field(-50),
+        Q_lat=field(-20), Q_sens=field(-5), LW_up=field(-200), LW_down=field(-210), em=field(0.75))
     ws.precip .= 2.0
     ws.evap .= 1.0
     ws.qcrcl .= 0.5
@@ -93,7 +93,7 @@ end
     end
 
     @test length(output_buf) == 1
-    @test times == [(year = 1950, month = 1)]
+    @test times == [(year=1950, month=1)]
     @test all(==(280.0), output_buf[1].Ts)
     @test all(==(2.0), output_buf[1].precip)
     # Out to space: what the air emits upward plus the part of the surface's
@@ -112,7 +112,7 @@ end
 end
 
 # All ocean, with wind and rising air
-_time_loop_fields() = constant_fields(z_topo = -1.0, swet = 0.5, u = 2.0, v = 1.0, omega = 0.001, omega_std = 0.01, wind_speed = 4.0)
+_time_loop_fields() = constant_fields(z_topo=-1.0, swet=0.5, u=2.0, v=1.0, omega=0.001, omega_std=0.01, wind_speed=4.0)
 
 @testset "time_loop! integrates one timestep and clamps at min_T_K" begin
     fields = _time_loop_fields()
@@ -120,7 +120,7 @@ _time_loop_fields() = constant_fields(z_topo = -1.0, swet = 0.5, u = 2.0, v = 1.
     ini = init_model!(fields, cfg)
     # A heat capacity so large that one step cannot lift Ts back over the floor
     fields.cap_surf .= 1.0f12
-    s = (; initial_state(ini)..., Ts = fill(min_T_K - 0.5, X, Y))
+    s = (; initial_state(ini)..., Ts=fill(min_T_K - 0.5, X, Y))
     out = step!(control_time(), ini.CO2_ctrl, s, fields, cfg)
 
     @test all(isfinite, s.Ts)
@@ -139,9 +139,8 @@ end
     s = initial_state(ini)
     ws = ModelWorkspace()
     seen = Ref{Any}(nothing)
-    step!(control_time(), ini.CO2_ctrl, s, fields, cfg; ws, observer = (point, view) ->
-        point === :after_step && (seen[] = (dq_eva = copy(view.tend.dq_eva), dq_rain = copy(view.tend.dq_rain),
-                                            dq_crcl = copy(view.tend.dq_crcl))))
+    step!(control_time(), ini.CO2_ctrl, s, fields, cfg; ws, observer=(point, view) -> point === :after_step && (seen[] = (dq_eva=copy(view.tend.dq_eva), dq_rain=copy(view.tend.dq_rain),
+        dq_crcl=copy(view.tend.dq_crcl))))
     tend = seen[]
     @test ws.qcrcl == tend.dq_crcl
     @test ws.evap == tend.dq_eva .* fields.wz_vapor .* q_to_mm_per_day
@@ -171,7 +170,9 @@ end
     field = repeat(w', X, 1)
     @test global_mean(field) ≈ sum(abs2, w) / sum(w) rtol = 1e-6
     # The poles count less than in a plain mean
-    polar = zeros(Float32, X, Y); polar[:, 1] .= 1; polar[:, Y] .= 1
+    polar = zeros(Float32, X, Y)
+    polar[:, 1] .= 1
+    polar[:, Y] .= 1
     @test global_mean(polar) < sum(polar) / length(polar) / 10
     @test_throws DimensionMismatch global_mean(zeros(Y, X))
     # The sample cells of the annual line are where their labels say

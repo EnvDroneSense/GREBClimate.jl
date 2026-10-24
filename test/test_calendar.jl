@@ -27,7 +27,7 @@
     @testset "ends of day, month and year" begin
         @test !is_day_end(1) && is_day_end(2)
         @test !is_month_end(61) && is_month_end(62) && !is_month_end(63)
-        ends = filter(is_month_end, 1:(3 * nstep_yr))
+        ends = filter(is_month_end, 1:(3*nstep_yr))
         @test length(ends) == 36
         @test month_of_step.(ends) == repeat(1:12, 3)
         @test is_year_end(730) && !is_year_end(729) && is_year_end(1460)
@@ -57,15 +57,15 @@ end
         @test (step_of_year(t), day_of_year(t), month(t), year(t)) == (270, 135, 5, 1951)
         @test data_slice(t) == step_of_year(t)
         @test decimal_year(t) == 1951 + 269 / 730
-        @test all(s -> month(ModelTime(control, 1970, s)) == month_of_step(s), 1:(2 * nstep_yr))
-        @test all(s -> is_month_end(ModelTime(control, 1970, s)) == is_month_end(s), 1:(2 * nstep_yr))
+        @test all(s -> month(ModelTime(control, 1970, s)) == month_of_step(s), 1:(2*nstep_yr))
+        @test all(s -> is_month_end(ModelTime(control, 1970, s)) == is_month_end(s), 1:(2*nstep_yr))
         @test is_year_end(ModelTime(control, 1970, 730)) && !is_year_end(ModelTime(control, 1970, 731))
     end
 
     @testset "years at and below zero" begin
         for start in (1970, 1, 0, -231_000)
             counter = start
-            for s in 1:(3 * nstep_yr)
+            for s in 1:(3*nstep_yr)
                 @test year(ModelTime(scenario, start, s)) == counter
                 is_year_end(s) && (counter += 1)
             end
@@ -81,7 +81,9 @@ end
         @test last(all_steps) === ModelTime(scenario, 1950, 2 * nstep_yr)
         @test year(last(all_steps)) == 1951
         # Walking a phase allocates nothing per step
-        walk(p) = (n = 0; for t in p; n += year(t); end; n)
+        walk(p) = (n=0; for t in p
+                n += year(t)
+            end; n)
         walk(steps(scenario, 1950, 1))
         @test @allocated(walk(steps(scenario, 1950, 100))) == @allocated(walk(steps(scenario, 1950, 1)))
     end

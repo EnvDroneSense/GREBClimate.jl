@@ -44,9 +44,9 @@ struct Processes
 end
 
 function Processes(; atmosphere=true, clouds=:observed, humidity=:observed, hydrology=:full,
-    ocean=:full, topography=:observed, co2=true, ice_albedo=true, transport=true,
-    heat_diffusion=true, heat_advection=true, vapor_diffusion=true, vapor_advection=true,
-    moisture_convergence=true)
+        ocean=:full, topography=:observed, co2=true, ice_albedo=true, transport=true,
+        heat_diffusion=true, heat_advection=true, vapor_diffusion=true, vapor_advection=true,
+        moisture_convergence=true)
     return Processes(atmosphere,
         _check_option(:clouds, clouds, (:observed, :none, :uniform)),
         _check_option(:humidity, humidity, (:observed, :uniform)),

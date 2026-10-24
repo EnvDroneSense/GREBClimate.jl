@@ -35,7 +35,7 @@ function balance(files, n)
     cost = Dict(row[1] => row[4] for row in SHARD)
     groups = [String[] for _ in 1:n]
     load = zeros(n)
-    for f in sort(files; by = f -> -cost[f])
+    for f in sort(files; by=f -> -cost[f])
         i = argmin(load)
         push!(groups[i], f)
         load[i] += cost[f]
@@ -46,7 +46,7 @@ end
 function launch(files, log)
     code = "using Pkg; Pkg.test(test_args = $(repr(files)))"
     cmd = `$(Base.julia_cmd()) --project=$ROOT -e $code`
-    return run(pipeline(ignorestatus(cmd); stdout = log, stderr = log); wait = false)
+    return run(pipeline(ignorestatus(cmd); stdout=log, stderr=log); wait=false)
 end
 
 function summary_line(log)
@@ -57,7 +57,7 @@ end
 
 function main(args)
     jobs, tier, shard = parse_options(args)
-    selected = select_tests(; tier = tier == "full" ? "" : tier, shard = shard)
+    selected = select_tests(; tier=tier == "full" ? "" : tier, shard=shard)
     parallel = filter(!in(SERIAL), selected)
     serial = filter(in(SERIAL), selected)
     groups, cost = balance(parallel, min(jobs, length(parallel)))
@@ -65,11 +65,11 @@ function main(args)
         push!(groups, [s])
     end
 
-    logdir = mktempdir(; cleanup = false)
+    logdir = mktempdir(; cleanup=false)
     failed = String[]
     started = time()
     println("running ", length(selected), " files in ", length(groups) - length(serial),
-            " parallel groups", isempty(serial) ? "" : " then threading alone", "; logs in ", logdir)
+        " parallel groups", isempty(serial) ? "" : " then threading alone", "; logs in ", logdir)
 
     results = NamedTuple[]
     function finish(i, group, proc, t0)
@@ -77,8 +77,8 @@ function main(args)
         log = joinpath(logdir, "group$i.log")
         ok = success(proc)
         ok || push!(failed, log)
-        push!(results, (group = i, files = join(replace.(group, r"^test_|\.jl$" => ""), " "),
-                        seconds = round(time() - t0; digits = 1), ok = ok, summary = summary_line(log)))
+        push!(results, (group=i, files=join(replace.(group, r"^test_|\.jl$" => ""), " "),
+            seconds=round(time() - t0; digits=1), ok=ok, summary=summary_line(log)))
     end
 
     n_par = length(groups) - length(serial)
@@ -87,16 +87,16 @@ function main(args)
     @sync for p in procs
         @async finish(p...)
     end
-    for (k, g) in enumerate(groups[n_par+1:end])
+    for (k, g) in enumerate(groups[(n_par+1):end])
         i = n_par + k
         finish(i, g, launch(g, joinpath(logdir, "group$i.log")), time())
     end
 
-    for r in sort(results; by = r -> r.group)
+    for r in sort(results; by=r -> r.group)
         println("group ", r.group, "  ", r.ok ? "ok    " : "FAILED", "  ", lpad(r.seconds, 6), " s  ",
-                r.files, "\n          ", r.summary)
+            r.files, "\n          ", r.summary)
     end
-    println("wall ", round(time() - started; digits = 1), " s; this proves only the files listed above")
+    println("wall ", round(time() - started; digits=1), " s; this proves only the files listed above")
     for log in failed
         println("\n--- tail of ", log)
         foreach(println, last(readlines(log), 40))

@@ -17,6 +17,7 @@ function SWradiation!(ws::ModelWorkspace, Ts, fields::ClimateFields, state::Mode
 
     # 1. Ice cover fraction
     @turbo for i in 1:xdim, j in 1:ydim
+
         T = Ts[i, j]
         land_ice = @ice_ramp(T, Tl_ice1, Tl_ice2, inv_Tl_ice_range)
         ocean_ice = @ice_ramp(T, To_ice1, To_ice2, inv_To_ice_range)
@@ -26,6 +27,7 @@ function SWradiation!(ws::ModelWorkspace, Ts, fields::ClimateFields, state::Mode
     # 2. Surface albedo: ice-free albedo plus the ice increment times the ice fraction
     if p.ice_albedo
         @turbo for i in 1:xdim, j in 1:ydim
+
             a_surf[i, j] = a_no_ice + da_ice * ice_cover[i, j]
             # Glacier override: if glacier mask > 0.5, set to ice albedo
             a_surf[i, j] = ifelse(glacier[i, j] > 0.5f0, a_no_ice + da_ice, a_surf[i, j])

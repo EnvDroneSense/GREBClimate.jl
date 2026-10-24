@@ -10,7 +10,7 @@ function monthly_climatology(records::Vector{MonthlyRecord})::Vector{MonthlyReco
 end
 
 # The last twelve records, or all of them if there are fewer
-_final_year(records) = records[max(1, end - months_per_year + 1):end]
+_final_year(records) = records[max(1, end-months_per_year+1):end]
 
 """
     scenario_anomalies(scnr_records, scnr_times, ctrl_clim)::Vector{MonthlyRecord}
@@ -21,7 +21,7 @@ turning absolute monthly output into anomalies relative to the control run.
 `scnr_times` holds the [`RecordTime`](@ref) of each record.
 """
 function scenario_anomalies(scnr_records::Vector{MonthlyRecord}, scnr_times::Vector{RecordTime},
-    ctrl_clim::Vector{MonthlyRecord})::Vector{MonthlyRecord}
+        ctrl_clim::Vector{MonthlyRecord})::Vector{MonthlyRecord}
     (isempty(scnr_records) || isempty(ctrl_clim)) && return scnr_records
     return [map((x, x_ref) -> x .- x_ref, rec, ctrl_clim[time.month])
             for (rec, time) in zip(scnr_records, scnr_times)]

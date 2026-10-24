@@ -11,7 +11,7 @@ const _OVERRIDES = (
     (c -> c.corrections isa NoCorrections, :To_flux_correction, a -> fill!(a, 0.0f0)),
     (c -> c.processes.hydrology === :none, :q_clim, a -> fill!(a, 0.0f0)),
     (c -> c.processes.humidity === :uniform, :q_clim, a -> fill!(a, 0.0052f0)),      # constant water vapor
-    (c -> c.processes.ocean === :mixed_layer, :mld_clim, a -> fill!(a, d_ocean)),    # no deep ocean
+    (c -> c.processes.ocean === :mixed_layer, :mld_clim, a -> fill!(a, d_ocean))    # no deep ocean
 )
 
 """
@@ -97,7 +97,7 @@ control climate match observed climatology. Mutates `Ts`/`Ta`/`To`/`q` in
 place as it integrates. `ws_a`/`ws_q` are forwarded to [`tendencies!`](@ref).
 """
 function qflux_correction!(CO2_ctrl, Ts, Ta, To, q, fields::ClimateFields, state::ModelState, r::ResolvedConfig, ws::ModelWorkspace, years;
-    ws_a::ModelWorkspace=ws, ws_q::ModelWorkspace=ws)
+        ws_a::ModelWorkspace=ws, ws_q::ModelWorkspace=ws)
     cap_surf = fields.cap_surf
     for t in steps(spinup, _control_start_year, years)
         slice = data_slice(t)
@@ -112,11 +112,24 @@ function qflux_correction!(CO2_ctrl, Ts, Ta, To, q, fields::ClimateFields, state
         qFc = clim_slice(fields.q_flux_correction, slice)
 
         # Surface/air temperature, deep ocean, and humidity update.
-        Ts0_buf = ws.Ts0; Ta0_buf = ws.Ta0; To0_buf = ws.To0; q0_buf = ws.q0
-        dT_ocean = tend.dT_ocean; SW = tend.SW; LW_surf = tend.LW_surf; LW_down = tend.LW_down
-        Q_lat = tend.Q_lat; Q_sens = tend.Q_sens; dTa_crcl = tend.dTa_crcl
-        LW_up = tend.LW_up; em = tend.em; Q_lat_air = tend.Q_lat_air
-        dTo = tend.dTo; dq_crcl = tend.dq_crcl; dq_eva = tend.dq_eva; dq_rain = tend.dq_rain
+        Ts0_buf = ws.Ts0
+        Ta0_buf = ws.Ta0
+        To0_buf = ws.To0
+        q0_buf = ws.q0
+        dT_ocean = tend.dT_ocean
+        SW = tend.SW
+        LW_surf = tend.LW_surf
+        LW_down = tend.LW_down
+        Q_lat = tend.Q_lat
+        Q_sens = tend.Q_sens
+        dTa_crcl = tend.dTa_crcl
+        LW_up = tend.LW_up
+        em = tend.em
+        Q_lat_air = tend.Q_lat_air
+        dTo = tend.dTo
+        dq_crcl = tend.dq_crcl
+        dq_eva = tend.dq_eva
+        dq_rain = tend.dq_rain
 
         @turbo for j in 1:ydim
             for i in 1:xdim
@@ -177,8 +190,8 @@ end
 # The control run: `years` years from a copy of `surf_ini`. Returns the monthly records and
 # their times
 function _control_run!(r::ResolvedConfig, fields::ClimateFields, surf_ini::SurfaceState, CO2_ctrl, years,
-    state::ModelState, ws::ModelWorkspace, acc::MonthlyAccumulator;
-    ws_a::ModelWorkspace, ws_q::ModelWorkspace, observer)
+        state::ModelState, ws::ModelWorkspace, acc::MonthlyAccumulator;
+        ws_a::ModelWorkspace, ws_q::ModelWorkspace, observer)
     reset!(acc)   # drop what the spin-up accumulated
     @info "Control run: CO2 = $CO2_ctrl ppm, $years yr"
 
@@ -198,8 +211,8 @@ end
 # The scenario run: `years` years from a copy of `surf_ini`, after the control run `ctrl_output`
 # has set the ice cover the surface masks need. Returns the monthly records and their times
 function _scenario_run!(r::ResolvedConfig, fields::ClimateFields, surf_ini::SurfaceState, CO2_ctrl, years,
-    ctrl_output, state::ModelState, ws::ModelWorkspace, acc::MonthlyAccumulator;
-    ws_a::ModelWorkspace, ws_q::ModelWorkspace, observer)
+        ctrl_output, state::ModelState, ws::ModelWorkspace, acc::MonthlyAccumulator;
+        ws_a::ModelWorkspace, ws_q::ModelWorkspace, observer)
     s = r.config.scenario
 
     # Regional CO2 masks belong to the scenario: the spin-up and the control
@@ -277,12 +290,11 @@ and `step_of_year`; `CO2`, the state `Ts`, `Ta`, `To`, `q`, the flows `tend` (wh
 own arrays: read or copy them, do not write to them. The spin-up does not
 call the observer. `GREBClimate.BudgetCheck` is one.
 """
-greb_model!(run::RunSpec, config::Config; jld2_dir::AbstractString="", kwargs...) =
-    greb_model!(run, resolve(config; jld2_dir); jld2_dir, kwargs...)
+greb_model!(run::RunSpec, config::Config; jld2_dir::AbstractString="", kwargs...) = greb_model!(run, resolve(config; jld2_dir); jld2_dir, kwargs...)
 
 function greb_model!(run::RunSpec, r::ResolvedConfig;
-    jld2_dir::AbstractString="", fields::ClimateFields=ClimateFields(),
-    allow_uninitialized::Bool=false, observer=nothing)
+        jld2_dir::AbstractString="", fields::ClimateFields=ClimateFields(),
+        allow_uninitialized::Bool=false, observer=nothing)
     if !fields.loaded && !allow_uninitialized
         error("""
               greb_model! was given an uninitialized ClimateFields (all-zero climatology).

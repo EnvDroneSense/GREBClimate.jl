@@ -40,7 +40,7 @@ function capture_preset(p::Symbol)
     co2_table = _table_name(s.co2)
     # stand-in for the table the run loads
     table = co2_table === :none ? Dict{Int,Float32}() :
-            Dict(y => 280.0f0 + 0.5f0 * (y - 1850) for y in s.start_year:(s.start_year + NYEARS))
+            Dict(y => 280.0f0 + 0.5f0 * (y - 1850) for y in s.start_year:(s.start_year+NYEARS))
     r = ResolvedConfig(config, resolve(config.hydrology), table, nothing)
     fields = synthetic_fields()
     ini = quiet() do
@@ -54,16 +54,17 @@ function capture_preset(p::Symbol)
     GREBClimate.apply_surface_mask!(fields, s.co2_mask, ice)
 
     co2, solar = Float32[], Float32[]
-    for y in 0:(NYEARS - 1), step in SAMPLE_STEPS
+    for y in 0:(NYEARS-1), step in SAMPLE_STEPS
+
         f = forcing(scenario_time(s.start_year, y * N + step), r)
         push!(co2, f.CO2)
         push!(solar, f.sw_solar_forcing)
     end
-    return (co2_ctrl = ini.CO2_ctrl, start_year = s.start_year, output = s.output,
-            co2_table = co2_table, solar_table = _solar_name(s.solar),
-            solar_row = s.solar isa SolarTable ? s.solar.index : nothing, boundary = _boundary_name(s.surface),
-            processes = _parts(config.processes), hydrology = _parts(config.hydrology),
-            corrections = repr(config.corrections),
-            static_mask = rle(vec(static_mask)), dynamic_mask = rle(vec(fields.co2_part)),
-            co2 = rle(co2), solar = rle(solar))
+    return (co2_ctrl=ini.CO2_ctrl, start_year=s.start_year, output=s.output,
+        co2_table=co2_table, solar_table=_solar_name(s.solar),
+        solar_row=s.solar isa SolarTable ? s.solar.index : nothing, boundary=_boundary_name(s.surface),
+        processes=_parts(config.processes), hydrology=_parts(config.hydrology),
+        corrections=repr(config.corrections),
+        static_mask=rle(vec(static_mask)), dynamic_mask=rle(vec(fields.co2_part)),
+        co2=rle(co2), solar=rle(solar))
 end

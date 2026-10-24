@@ -69,10 +69,10 @@ end
     with_logger(NullLogger()) do
         # A control and a scenario year, so the scenario phase is compiled too
         greb_model!(RunSpec(ctrl=1, scnr=1), preset(:co2_double; corrections=NoCorrections());
-                    jld2_dir="", allow_uninitialized=true)
+            jld2_dir="", allow_uninitialized=true)
         greb_model!(RunSpec(scnr=0), preset(:full_model; hydrology=(evaporation=:skin,),
-                                             corrections=NoCorrections());
-                    jld2_dir="", allow_uninitialized=true)
+                corrections=NoCorrections());
+            jld2_dir="", allow_uninitialized=true)
     end
 end
 

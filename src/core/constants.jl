@@ -68,10 +68,10 @@ const c_effmix = 0.5f0                       # mixing efficiency
 const turb_coeff = Δt * co_turb / cap_ocean  # precomputed mixing coefficient
 
 # ── Atmospheric transport ───────────────────────────────────────
-const κ = 8f5                          # diffusion coefficient [m²/s]
+const κ = 8.0f5                          # diffusion coefficient [m²/s]
 
 # ── Latent heat / hydrology ─────────────────────────────────────
-const ce = 2f-3                        # latent heat transfer coefficient
+const ce = 2.0f-3                        # latent heat transfer coefficient
 const cq_latent = 2.257f6              # latent heat of evaporation [J/kg]
 const cq_rain = -0.1f0 / 24.0f0 / 3600.0f0   # rain-related vapor decrease [1/s]
 
@@ -89,7 +89,7 @@ const solar_percent = 100.0f0        # default 100%
 
 # ── Emissivity parameters (LWradiation!) ──────────────────────────
 const emissivity_fit = Float32[9.0721, 106.7252, 61.5562, 0.0179, 0.0028,
-                      0.0570, 0.3462, 2.3406, 0.7032, 1.0662]
+    0.0570, 0.3462, 2.3406, 0.7032, 1.0662]
 
 # ── Transport geometry [m, degrees] ───────────────────────────────
 const deg_grid = 2.0f0 * pi_f32 * 6.371f6 / 360.0f0

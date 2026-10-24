@@ -65,10 +65,11 @@ function hydro!(ws::ModelWorkspace, Ts, q, fields::ClimateFields, slice::Int, p:
         @turbo for j in 1:ydim
             for i in 1:xdim
                 T = Ts[i, j] - 273.15f0
-                qs = max(_qsat_scale * exp(_qsat_a * T / (T + _qsat_b)) * wz_air[i, j], 1f-8)
+                qs = max(_qsat_scale * exp(_qsat_a * T / (T + _qsat_b)) * wz_air[i, j], 1.0f-8)
                 rq = q[i, j] / qs
 
-                u_val = u[i, j]; v_val = v[i, j]
+                u_val = u[i, j]
+                v_val = v[i, j]
                 wind = sqrt(u_val*u_val + v_val*v_val)
                 wind = sqrt(wind*wind + ifelse(@is_land(z_topo[i, j]), _hydro_gust_land, _hydro_gust_ocean))
                 qlat = (q[i, j] - qs) * wind * _hydro_latent_factor * swet[i, j]
@@ -88,7 +89,7 @@ function hydro!(ws::ModelWorkspace, Ts, q, fields::ClimateFields, slice::Int, p:
         @turbo for j in 1:ydim
             for i in 1:xdim
                 T0 = Ts[i, j] - 273.15f0
-                qs0 = max(_qsat_scale * exp(_qsat_a * T0 / (T0 + _qsat_b)) * wz_air[i, j], 1f-8)
+                qs0 = max(_qsat_scale * exp(_qsat_a * T0 / (T0 + _qsat_b)) * wz_air[i, j], 1.0f-8)
                 rq = q[i, j] / qs0
 
                 Tskin = ifelse(@is_land(z_topo[i, j]), Ts[i, j] + 5.0f0, Ts[i, j] + 1.0f0)
@@ -117,10 +118,11 @@ function hydro!(ws::ModelWorkspace, Ts, q, fields::ClimateFields, slice::Int, p:
         @turbo for j in 1:ydim
             for i in 1:xdim
                 T = Ts[i, j] - 273.15f0
-                qs = max(_qsat_scale * exp(_qsat_a * T / (T + _qsat_b)) * wz_air[i, j], 1f-8)
+                qs = max(_qsat_scale * exp(_qsat_a * T / (T + _qsat_b)) * wz_air[i, j], 1.0f-8)
                 rq = q[i, j] / qs
 
-                u_val = u[i, j]; v_val = v[i, j]
+                u_val = u[i, j]
+                v_val = v[i, j]
                 wind = sqrt(u_val*u_val + v_val*v_val)
                 wind = sqrt(wind*wind + ifelse(@is_land(z_topo[i, j]), _orig_gust_land, _orig_gust_ocean))
                 coeff = ifelse(@is_land(z_topo[i, j]), _orig_coeff_land, _orig_coeff_ocean)
@@ -141,7 +143,7 @@ function hydro!(ws::ModelWorkspace, Ts, q, fields::ClimateFields, slice::Int, p:
         @turbo for j in 1:ydim
             for i in 1:xdim
                 T = Ts[i, j] - 273.15f0
-                qs = max(_qsat_scale * exp(_qsat_a * T / (T + _qsat_b)) * wz_air[i, j], 1f-8)
+                qs = max(_qsat_scale * exp(_qsat_a * T / (T + _qsat_b)) * wz_air[i, j], 1.0f-8)
                 rq = q[i, j] / qs
 
                 wind = wind_speed[i, j]

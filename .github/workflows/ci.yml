@@ -10,6 +10,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - name: Check formatting
+        run: |
+          import Pkg; Pkg.add(name="JuliaFormatter", version="2")
+          using JuliaFormatter
+          ok = all(format(d; overwrite=false) for d in ("src", "test", "benchmark"))
+          ok || error("Not formatted: run JuliaFormatter.format on src, test and benchmark")
+        shell: julia --color=yes {0}
+
   test:
     runs-on: ${{ matrix.os }}
     strategy:

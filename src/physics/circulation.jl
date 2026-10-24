@@ -4,6 +4,7 @@
 "Refresh the wrap-around ghost rows of a `(xghost, ydim)` buffer."
 @inline function refresh_ghosts!(P::AbstractMatrix{Float32})
     @inbounds for k in axes(P, 2), h in 1:nghost
+
         P[h, k] = P[xdim+h, k]              # west ghosts <- east edge
         P[xdim+nghost+h, k] = P[nghost+h, k]    # east ghosts <- west edge
     end
@@ -138,12 +139,20 @@ function _diffusion!(ws::ModelWorkspace, Tp::Matrix{Float32}, wzp::Matrix{Float3
             cc = ccx[k] * 0.05f0
             @turbo for j in 1:xdim
                 # Ghost offsets: j-3 -> j, j-2 -> j+1, j-1 -> j+2, j -> j+3, ...
-                wm3 = wzp[j, k];   wm2 = wzp[j+1, k]; wm1 = wzp[j+2, k]
+                wm3 = wzp[j, k]
+                wm2 = wzp[j+1, k]
+                wm1 = wzp[j+2, k]
                 w0 = wzp[j+3, k]
-                wp1 = wzp[j+4, k]; wp2 = wzp[j+5, k]; wp3 = wzp[j+6, k]
-                tm3 = Tp[j, k];    tm2 = Tp[j+1, k];  tm1 = Tp[j+2, k]
+                wp1 = wzp[j+4, k]
+                wp2 = wzp[j+5, k]
+                wp3 = wzp[j+6, k]
+                tm3 = Tp[j, k]
+                tm2 = Tp[j+1, k]
+                tm1 = Tp[j+2, k]
                 t0 = Tp[j+3, k]
-                tp1 = Tp[j+4, k];  tp2 = Tp[j+5, k];  tp3 = Tp[j+6, k]
+                tp1 = Tp[j+4, k]
+                tp2 = Tp[j+5, k]
+                tp3 = Tp[j+6, k]
 
                 dTx = cc * (
                     10.0f0 * (wm1 * (tm1 - t0) + wp1 * (tp1 - t0)) +
@@ -167,11 +176,19 @@ function _diffusion!(ws::ModelWorkspace, Tp::Matrix{Float32}, wzp::Matrix{Float3
             for _ in 1:time2
                 # Jacobi
                 @turbo for j in 1:xdim
-                    wm3 = wzp[j, k];   wm2 = wzp[j+1, k]; wm1 = wzp[j+2, k]
-                    wp1 = wzp[j+4, k]; wp2 = wzp[j+5, k]; wp3 = wzp[j+6, k]
-                    tm3 = T1h[j];      tm2 = T1h[j+1];    tm1 = T1h[j+2]
+                    wm3 = wzp[j, k]
+                    wm2 = wzp[j+1, k]
+                    wm1 = wzp[j+2, k]
+                    wp1 = wzp[j+4, k]
+                    wp2 = wzp[j+5, k]
+                    wp3 = wzp[j+6, k]
+                    tm3 = T1h[j]
+                    tm2 = T1h[j+1]
+                    tm1 = T1h[j+2]
                     t0 = T1h[j+3]
-                    tp1 = T1h[j+4];    tp2 = T1h[j+5];    tp3 = T1h[j+6]
+                    tp1 = T1h[j+4]
+                    tp2 = T1h[j+5]
+                    tp3 = T1h[j+6]
 
                     dTxh[j] = cc2 * (
                         10.0f0 * (wm1 * (tm1 - t0) + wp1 * (tp1 - t0)) +
@@ -253,7 +270,7 @@ function _advection!(ws::ModelWorkspace, Tp::Matrix{Float32}, wzp::Matrix{Float3
                 dX_adv[j, k] = ccy * (
                     -v_pos * wzp[j+nghost, 1] * (Tp[j+nghost, 2] - Tp[j+nghost, 1]) +
                     v_neg * (wzp[j+nghost, 3] * (Tp[j+nghost, 2] - Tp[j+nghost, 3]) +
-                           wzp[j+nghost, 4] * (Tp[j+nghost, 2] - Tp[j+nghost, 4])) / 3.0f0
+                             wzp[j+nghost, 4] * (Tp[j+nghost, 2] - Tp[j+nghost, 4])) / 3.0f0
                 )
             end
         elseif k >= 3 && k <= ydim-2
@@ -264,9 +281,9 @@ function _advection!(ws::ModelWorkspace, Tp::Matrix{Float32}, wzp::Matrix{Float3
                 v_neg = v_clim_neg_t[j, k]
                 dX_adv[j, k] = ccy * (
                     -v_pos * (wzp[j+nghost, km1] * (Tp[j+nghost, k] - Tp[j+nghost, km1]) +
-                            wzp[j+nghost, km2] * (Tp[j+nghost, k] - Tp[j+nghost, km2])) +
+                              wzp[j+nghost, km2] * (Tp[j+nghost, k] - Tp[j+nghost, km2])) +
                     v_neg * (wzp[j+nghost, kp1] * (Tp[j+nghost, k] - Tp[j+nghost, kp1]) +
-                           wzp[j+nghost, kp2] * (Tp[j+nghost, k] - Tp[j+nghost, kp2]))
+                             wzp[j+nghost, kp2] * (Tp[j+nghost, k] - Tp[j+nghost, kp2]))
                 ) / 3.0f0
             end
         elseif k == ydim-1
@@ -277,7 +294,7 @@ function _advection!(ws::ModelWorkspace, Tp::Matrix{Float32}, wzp::Matrix{Float3
                 v_neg = v_clim_neg_t[j, k]
                 dX_adv[j, k] = ccy * (
                     -v_pos * (wzp[j+nghost, km1] * (Tp[j+nghost, k] - Tp[j+nghost, km1]) +
-                            wzp[j+nghost, km2] * (Tp[j+nghost, k] - Tp[j+nghost, km2])) / 3.0f0 +
+                              wzp[j+nghost, km2] * (Tp[j+nghost, k] - Tp[j+nghost, km2])) / 3.0f0 +
                     v_neg * wzp[j+nghost, kp1] * (Tp[j+nghost, k] - Tp[j+nghost, kp1])
                 )
             end
@@ -287,7 +304,7 @@ function _advection!(ws::ModelWorkspace, Tp::Matrix{Float32}, wzp::Matrix{Float3
                 v_pos = v_clim_pos_t[j, k]
                 dX_adv[j, k] = ccy * (
                     -v_pos * (wzp[j+nghost, km1] * (Tp[j+nghost, k] - Tp[j+nghost, km1]) +
-                            wzp[j+nghost, km2] * (Tp[j+nghost, k] - Tp[j+nghost, km2]))
+                              wzp[j+nghost, km2] * (Tp[j+nghost, k] - Tp[j+nghost, km2]))
                 ) / 3.0f0
             end
         end
@@ -296,11 +313,15 @@ function _advection!(ws::ModelWorkspace, Tp::Matrix{Float32}, wzp::Matrix{Float3
         if !is_polar[k]   # mid-latitudes, normal timestep
             cc = ccx[k]
             @turbo for j in 1:xdim
-                wm2 = wzp[j+1, k]; wm1 = wzp[j+2, k]
-                wp1 = wzp[j+4, k]; wp2 = wzp[j+5, k]
-                tm2 = Tp[j+1, k];  tm1 = Tp[j+2, k]
+                wm2 = wzp[j+1, k]
+                wm1 = wzp[j+2, k]
+                wp1 = wzp[j+4, k]
+                wp2 = wzp[j+5, k]
+                tm2 = Tp[j+1, k]
+                tm1 = Tp[j+2, k]
                 t0 = Tp[j+3, k]
-                tp1 = Tp[j+4, k];  tp2 = Tp[j+5, k]
+                tp1 = Tp[j+4, k]
+                tp2 = Tp[j+5, k]
                 u_pos = u_clim_pos_t[j, k]
                 u_neg = u_clim_neg_t[j, k]
                 dX_adv[j, k] += cc * (
@@ -321,21 +342,29 @@ function _advection!(ws::ModelWorkspace, Tp::Matrix{Float32}, wzp::Matrix{Float3
             for _ in 1:time2
                 # Jacobi
                 @turbo for j in 1:xdim
-                    wm3 = wzp[j, k];   wm2 = wzp[j+1, k]; wm1 = wzp[j+2, k]
-                    wp1 = wzp[j+4, k]; wp2 = wzp[j+5, k]; wp3 = wzp[j+6, k]
-                    tm3 = T1h[j];      tm2 = T1h[j+1];    tm1 = T1h[j+2]
+                    wm3 = wzp[j, k]
+                    wm2 = wzp[j+1, k]
+                    wm1 = wzp[j+2, k]
+                    wp1 = wzp[j+4, k]
+                    wp2 = wzp[j+5, k]
+                    wp3 = wzp[j+6, k]
+                    tm3 = T1h[j]
+                    tm2 = T1h[j+1]
+                    tm1 = T1h[j+2]
                     t0 = T1h[j+3]
-                    tp1 = T1h[j+4];    tp2 = T1h[j+5];    tp3 = T1h[j+6]
+                    tp1 = T1h[j+4]
+                    tp2 = T1h[j+5]
+                    tp3 = T1h[j+6]
                     u_pos = u_clim_pos_t[j, k]
                     u_neg = u_clim_neg_t[j, k]
 
                     dTxh[j] = ccx2 * (
                         -u_pos * (10.0f0 * wm1 * (t0 - tm1) +
-                                4.0f0 * wm2 * (tm1 - tm2) +
-                                1.0f0 * wm3 * (tm2 - tm3)) +
+                                  4.0f0 * wm2 * (tm1 - tm2) +
+                                  1.0f0 * wm3 * (tm2 - tm3)) +
                         u_neg * (10.0f0 * wp1 * (t0 - tp1) +
-                               4.0f0 * wp2 * (tp1 - tp2) +
-                               1.0f0 * wp3 * (tp2 - tp3))
+                                 4.0f0 * wp2 * (tp1 - tp2) +
+                                 1.0f0 * wp3 * (tp2 - tp3))
                     ) / 20.0f0
                 end
                 @turbo for j in 1:xdim

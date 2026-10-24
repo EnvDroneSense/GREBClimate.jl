@@ -28,8 +28,8 @@ end
         end
     """
     function run_at(n)
-        parts = split(strip(run_julia(script; threads = n)))
-        return (nthreads = parse(Int, parts[1]), digest = parse.(Float64, parts[2:end]))
+        parts = split(strip(run_julia(script; threads=n)))
+        return (nthreads=parse(Int, parts[1]), digest=parse.(Float64, parts[2:end]))
     end
 
     serial = run_at(1)
@@ -62,7 +62,7 @@ end
             print(Threads.nthreads(), " ", finite, " ",
                   hash([getfield(r, v) for r in result.ctrl for v in fieldnames(MonthlyRecord)]))
         """
-        run_at(n) = split(strip(run_julia(script; threads = n)))
+        run_at(n) = split(strip(run_julia(script; threads=n)))
 
         serial = run_at(1)
         threaded = run_at(2)

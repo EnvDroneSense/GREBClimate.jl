@@ -25,9 +25,8 @@ end
 
 # What an observer of `greb_model!` is handed at each call. The arrays are the
 # model's own, not copies.
-_step_view(t::ModelTime, CO2, Ts, Ta, To, q, tend, fields, r) =
-    (; time=t, phase=t.phase, step=t.step, year=year(t), step_of_year=step_of_year(t),
-        CO2, Ts, Ta, To, q, tend, fields, resolved=r)
+_step_view(t::ModelTime, CO2, Ts, Ta, To, q, tend, fields, r) = (; time=t, phase=t.phase, step=t.step, year=year(t), step_of_year=step_of_year(t),
+    CO2, Ts, Ta, To, q, tend, fields, resolved=r)
 
 """
     BudgetCheck()
@@ -71,7 +70,10 @@ end
 function (b::BudgetCheck)(point::Symbol, view)
     if point === :after_tendencies
         # The update overwrites the state, and seaice! the heat capacity
-        b.Ts .= view.Ts; b.Ta .= view.Ta; b.To .= view.To; b.q .= view.q
+        b.Ts .= view.Ts
+        b.Ta .= view.Ta
+        b.To .= view.To
+        b.q .= view.q
         b.cap_surf .= view.fields.cap_surf
     elseif point === :after_step
         _check_step!(b, view)
@@ -88,6 +90,7 @@ function _check_step!(b::BudgetCheck, view)
     hydro_on = p.hydrology !== :none
     rain_limited = p.hydrology === :full && p.atmosphere && r.hydrology.rain === :rh
     for j in 1:ydim, i in 1:xdim
+
         Ts = b.Ts[i, j] + tend.dT_ocean[i, j] +
              Δt * (surface_flux(tend, i, j) + fields.Ts_flux_correction[i, j, slice]) / b.cap_surf[i, j]
         Ta = b.Ta[i, j] + tend.dTa_crcl[i, j] + Δt * atmosphere_flux(tend, i, j) / cap_air

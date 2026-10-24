@@ -15,7 +15,7 @@ while the remaining stages run on `ws`. With the default `ws_a=ws_q=ws` they
 run one after the other.
 """
 function tendencies!(CO2, Ts, Ta, To, q, fields::ClimateFields, state::ModelState, ws::ModelWorkspace,
-    slice::Int, r::ResolvedConfig; ws_a::ModelWorkspace=ws, ws_q::ModelWorkspace=ws)
+        slice::Int, r::ResolvedConfig; ws_a::ModelWorkspace=ws, ws_q::ModelWorkspace=ws)
 
     p = r.config.processes
     parallel = Threads.nthreads() > 1 && ws_a !== ws_q

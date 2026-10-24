@@ -25,7 +25,7 @@ const _RAIN_COEFFICIENTS = Dict(
     (:omega, :era) => (0.862162f0, 0.0f0, -29.02096f0, 0.0f0),
     (:rh_omega, :era) => (-0.2685845f0, 1.4591853f0, -26.9858807f0, 0.0f0),
     (:fitted, :era) => (-1.88f0, 2.25f0, -17.69f0, 59.07f0),
-    (:fitted, :ncep) => (-1.27f0, 1.99f0, -16.54f0, 21.15f0),
+    (:fitted, :ncep) => (-1.27f0, 1.99f0, -16.54f0, 21.15f0)
 )
 
 """
@@ -60,7 +60,7 @@ julia> resolve(mscm_hydrology()).c_q
 function resolve(config::Config; jld2_dir::AbstractString="")
     s = config.scenario
     return ResolvedConfig(config, resolve(config.hydrology), _co2_table(s.co2, jld2_dir),
-                          _solar_table(s.solar, jld2_dir))
+        _solar_table(s.solar, jld2_dir))
 end
 
 function resolve(h::Hydrology)
