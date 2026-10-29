@@ -24,6 +24,7 @@ const SHARD = [
     ("test_experiment_tools.jl", "light", "standard", 5),
     ("test_physics.jl", "light", "standard", 26),
     ("test_threading.jl", "light", "full", 25),
+    ("test_enzyme.jl", "light", "full", 15),
     ("test_model.jl", "heavy", "full", 49),
     ("test_ensemble.jl", "heavy", "full", 30),
     ("test_golden.jl", "heavy", "full", 21),

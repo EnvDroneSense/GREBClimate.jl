@@ -17,6 +17,7 @@ using Logging: with_logger, NullLogger
 using DataDeps: DataDeps, DataDep, register, unpack, @datadep_str
 using JLD2: JLD2, jldopen
 using LoopVectorization: LoopVectorization, @turbo   # SIMD
+using SLEEFPirates: SLEEFPirates
 using PrecompileTools: @compile_workload
 
 export Config, preset, preset_names, Scenario, Processes, Hydrology, mscm_hydrology
@@ -46,6 +47,10 @@ include("data.jl")
 include("core/state.jl")
 include("io.jl")
 include("config/resolve.jl")
+# The fast scalar log/exp that @turbo uses internally, callable from plain loops
+# (autodiff rules for them live in ext/GREBEnzymeExt.jl).
+@inline fastlog(x::AbstractFloat) = SLEEFPirates.log_fast(x)
+@inline fastexp(x::AbstractFloat) = SLEEFPirates.exp(x)
 include("physics/radiation.jl")
 include("physics/hydrology.jl")
 include("physics/ocean.jl")

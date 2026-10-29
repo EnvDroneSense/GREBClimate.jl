@@ -62,10 +62,10 @@ function hydro!(ws::ModelWorkspace, Ts, q, fields::ClimateFields, slice::Int, p:
     # Saturation humidity, relative humidity, evaporation, precipitation, the
     # optional rain-limit clamp, and water-vapor tendencies
     if h.evaporation === :original
-        @turbo for j in 1:ydim
-            for i in 1:xdim
+        for j in 1:ydim
+            @inbounds @fastmath @simd ivdep for i in 1:xdim
                 T = Ts[i, j] - 273.15f0
-                qs = max(_qsat_scale * exp(_qsat_a * T / (T + _qsat_b)) * wz_air[i, j], 1.0f-8)
+                qs = max(_qsat_scale * fastexp(_qsat_a * T / (T + _qsat_b)) * wz_air[i, j], 1.0f-8)
                 rq = q[i, j] / qs
 
                 u_val = u[i, j]
@@ -86,16 +86,16 @@ function hydro!(ws::ModelWorkspace, Ts, q, fields::ClimateFields, slice::Int, p:
         end
     elseif h.evaporation === :skin
         wind_speed = clim_slice(fields.wind_speed_clim, slice)
-        @turbo for j in 1:ydim
-            for i in 1:xdim
+        for j in 1:ydim
+            @inbounds @fastmath @simd ivdep for i in 1:xdim
                 T0 = Ts[i, j] - 273.15f0
-                qs0 = max(_qsat_scale * exp(_qsat_a * T0 / (T0 + _qsat_b)) * wz_air[i, j], 1.0f-8)
+                qs0 = max(_qsat_scale * fastexp(_qsat_a * T0 / (T0 + _qsat_b)) * wz_air[i, j], 1.0f-8)
                 rq = q[i, j] / qs0
 
                 Tskin = ifelse(@is_land(z_topo[i, j]), Ts[i, j] + 5.0f0, Ts[i, j] + 1.0f0)
                 Tskin = ifelse(Tskin < 200.0f0, 200.0f0, Tskin)
                 T = Tskin - 273.15f0
-                qs_val = _qsat_scale * exp(_qsat_a * T / (T + _qsat_b)) * wz_air[i, j]
+                qs_val = _qsat_scale * fastexp(_qsat_a * T / (T + _qsat_b)) * wz_air[i, j]
 
                 mean_wind = wind_speed[i, j]
                 gust = ifelse(@is_land(z_topo[i, j]), _skin_gust_land, _skin_gust_ocean)
@@ -115,10 +115,10 @@ function hydro!(ws::ModelWorkspace, Ts, q, fields::ClimateFields, slice::Int, p:
             end
         end
     elseif h.evaporation === :original_gust
-        @turbo for j in 1:ydim
-            for i in 1:xdim
+        for j in 1:ydim
+            @inbounds @fastmath @simd ivdep for i in 1:xdim
                 T = Ts[i, j] - 273.15f0
-                qs = max(_qsat_scale * exp(_qsat_a * T / (T + _qsat_b)) * wz_air[i, j], 1.0f-8)
+                qs = max(_qsat_scale * fastexp(_qsat_a * T / (T + _qsat_b)) * wz_air[i, j], 1.0f-8)
                 rq = q[i, j] / qs
 
                 u_val = u[i, j]
@@ -140,10 +140,10 @@ function hydro!(ws::ModelWorkspace, Ts, q, fields::ClimateFields, slice::Int, p:
         end
     elseif h.evaporation === :skin_gust
         wind_speed = clim_slice(fields.wind_speed_clim, slice)
-        @turbo for j in 1:ydim
-            for i in 1:xdim
+        for j in 1:ydim
+            @inbounds @fastmath @simd ivdep for i in 1:xdim
                 T = Ts[i, j] - 273.15f0
-                qs = max(_qsat_scale * exp(_qsat_a * T / (T + _qsat_b)) * wz_air[i, j], 1.0f-8)
+                qs = max(_qsat_scale * fastexp(_qsat_a * T / (T + _qsat_b)) * wz_air[i, j], 1.0f-8)
                 rq = q[i, j] / qs
 
                 wind = wind_speed[i, j]

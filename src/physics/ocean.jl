@@ -17,7 +17,7 @@ function seaice!(fields::ClimateFields, Ts0, slice::Int, p::Processes)
 
     if p.ice_albedo
         # Compute ice‑dependent heat capacity for ocean points
-        @turbo for i in 1:xdim, j in 1:ydim
+        @inbounds @fastmath for i in 1:xdim, j in 1:ydim
 
             is_ocean = !@is_land(z_topo[i, j])
             T = Ts0[i, j]
@@ -35,7 +35,7 @@ function seaice!(fields::ClimateFields, Ts0, slice::Int, p::Processes)
         end
     else
         # Without the ice-albedo feedback the ocean keeps its open-water capacity
-        @turbo for i in 1:xdim, j in 1:ydim
+        @inbounds @fastmath for i in 1:xdim, j in 1:ydim
 
             cap_surf[i, j] = ifelse(@is_land(z_topo[i, j]), cap_land, cap_ocean * mld[i, j])
         end

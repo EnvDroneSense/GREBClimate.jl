@@ -5,6 +5,16 @@ Notable changes to GREBClimate.jl, following
 
 ## [Unreleased]
 
+### Added
+
+- Optional Enzyme support: `LWradiation!`, `hydro!`, `SWradiation!` and
+  `seaice!` no longer use `@turbo` (10 loops), so Enzyme can differentiate
+  them. A one-year run costs about 3 % more cycles. The `log`/`exp` loops call
+  `fastlog`/`fastexp` (the same SLEEFPirates routines), which agree with the
+  previous results to about 3e-7 relative. The derivative rules live in a
+  package extension, loaded only when Enzyme is loaded. SLEEFPirates is now a
+  direct dependency.
+
 ### Fixed
 
 - `include("examples/run_greb.jl")` no longer looks for the dataset: before, it

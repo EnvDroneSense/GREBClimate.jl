@@ -16,7 +16,7 @@ function SWradiation!(ws::ModelWorkspace, Ts, fields::ClimateFields, state::Mode
     glacier = fields.glacier
 
     # 1. Ice cover fraction
-    @turbo for i in 1:xdim, j in 1:ydim
+    @inbounds @fastmath for i in 1:xdim, j in 1:ydim
 
         T = Ts[i, j]
         land_ice = @ice_ramp(T, Tl_ice1, Tl_ice2, inv_Tl_ice_range)
@@ -26,7 +26,7 @@ function SWradiation!(ws::ModelWorkspace, Ts, fields::ClimateFields, state::Mode
 
     # 2. Surface albedo: ice-free albedo plus the ice increment times the ice fraction
     if p.ice_albedo
-        @turbo for i in 1:xdim, j in 1:ydim
+        @inbounds @fastmath for i in 1:xdim, j in 1:ydim
 
             a_surf[i, j] = a_no_ice + da_ice * ice_cover[i, j]
             # Glacier override: if glacier mask > 0.5, set to ice albedo
@@ -40,7 +40,7 @@ function SWradiation!(ws::ModelWorkspace, Ts, fields::ClimateFields, state::Mode
     cld = fields.cloud_clim
     sw_solar = fields.sw_solar
     multiplier = state.sw_solar_forcing * 0.01f0 * solar_percent
-    @turbo for j in 1:ydim
+    @inbounds @fastmath for j in 1:ydim
         sf = sw_solar[j, slice] * multiplier
         for i in 1:xdim
             aa = cld[i, j, slice] * a_cloud
@@ -78,14 +78,14 @@ function LWradiation!(ws::ModelWorkspace, Ts, Ta, q, CO2, fields::ClimateFields,
 
     # ── Effective columns, emissivity (log-regression, 10 parameters),
     # cloud adjustment, and surface/downward longwave flux
-    @turbo for j in 1:ydim
-        for i in 1:xdim
+    for j in 1:ydim
+        @inbounds @fastmath @simd ivdep for i in 1:xdim
             e_vapor = wz_air[i, j] * r_qviwv * q[i, j]  # water vapor [kg/m²]
             e_co2 = wz_air[i, j] * CO2 * co2_part[i, j]  # CO2 [ppm scaled by pressure]
-            em_val = p4 * log(p1 * e_co2 + p2 * e_vapor + p3) +
+            em_val = p4 * fastlog(p1 * e_co2 + p2 * e_vapor + p3) +
                      p7 +
-                     p5 * log(p1 * e_co2 + p3) +
-                     p6 * log(p2 * e_vapor + p3)
+                     p5 * fastlog(p1 * e_co2 + p3) +
+                     p6 * fastlog(p2 * e_vapor + p3)
             em_val = (p8 - cloud_clim[i, j, slice]) / p9 * (em_val - p10) + p10
             em[i, j] = em_val
             LW_surf[i, j] = -σ * Ts[i, j]^4
