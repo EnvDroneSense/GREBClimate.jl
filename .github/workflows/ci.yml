@@ -25,6 +25,29 @@ jobs:
           ok || error("Not formatted: run JuliaFormatter.format on src, test and benchmark")
         shell: julia --color=yes {0}
 
+  benchmark-smoke:
+    # Checks that the comparison tool runs and prints its self-check, not the
+    # numbers: the machine is shared and there is no dataset.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v2
+      - name: Run a small comparison
+        run: |
+          import Pkg
+          Pkg.activate("benchmark")
+          Pkg.develop(path=".")
+          Pkg.instantiate()
+          include(joinpath(pwd(), "benchmark", "common.jl"))
+          include(joinpath(pwd(), "benchmark", "compare.jl"))
+          x = rand(1000)
+          ok = compare_kernels("sum" => () -> sum(x), "sum twice" => () -> sum(x) + sum(x); seconds=1)
+          println("self-check passed: ", ok)
+        shell: julia --color=yes {0}
+
   test:
     runs-on: ${{ matrix.os }}
     strategy:

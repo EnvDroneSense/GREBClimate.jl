@@ -5,17 +5,18 @@ description: Run GREBClimate.jl's timing/allocation benchmarks (benchmark/run_be
 
 # GREB benchmark
 
-`benchmark/run_benchmarks.jl` is a dependency-free harness with five modes, all on the real dataset after JIT warm-up. Benchmarks are not a correctness signal; the test suite is.
+`benchmark/run_benchmarks.jl` is a harness with six modes, all on the real dataset after JIT warm-up. It runs in the `benchmark` environment (Chairmarks; set up once with `julia --project=benchmark -e 'using Pkg; Pkg.develop(path="."); Pkg.instantiate()'`). Benchmarks are not a correctness signal; the test suite is.
 
 | Mode | Answers | Command |
 |---|---|---|
-| `year` (default) | How fast is a 1-year `:full_model` control run; before vs after a change | `julia --project=. -t 2,0 benchmark/run_benchmarks.jl year` |
-| `stages` | Where the time goes: each `tendencies!` stage and its share | `julia --project=. -t 1 benchmark/run_benchmarks.jl stages` |
-| `threads` | Speedup of `-t 1..4`, each in its own subprocess | `julia --project=. -t 1 benchmark/run_benchmarks.jl threads` |
-| `alloc` | Bytes allocated by one `tendencies!` call; budget 256 bytes (`TENDENCIES_ALLOC_BUDGET`, same value in `test/test_invariants.jl`) | `julia --project=. -t 1 benchmark/run_benchmarks.jl alloc` |
-| `years` | Cost and stability over many years: `--ctrl=N --scnr=N [--experiment=NAME]` (default 10/10, `full_model`, which holds CO2 flat; use `a1b` for a trend) | `julia --project=. -t 2,0 benchmark/run_benchmarks.jl years --ctrl=10 --scnr=100` |
+| `year` (default) | How fast is a 1-year `:full_model` control run; before vs after a change | `julia --project=benchmark -t 2,0 benchmark/run_benchmarks.jl year` |
+| `stages` | Where the time goes: each `tendencies!` stage and its share | `julia --project=benchmark -t 1 benchmark/run_benchmarks.jl stages` |
+| `threads` | Speedup of `-t 1..4`, each in its own subprocess | `julia --project=benchmark -t 1 benchmark/run_benchmarks.jl threads` |
+| `alloc` | Bytes allocated by one `tendencies!` call; budget 256 bytes (`TENDENCIES_ALLOC_BUDGET`, same value in `test/test_invariants.jl`) | `julia --project=benchmark -t 1 benchmark/run_benchmarks.jl alloc` |
+| `years` | Cost and stability over many years: `--ctrl=N --scnr=N [--experiment=NAME]` (default 10/10, `full_model`, which holds CO2 flat; use `a1b` for a trend) | `julia --project=benchmark -t 2,0 benchmark/run_benchmarks.jl years --ctrl=10 --scnr=100` |
+| `compare` | Same-process, interleaved comparison with a self-check; the mode is the `circulation!(Ta)` against `circulation!(q)` demo, `compare_kernels` in `benchmark/compare.jl` takes any variants. `--seconds=S` (default 5), `--counters` on Linux | `taskset -c <core> julia --project=benchmark -t 1 benchmark/run_benchmarks.jl compare` |
 
-The data directory is the next positional argument (default `../greb_input_data`, or `GREB_DATA`); `[jld2_dir] [reps]` are positional in every mode. The legacy form `run_benchmarks.jl <dir>` runs `year`.
+The data directory is the next positional argument (default `../greb_input_data`, or `GREB_DATA`); `[jld2_dir] [reps]` are positional in the modes with reps; `stages` and `compare` take `--seconds=S` instead. The legacy form `run_benchmarks.jl <dir>` runs `year`.
 
 ## Reference numbers (this machine)
 
@@ -31,7 +32,7 @@ The data directory is the next positional argument (default `../greb_input_data`
 | `-t 3`, `-t 4` | 0.87-1.00x; never help on this grid |
 | Allocations per `tendencies!` | 0 bytes |
 
-`year`, `years` and `stages` print the machine state themselves: processor load, power source, and a calibration loop against the best time seen on this machine. A run they mark NOISY is not quoted. On battery a `year` reads about 1.4 s (2026-10-05), so check the power line first: 0.6 s is normal under load on mains, and 0.3 s is not a speedup if the load was simply lighter.
+`year`, `years`, `stages` and `compare` print the machine state themselves: processor load, power source (on Linux also power profile, governor and CPU), and a calibration loop against the best time seen on this machine. A run they mark NOISY is not quoted; `power-saver` marks a run NOISY. Each run appends a CSV line per variant to `benchmark/results/` (gitignored). On battery a `year` reads about 1.4 s (2026-10-05), so check the power line first: 0.6 s is normal under load on mains, and 0.3 s is not a speedup if the load was simply lighter.
 
 ## Steps
 
@@ -46,7 +47,7 @@ The data directory is the next positional argument (default `../greb_input_data`
 
    `stages` and `alloc` are far less noise-prone; a single reading there is more trustworthy.
 3. For thread counts use `threads`, and run it several times: the threaded paths carry most of the variance (`-t 1` is stable). Compare relative speedups, not absolute times.
-4. Report mean/min/max (`year`, `threads`), the per-stage table (`stages`) or the byte count (`alloc`). Say plainly when noise makes a reading untrustworthy.
+4. Report min/median (`year`, `threads`), the per-stage table (`stages`) or the byte count (`alloc`). Say plainly when noise makes a reading untrustworthy.
 
 ## Profiling
 
@@ -81,4 +82,4 @@ Reference shape of `step` (2026-10-05, release 2.0.1, `-t 1`): `circulation!` 89
 | `test/test_threading.jl` "threaded circulation matches serial" | After touching the parallel branch of `tendencies!` or either `circulation!` call; `Pkg.test()` alone is single-threaded |
 | `test/test_golden.jl` or a diff against a saved run | With every timing change; a faster wrong answer is not a win |
 
-For measurements beyond this harness: compile old and new into one process, alternate them in shuffled order, take the minimum of N trials, and time a second copy of the baseline as a self-check (it must land at about 1.00x).
+To compare code variants use `compare_kernels` (it shuffles the order, times a second copy of the baseline and prints `NOT OK` when that copy is more than 1 % off 1.000; discard such a run). `--counters` adds instructions and cycles per call on Linux and needs LinuxPerf in the user environment, `perf_event_paranoid` <= 2 and a pinned P-core; it refuses a value whose counter did not run the whole time. On Windows there are no counters and no pinning, so effects of a few percent at year scale cannot be resolved.

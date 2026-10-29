@@ -1,5 +1,7 @@
 # Helpers shared by the benchmark scripts.
 
+using Dates
+
 const REPO = normpath(joinpath(@__DIR__, ".."))
 const JULIA_BIN = joinpath(Sys.BINDIR, Base.julia_exename())
 
@@ -104,7 +106,34 @@ function system_state()
             return "unknown"
         end
     end
-    return "load average $(round(Sys.loadavg()[1], digits=2)) on $(Sys.CPU_THREADS) threads"
+    governor = try
+        strip(read("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor", String))
+    catch
+        "unknown"
+    end
+    return "load average $(round(Sys.loadavg()[1], digits=2)) on $(Sys.CPU_THREADS) threads, " *
+           "power profile $(power_profile()), governor $governor, cpu $(ccall(:sched_getcpu, Cint, ()))"
+end
+
+"The Linux power profile (`powerprofilesctl get`); `unknown` where the system does not say."
+function power_profile()
+    Sys.islinux() || return "unknown"
+    try
+        return readchomp(`powerprofilesctl get`)
+    catch
+        return "unknown"
+    end
+end
+
+"Short commit hash of the repository and whether tracked files are modified."
+function repo_state()
+    try
+        commit = readchomp(`git -C $REPO rev-parse --short HEAD`)
+        dirty = !isempty(readchomp(`git -C $REPO status --porcelain --untracked-files=no`))
+        return commit, dirty
+    catch
+        return "unknown", false
+    end
 end
 
 "Print the machine state before a benchmark; returns the calibration time."
@@ -119,7 +148,7 @@ end
 
 """
 Print the machine state after a benchmark and whether the run was noisy:
-the calibration loop against the best seen and against `before`, and for
+the calibration loop against the best seen and against `before`, the power profile, and for
 `times` the ratio of the median to the minimum.
 """
 function machine_footer(before::Float64, times::Vector{Float64}=Float64[])
@@ -128,6 +157,7 @@ function machine_footer(before::Float64, times::Vector{Float64}=Float64[])
     worst = max(before, after) / best
     reasons = String[]
     worst > NOISE_LIMIT && push!(reasons, "calibration $(round(worst, digits=2))x the best")
+    power_profile() == "power-saver" && push!(reasons, "power profile power-saver")
     if length(times) >= 3
         sorted = sort(times)
         spread = sorted[(end+1)÷2] / sorted[1]
@@ -137,4 +167,31 @@ function machine_footer(before::Float64, times::Vector{Float64}=Float64[])
     println("calibration loop after: ", round(1e3 * after, digits=2), " ms, ", round(after / best, digits=2), "x the best")
     println(isempty(reasons) ? "machine state: quiet" : "machine state: NOISY (" * join(reasons, "; ") * ") - do not quote these timings")
     return isempty(reasons)
+end
+
+# ----- Result records -----
+
+const RESULTS_DIR = joinpath(REPO, "benchmark", "results")
+const RECORD_COLUMNS = "date,commit,mode,name,threads,samples,min_s,median_s,ratio_min,ratio_median,selfcheck,state"
+
+"""
+Append one line to `benchmark/results/<date>.csv`, creating the file with its
+header line when it is new. `ratios` is `(min, median)` against the baseline,
+`nothing` for a single-variant mode; `selfcheck` is the baseline copy's median
+ratio or `nothing`; `quiet` is what `machine_footer` returned.
+"""
+function record_result(mode::AbstractString, name::AbstractString, times::Vector{Float64}, quiet::Bool;
+        ratios=nothing, selfcheck=nothing)
+    sorted = sort(times)
+    median_t = (sorted[(end+1)÷2] + sorted[(end+2)÷2]) / 2
+    commit, dirty = repo_state()
+    fields = (Dates.format(now(), "yyyy-mm-ddTHH:MM:SS"), commit * (dirty ? "-dirty" : ""), mode, name,
+        Threads.nthreads(), length(times), sorted[1], median_t,
+        ratios === nothing ? "" : ratios[1], ratios === nothing ? "" : ratios[2],
+        selfcheck === nothing ? "" : selfcheck, quiet ? "quiet" : "NOISY")
+    mkpath(RESULTS_DIR)
+    file = joinpath(RESULTS_DIR, Dates.format(today(), "yyyy-mm-dd") * ".csv")
+    isfile(file) || write(file, RECORD_COLUMNS * "\n")
+    open(io -> println(io, join(fields, ',')), file, "a")
+    return nothing
 end

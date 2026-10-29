@@ -5,19 +5,24 @@ results: the test suite is the correctness gate, and a faster benchmark with a
 red suite is a regression. It needs the local dataset and never downloads it
 (`GREB_DATA` or a path argument overrides the location).
 
+The timing modes need Chairmarks, which lives only in `benchmark/Project.toml`
+and is not a dependency of the package. Set the environment up once:
+
 ```bash
-julia --project=. -t 2,0 benchmark/run_benchmarks.jl [mode] [jld2_dir] [reps]
+julia --project=benchmark -e 'using Pkg; Pkg.develop(path="."); Pkg.instantiate()'
+julia --project=benchmark -t 2,0 benchmark/run_benchmarks.jl [mode] [jld2_dir] [reps]
 ```
 
 | Mode | Measures | Default reps | Notes |
 |:-----|:---------|:-------------|:------|
-| `year` (default) | One control year of `:full_model` on the stored flux corrections | 3 | Prints each run and mean/min/max in seconds |
-| `stages` | One call of each physics stage: `circulation!` (air, vapor), `SWradiation!`, `LWradiation!`, `hydro!`, `deep_ocean!` | 2000 | Single workspace, so threads are not used. Leaves out `seaice!`, output and the tendency assembly |
+| `year` (default) | One control year of `:full_model` on the stored flux corrections | 3 | Prints each run and the min and median in seconds. `--out=PATH` also writes the run times to a file, one per line |
+| `stages` | One call of each physics stage: `circulation!` (air, vapor), `SWradiation!`, `LWradiation!`, `hydro!`, `deep_ocean!` | none | `--seconds=S` per stage (default 0.5) instead of a rep count. Prints min and median per call; the share is of the minima. Single workspace, so threads are not used. Leaves out `seaice!`, output and the tendency assembly |
 | `threads` | `year` in a fresh process at `-t 1`, 2, 3, 4 | 3 | Prints the speedup against `-t 1` |
 | `alloc` | Bytes allocated by one `tendencies!` call | none | Compared with the 256-byte budget in `test/test_invariants.jl`; the two numbers are kept in sync by hand |
 | `years` | `--ctrl=N` control years plus `--scnr=N` scenario years of `--experiment=<preset>` | 1 | Defaults 10, 10, `full_model`. Stored corrections, no spin-up. Prints seconds per simulated year |
+| `compare` | `circulation!(Ta)` against `circulation!(q)` in one process, interleaved | none | `--seconds=S` per variant (default 5), `--counters` (below). A fixed demo of `compare_kernels`; exits 1 when the self-check fails |
 
-Example: `julia --project=. -t 2,0 benchmark/run_benchmarks.jl years --ctrl=10 --scnr=100 --experiment=co2_double`.
+Example: `julia --project=benchmark -t 2,0 benchmark/run_benchmarks.jl years --ctrl=10 --scnr=100 --experiment=co2_double`.
 
 ## Reading the numbers
 
@@ -28,20 +33,69 @@ Example: `julia --project=. -t 2,0 benchmark/run_benchmarks.jl years --ctrl=10 -
 | Compare variants in one process | Compile both, interleave the trials, shuffle the order each trial, and time a second copy of the baseline as a control. If the control is not about 1.00x, discard the run |
 | Do not record test-suite timings as benchmark results | Assertion counts are stable; wall-clock times are not |
 
-`year`, `years` and `stages` print the machine state before and after: the
-processor load, the power source, and a fixed calibration loop compared with
+`year`, `years`, `stages` and `compare` print the machine state before and
+after: the processor load, the power source (on Linux the power profile, the
+CPU governor and the CPU the process runs on), and a fixed calibration loop compared with
 the best time this machine has given for it (kept in
 `benchmark/profiles/calibration.txt`, which is gitignored). A run is marked
 NOISY when the calibration loop is more than 5 % off the best, or when the
-median of the runs is more than 5 % above their minimum; do not quote a
-noisy run.
+median of the runs is more than 5 % above their minimum, or when the Linux
+power profile is `power-saver`; do not quote a noisy run.
 
 `stages` gives shares of its six calls, not of a step. For the shares of a
 whole run, including what `stages` leaves out, use the `step` profile below.
 
-This harness times one variant per run. It is a quick check and a source of
-per-stage shares, not a measurement protocol: a claimed speed-up needs the
-same-process comparison above.
+`year`, `years` and `stages` time one variant per run. They are a quick check
+and a source of per-stage shares, not a measurement protocol: a claimed
+speed-up needs the same-process comparison above, which is `compare`.
+
+## Comparing variants
+
+`compare_kernels` in `compare.jl` implements that comparison:
+
+```julia
+include("benchmark/common.jl"); include("benchmark/compare.jl")
+compare_kernels("old" => () -> f_old(x), "new" => () -> f_new(x); seconds=5)
+```
+
+The first pair is the baseline. A second copy of it is timed as a control. The
+run is `rounds` (20) rounds; in each, every variant is timed for
+`seconds / rounds` in a freshly shuffled order. A sample is the fastest call of
+one round's chunk, so the table shows the min and median of 20 samples and the
+ratio of each to the baseline. If the copy's median ratio is not within 1 % of
+1.000 the function prints `NOT OK` and returns `false`; discard that run. Each
+call compiles its own variants first, so define them in the same session.
+
+Ratios below about 2 % need `--counters` or a quiet machine. The timings
+cannot tell a 1 % change from the machine.
+
+## Counters (Linux only)
+
+`compare --counters` also prints instructions and cycles per call from the
+hardware counters. They resolve differences far below what the clock does:
+`circulation!(q)` against `circulation!(Ta)` reads 1.030 on instructions and
+about 1.047 on cycles.
+
+| Requirement | Detail |
+|:------------|:-------|
+| LinuxPerf | `julia -e 'using Pkg; Pkg.add("LinuxPerf")'` in your own default environment. It is not in `benchmark/Project.toml`, so Windows resolves cleanly |
+| `perf_event_paranoid` | `/proc/sys/kernel/perf_event_paranoid` must be 2 or lower |
+| Fill rate | A variant whose counters did not run the whole time (fill rate below 1.000, for example on an E-core) is printed as refused |
+| Pinning | Pin to a P-core: `taskset -c <P-core> julia --project=benchmark -t 1 benchmark/run_benchmarks.jl compare --counters` |
+
+When a requirement is missing, the flag prints one line saying which and the
+run goes on without counters.
+
+On Windows there are no counters and no pinning, so timings are noisier;
+effects below about 5 % at the scale of a year cannot be resolved there.
+
+## Results
+
+Every run of `year`, `years`, `stages` and `compare` appends a line per variant
+to `benchmark/results/<date>.csv` (gitignored): `date,commit,mode,name,threads,samples,min_s,median_s,ratio_min,ratio_median,selfcheck,state`.
+The ratio columns are empty outside `compare`, `selfcheck` is filled on the
+baseline-copy row, and `state` is `quiet` or `NOISY`. The commit carries
+`-dirty` when tracked files are modified.
 
 ## Profiling
 
@@ -103,7 +157,9 @@ seen), which is why a run is repeated up to a sample target. In `allocs.txt`,
 | File | Role |
 |:-----|:-----|
 | `run_benchmarks.jl` | The modes above |
+| `compare.jl` | `compare_kernels`: the interleaved comparison |
+| `counters.jl` | Hardware counters through LinuxPerf; loaded only by `--counters` |
 | `profile.jl` | The sampling profile above |
-| `common.jl` | Argument parsing and dataset lookup shared with the Fortran comparison |
-| `Manifest.toml` | Gitignored; there is no `Project.toml` here, scripts run in the package environment (`--project=.` from the repo root) |
+| `common.jl` | Argument parsing, dataset lookup, machine state and result records, shared with `profile.jl` and the Fortran comparison. Needs no Chairmarks |
+| `Project.toml` | Chairmarks and the package for `run_benchmarks.jl`. `Manifest.toml` is gitignored. `profile.jl` still runs in the package environment (`--project=.`) |
 | `fortran/` | Local only (excluded in `.git/info/exclude`, not in the repository). `run_fortran_comparison.jl` times and checks GREBClimate.jl against the original Fortran GREB (modes `compare`, `memory`, `verify`, `io`, `build`, `selftest`); `peak_memory.ps1` is its Windows peak-memory helper. Needs gfortran and the Fortran source (`GREB_GFORTRAN`, `GREB_FORTRAN_DIR`) |

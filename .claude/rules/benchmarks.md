@@ -9,6 +9,13 @@ and interleave the trials, shuffling order within each trial (a fixed order
 measurably penalizes whichever variant runs last). Always time a second
 identical copy of the baseline as a control; if that self-check is not
 ~1.00x, the run is not trustworthy and gets thrown away, not reported.
+`compare_kernels` in `benchmark/compare.jl` does all of this (run under
+`--project=benchmark`; `compare` mode is its demo, and the self-check fails a
+run beyond 1 %). On Linux pin with `taskset -c <P-core>`, and use `--counters`
+for effects the clock cannot resolve; Windows has neither, so year-scale
+effects below about 5 % cannot be shown there. Chairmarks stays in
+`benchmark/Project.toml`, and `common.jl` stays free of it because `profile.jl`
+includes it.
 
 Use `-t 2,0` for the `year`/`stages` modes (two compute threads, no
 interactive thread: 0.259 s per year against 0.303 s for plain `-t 2`,

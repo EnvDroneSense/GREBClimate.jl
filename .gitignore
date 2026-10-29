@@ -18,6 +18,9 @@ era5_raw/
 # Profiler reports (benchmark/profile.jl)
 /benchmark/profiles/
 
+# Benchmark result records (benchmark/run_benchmarks.jl)
+/benchmark/results/
+
 # Generated plots
 /examples/*.png
 /demo_out/

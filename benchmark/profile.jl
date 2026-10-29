@@ -306,17 +306,6 @@ end
 load_pprof() = load_optional("PProf", "e4faabce-9ead-11e9-39d9-4379958e3056")
 load_jet() = load_optional("JET", "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b")
 
-"Short commit hash of the repository and whether tracked files are modified."
-function repo_state()
-    try
-        commit = readchomp(`git -C $REPO rev-parse --short HEAD`)
-        dirty = !isempty(readchomp(`git -C $REPO status --porcelain --untracked-files=no`))
-        return commit, dirty
-    catch
-        return "unknown", false
-    end
-end
-
 "One aligned `name: value` line of a header."
 header_line(name::AbstractString, value) = string(rpad(name * ":", 13), value, "\n")
 
