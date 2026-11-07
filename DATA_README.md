@@ -2,7 +2,7 @@
 
 > **You do not need this to run the model.** GREBClimate reads a prepared
 > `.jld2` dataset that it downloads on first use; see
-> [Input data](https://EnvDroneSense.github.io/GREBClimate.jl/dev/data/).
+> [Input data](https://EnvDroneSense.github.io/GREBClimate.jl/stable/data/).
 > This page lists the **raw** GREB `.bin` files that dataset is generated from.
 > They are collated from several upstream sources (NCEP, ERA-Interim, ISCCP,
 > WOCE, CMIP5, IPCC scenario tables) and are not redistributed here.
@@ -11,10 +11,13 @@
 
 ```bash
 julia --project=. tools/dataset/convert_greb_to_jld2.jl <input_dir> [output_dir]   # defaults: Data/, greb_input_data/
-julia --project=. tools/dataset/package_dataset.jl greb_input_data greb_input_data-v1.tar.gz
+julia --project=. tools/dataset/package_dataset.jl greb_input_data dataset_packs   # five tar.xz packs
 ```
 
-## Generating new input data (ERA5)
+## Generating new input data (ERA5, work in progress)
+
+Nothing in the dataset uses ERA5 yet: the converter skips `era5.*` files unless
+you pass `--all`, and `package_dataset.jl` rejects a tree that contains them.
 
 `tools/dataset/fetch_era5_data.py` builds an ERA5 climatology from the Copernicus
 Climate Data Store and writes it in the `.bin` format the converter reads.
@@ -24,6 +27,9 @@ It requires your own [CDS API access](https://cds.climate.copernicus.eu/how-to-a
 python -m pip install cdsapi netCDF4 numpy
 python tools/dataset/fetch_era5_data.py --start-year 1991 --end-year 2020 --out-dir era5_raw
 julia --project=. tools/dataset/convert_greb_to_jld2.jl era5_raw greb_input_data_era5
+```
+
+## Input layout
 
 The converter reads the `.bin` files (and matching `.ctl` files, if present)
 **flat** from the input directory:
@@ -103,7 +109,7 @@ and `.forcing` (e.g. `"rcp85"`, `"hist"`).
 
 | File | Scenario |
 |------|----------|
-| `ipcc.scenario.rcp{26,45,6,85}.forcing.txt` | RCP 2.6, 4.5, 6.0, 8.5 |
+| `ipcc.scenario.rcp{26,45,6,85}.forcing.txt` | RCP 2.6, 4.5, 6.0, 8.5 (the RCP 6.0 table is stored as `rcp60`) |
 | `ipcc.scenario.ssp{119,126,245,460,585}.forcing.txt` | SSP1-1.9, 1-2.6, 2-4.5, 4-6.0, 5-8.5 |
 | `ipcc.scenario.hist.forcing.CO2.emission.pop.txt` | Historical CO2, 1850-2017 |
 
@@ -112,7 +118,9 @@ literal atmospheric ppm. `:historical_co2` starts its clock at 1850 (the other
 scenarios at 1950), so `RunSpec(scnr=168)` covers the whole record. The
 historical file's columns 3-4 (emissions, population) are not read by the
 model; the converter keeps them in `scenario/historical_emissions_population.jld2`
-for other use.
+for other use. For the years before 2009 the converter replaces the SSP tables by
+the historical CO2 record and stores a label per table (`co2` for the SSP and
+historical tables, `co2_equivalent` for the RCP tables).
 
 **Solar forcing scenarios** in `solar_forcing_scenarios/`:
 

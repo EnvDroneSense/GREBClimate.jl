@@ -34,8 +34,9 @@ Base.@kwdef struct RunSpec
     scnr::Int = 1
 end
 
-# The scenario of every named experiment. IPCC-table and A1B runs start from a
-# 280 ppm control; orbital runs start in year 1 and are returned absolute.
+# The scenario of every named experiment. The CO2-table runs (IPCC tables,
+# historical, a user's file) and A1B start from a 280 ppm control; orbital runs
+# start in year 1 and are returned absolute.
 const _TABLE = (control_co2=280,)
 const _ORBITAL = (start_year=1, output=:absolute)
 const _PRESET_SCENARIOS = Dict{Symbol,Scenario}(
@@ -81,7 +82,7 @@ const _PRESET_SCENARIOS = Dict{Symbol,Scenario}(
     :regional_co2_summer => Scenario(co2=SeasonalCO2(680, 340, :boreal_summer)),
     # Deconstruction experiments: switch processes off with `processes`
     :decon_mean_climate => Scenario(),
-    :decon_2xco2 => Scenario(co2=ConstantCO2(680)),
+    :decon_2xco2 => Scenario(co2=ConstantCO2(680))
 )
 
 """
@@ -96,8 +97,8 @@ preset_names() = sort!(collect(keys(_PRESET_SCENARIOS)))
 # make a deconstruction run diverge.
 const _PRESET_PHYSICS = Dict{Symbol,NamedTuple}(
     :decon_mean_climate => (processes=Processes(moisture_convergence=false),
-                            hydrology=mscm_hydrology(), corrections=Stored()),
-    :decon_2xco2 => (processes=Processes(moisture_convergence=false), hydrology=mscm_hydrology()),
+        hydrology=mscm_hydrology(), corrections=Stored()),
+    :decon_2xco2 => (processes=Processes(moisture_convergence=false), hydrology=mscm_hydrology())
 )
 
 """
@@ -126,8 +127,8 @@ ConstantCO2(680.0f0)
 ```
 """
 function preset(name::Symbol; processes::Union{Processes,NamedTuple,Nothing}=nothing,
-    hydrology::Union{Hydrology,NamedTuple,Nothing}=nothing, corrections::Union{Corrections,Nothing}=nothing,
-    index::Union{Integer,Nothing}=nothing, percent::Real=0, path::AbstractString="")
+        hydrology::Union{Hydrology,NamedTuple,Nothing}=nothing, corrections::Union{Corrections,Nothing}=nothing,
+        index::Union{Integer,Nothing}=nothing, percent::Real=0, path::AbstractString="")
     haskey(_PRESET_SCENARIOS, name) ||
         throw(ArgumentError("unknown preset :$name; known: $(join((":$p" for p in preset_names()), ", "))"))
     s = _PRESET_SCENARIOS[name]

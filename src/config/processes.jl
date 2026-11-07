@@ -44,9 +44,9 @@ struct Processes
 end
 
 function Processes(; atmosphere=true, clouds=:observed, humidity=:observed, hydrology=:full,
-    ocean=:full, topography=:observed, co2=true, ice_albedo=true, transport=true,
-    heat_diffusion=true, heat_advection=true, vapor_diffusion=true, vapor_advection=true,
-    moisture_convergence=true)
+        ocean=:full, topography=:observed, co2=true, ice_albedo=true, transport=true,
+        heat_diffusion=true, heat_advection=true, vapor_diffusion=true, vapor_advection=true,
+        moisture_convergence=true)
     return Processes(atmosphere,
         _check_option(:clouds, clouds, (:observed, :none, :uniform)),
         _check_option(:humidity, humidity, (:observed, :uniform)),
@@ -67,7 +67,7 @@ et al. (2019); [`mscm_hydrology`](@ref) gives the original GREB scheme.
 |:--------|:-------|
 | `rain` | `:fitted` (Stassen et al. 2019), `:original` (proportional to humidity), `:rh` (+ relative humidity, with a minimum rain rate), `:omega` (+ vertical velocity), `:rh_omega` |
 | `rain_fit` | `:era`, `:ncep`: which reanalysis the `:fitted` coefficients were fitted to; only for `rain = :fitted` |
-| `evaporation` | `:original` (climatological wind plus a fixed gust term), `:skin` (skin temperature, land/ocean exchange coefficients), `:original_gust` (`:original` with larger gust terms and land/ocean coefficients), `:skin_gust` (wind-speed climatology with its own gust terms and land/ocean coefficients; no skin temperature) |
+| `evaporation` | `:original` (climatological wind plus a fixed gust term), `:skin` (skin temperature, wind-speed climatology, land/ocean exchange coefficients), `:original_gust` (`:original` with larger gust terms and land/ocean coefficients), `:skin_gust` (wind-speed climatology with its own gust terms and land/ocean coefficients; no skin temperature) |
 """
 struct Hydrology
     rain::Symbol
@@ -97,7 +97,7 @@ mscm_hydrology() = Hydrology(rain=:original, evaporation=:original)
 
 How the flux corrections that hold the control climate at the observed one
 are obtained: [`SpinUp`](@ref)`(years)` computes them, [`Stored`](@ref)`()`
-reads the dataset's file, [`NoCorrections`](@ref)`()` runs without.
+reads the dataset's file, and [`NoCorrections`](@ref)`()` runs without any.
 
 The corrections belong to the configuration they were computed for. The
 default hydrology (fitted rain, moisture convergence) is only stable on

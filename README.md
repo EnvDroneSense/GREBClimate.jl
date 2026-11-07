@@ -4,13 +4,13 @@
 
 [![CI](https://github.com/EnvDroneSense/GREBClimate.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/EnvDroneSense/GREBClimate.jl/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/github/EnvDroneSense/GREBClimate.jl/graph/badge.svg?token=CKFBW810SH)](https://codecov.io/github/EnvDroneSense/GREBClimate.jl)
-[![docs dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://EnvDroneSense.github.io/GREBClimate.jl/dev/)
+[![docs stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://EnvDroneSense.github.io/GREBClimate.jl/stable/)
 [![Julia](https://img.shields.io/badge/Julia-1.10+-9558B2?logo=julia)](https://julialang.org/)
 [![Pluto](https://img.shields.io/badge/Pluto-Interactive-purple)](https://github.com/fonsp/Pluto.jl)
 
-A high-performance Julia translation of the **Globally Resolved Energy Balance (GREB)** climate model, originally developed by Dietmar Dommenget and colleagues at Monash University.
+A Julia translation of the **Globally Resolved Energy Balance (GREB)** climate model, originally developed by Dietmar Dommenget and colleagues at Monash University.
 
-GREBClimate is a **Julia package**: you call it from a script or the REPL, and nothing is held as module-global state. A plotting toolbox (`viz/`) and an interactive [Pluto.jl](https://github.com/fonsp/Pluto.jl) notebook ship alongside it. The full guide is in the **[documentation](https://EnvDroneSense.github.io/GREBClimate.jl/dev/)**.
+GREBClimate is a **Julia package**: you call it from a script or the REPL, and nothing is held as module-global state. A plotting toolbox (`viz/`) and an interactive [Pluto.jl](https://github.com/fonsp/Pluto.jl) notebook ship alongside it. The full guide is in the **[documentation](https://EnvDroneSense.github.io/GREBClimate.jl/stable/)**.
 
 ## Table of Contents
 
@@ -31,18 +31,19 @@ GREB is a conceptual climate model that simulates the global energy balance on a
 
 ## Features
 
-- **40+ experiments**: CO₂ scaling, IPCC RCP and SSP scenarios, a historical CO₂ hindcast, your own CO₂ trajectory, solar, orbital and paleoclimate forcing, and ENSO and regional-CO₂ runs ([experiment list](https://EnvDroneSense.github.io/GREBClimate.jl/dev/configuration/#Presets))
-- **Deconstruction experiments**: switch individual feedback processes off to isolate their role in the mean climate or the 2×CO₂ response ([switches](https://EnvDroneSense.github.io/GREBClimate.jl/dev/configuration/))
+- **40+ experiments**: CO₂ scaling, IPCC RCP and SSP scenarios, a historical CO₂ hindcast, your own CO₂ trajectory, solar, orbital and paleoclimate forcing, and ENSO and regional-CO₂ runs ([experiment list](https://EnvDroneSense.github.io/GREBClimate.jl/stable/configuration/#Presets))
+- **Deconstruction experiments**: switch individual feedback processes off to isolate their role in the mean climate or the 2×CO₂ response ([switches](https://EnvDroneSense.github.io/GREBClimate.jl/stable/configuration/))
 - **Two climatologies**: NCEP and ERA-Interim
 - **Ensembles**: run many configurations side by side with `run_ensemble`, each member identical to its own single run
 - **Fast**: SIMD-vectorised physics, and the temperature and humidity transport run concurrently with `julia -t 2,0`
-- **Plots and notebook**: maps, time series, seasonal cycles, Hovmöller diagrams and animations ([guide](https://EnvDroneSense.github.io/GREBClimate.jl/dev/viz/))
+- **Enzyme support (optional)**: the radiation, hydrology and sea-ice kernels use plain loops so that [Enzyme](https://github.com/EnzymeAD/Enzyme.jl) can differentiate them; the derivative rules for the fast `log`/`exp` load only when Enzyme is loaded
+- **Plots and notebook**: maps, time series, seasonal cycles, zonal means, Hovmöller diagrams, run comparisons, animations and building blocks for your own plots ([guide](https://EnvDroneSense.github.io/GREBClimate.jl/stable/viz/))
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-Requires **Julia 1.10** (the current LTS) or later. Download from [julialang.org](https://julialang.org/downloads/).
+Requires **Julia 1.10** or later. Download from [julialang.org](https://julialang.org/downloads/).
 
 ### Installation
 
@@ -71,11 +72,15 @@ Version 2.0 replaces `PhysicsConfig` and `create_experiment_config` with `preset
 julia viz/notebooks/launch_pluto.jl
 ```
 
-The first launch sets up its `viz/` environment. See [Plots and notebook](https://EnvDroneSense.github.io/GREBClimate.jl/dev/viz/) for the plots and scripting.
+The first launch sets up its `viz/` environment. See [Plots and notebook](https://EnvDroneSense.github.io/GREBClimate.jl/stable/viz/) for the plots and scripting.
 
 ## 📂 Input Data
 
-The model reads a ~439 MB JLD2 dataset of climatologies, flux corrections and forcing tables. It is not in the repository: `greb_data_dir()` finds a local copy (an explicit path, `$GREB_DATA`, or `greb_input_data/` beside the repository) and otherwise downloads and caches it once (~353 MB). Set `DATADEPS_ALWAYS_ACCEPT=true` in non-interactive sessions. The layout, the loading rules and how to regenerate the data are in [Input data](https://EnvDroneSense.github.io/GREBClimate.jl/dev/data/).
+The model reads a JLD2 dataset of climatologies, flux corrections and forcing tables (439 MB unpacked, a 321 MB download in five packs). It is not in the repository. `greb_data_dir()` finds a local copy (an explicit path, `$GREB_DATA`, or `greb_input_data/` in the package's top folder). If there is none, it asks once whether to download the whole dataset and caches the result.
+
+Answering no fetches only the 103 MB core pack. `download_greb_pack` adds an optional pack later: ERA-Interim, or the data for the `:rcp85`, `:elnino`, `:lanina` and orbital solar experiments. Set `DATADEPS_ALWAYS_ACCEPT=true` in non-interactive sessions. Pluto has no terminal to answer the question, so run `using GREBClimate; greb_data_dir()` once in a REPL first.
+
+The layout, the loading rules and how to regenerate the data are in [Input data](https://EnvDroneSense.github.io/GREBClimate.jl/stable/data/).
 
 ## 🎮 Running the Model
 
@@ -93,10 +98,12 @@ A run has three phases, in years:
 | Phase | What it does |
 |:------|:-------------|
 | Spin-up | Derives the flux corrections holding the control at the observed climate: `corrections = SpinUp(3)` in the config, the default. `Stored()` uses the dataset's corrections, `NoCorrections()` lets the control drift. |
-| `ctrl` (`RunSpec`) | Control run at 340 ppm CO₂ (280 ppm for the IPCC CO₂-table scenarios; `:rcp85_boundary` uses 340) |
+| `ctrl` (`RunSpec`) | Control run at 340 ppm CO₂; 280 ppm for the CO₂-table presets (`:rcp*`, `:ssp*`, `:historical_co2`, `:a1b`, `:custom_co2`) |
 | `scnr` (`RunSpec`) | Scenario run under the experiment's forcing |
 
-`result.ctrl` and `result.scnr` are vectors of monthly means, each a `NamedTuple` of 96×48 fields (`Ts, Ta, To, q, albedo, ice, precip, evap, qcrcl, sw, lw, qlat, qsens, olr, lwdown`). `result.scnr` is an **anomaly** against the control's final year, except for the orbital experiments and runs with `ctrl=0`. `global_mean(rec.Ts)` gives an area-weighted global mean, and `run_ensemble` runs a list of configurations side by side. The [Tutorial](https://EnvDroneSense.github.io/GREBClimate.jl/dev/tutorial/) covers configuration switches, experiment keywords, reading the results, ensembles and run checks; [`examples/run_greb.jl`](examples/run_greb.jl) is a runnable script.
+`result.ctrl` and `result.scnr` are vectors of monthly means, each a `NamedTuple` of 96×48 fields (`Ts, Ta, To, q, albedo, ice, precip, evap, qcrcl, sw, lw, qlat, qsens, olr, lwdown`). `result.scnr` is an **anomaly** against the control's final year, except for the orbital experiments and runs with `ctrl=0`. `global_mean(rec.Ts)` gives an area-weighted global mean, and `run_ensemble` runs a list of configurations side by side.
+
+The [Tutorial](https://EnvDroneSense.github.io/GREBClimate.jl/stable/tutorial/) covers configuration switches, experiment keywords, reading the results, ensembles and run checks. Two scripts run the steps: [`examples/quickstart.jl`](examples/quickstart.jl), and [`examples/feedback_deconstruction.jl`](examples/feedback_deconstruction.jl), which asks which processes carry the warming of a doubled CO2. The [Examples](https://EnvDroneSense.github.io/GREBClimate.jl/stable/examples/) page shows their output.
 
 ## 🔬 Model Components
 
@@ -109,7 +116,7 @@ A run has three phases, in years:
 | Ocean | Mixed-layer heat content, exchange with the deep ocean, and sea ice |
 | Flux corrections | Keep the control climate at the observed climatology |
 
-The [Model overview](https://EnvDroneSense.github.io/GREBClimate.jl/dev/model/) gives the energy-balance equation, the functions behind each component, and how a run is structured.
+The [Model overview](https://EnvDroneSense.github.io/GREBClimate.jl/stable/model/) gives the energy-balance equation, the functions behind each component, and how a run is structured.
 
 ## Contributing
 
@@ -119,11 +126,11 @@ Bug reports and contributions are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) co
 
 ### Primary Publications
 
-1. **Dommenget, D., and Flöter, J. (2011)**. Conceptual Understanding of Climate Change with a Globally Resolved Energy Balance Model. *Journal of Climate Dynamics*, 37: 2143. [doi:10.1007/s00382-011-1026-0](https://doi.org/10.1007/s00382-011-1026-0)
+1. **Dommenget, D., and Flöter, J. (2011)**. Conceptual Understanding of Climate Change with a Globally Resolved Energy Balance Model. *Climate Dynamics*, 37, 2143-2165. [doi:10.1007/s00382-011-1026-0](https://doi.org/10.1007/s00382-011-1026-0)
 
 2. **Stassen, C., Dommenget, D., and Loveday, N. (2019)**. A hydrological cycle model for the Globally Resolved Energy Balance (GREB) model v1.0. *Geoscientific Model Development*, 12, 425-440. [doi:10.5194/gmd-12-425-2019](https://doi.org/10.5194/gmd-12-425-2019)
 
-3. **Dommenget, D., Nice, K., Bayr, T., Kasang, D., Stassen, C., and Rezny, M.** The Monash Simple Climate Model Experiments: An interactive database of the mean climate, climate change and scenarios simulations. *Geoscientific Model Development*, 12, 2155-2179. [doi:10.5194/gmd-12-2155-2019](https://doi.org/10.5194/gmd-12-2155-2019)
+3. **Dommenget, D., Nice, K., Bayr, T., Kasang, D., Stassen, C., and Rezny, M. (2019)**. The Monash Simple Climate Model Experiments: An interactive database of the mean climate, climate change and scenarios simulations. *Geoscientific Model Development*, 12, 2155-2179. [doi:10.5194/gmd-12-2155-2019](https://doi.org/10.5194/gmd-12-2155-2019)
 
 ### Original GREB Model
 - [Monash University GREB Homepage](https://users.monash.edu.au/~dietmard/content/GREB/code.html)

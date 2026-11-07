@@ -15,20 +15,18 @@ Base.@kwdef struct ModelWorkspace
     wz_ghost::Matrix{Float32} = zeros(Float32, xghost, ydim)  # ghosted copy of wz_air/wz_vapor
     dX_diff::Matrix{Float32} = zeros(Float32, xdim, ydim)  # diffusion output
     dX_adv::Matrix{Float32} = zeros(Float32, xdim, ydim)  # advection output
-    dX_conv::Matrix{Float32} = zeros(Float32, xdim, ydim)  # convection output
+    dX_conv::Matrix{Float32} = zeros(Float32, xdim, ydim)  # moisture-convergence output
 
     # Tendency buffers
     Q_sens::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Sensible heat flux buffer
 
-    # State buffers
-    Ts0::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface temperature output
-    Ta0::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Air temperature output
-    To0::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Ocean temperature output
-    q0::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Humidity output
+    # The next state during the flux-correction spin-up
+    Ts0::Matrix{Float32} = zeros(Float32, xdim, ydim)  # surface temperature
+    Ta0::Matrix{Float32} = zeros(Float32, xdim, ydim)  # air temperature
+    To0::Matrix{Float32} = zeros(Float32, xdim, ydim)  # deep-ocean temperature
+    q0::Matrix{Float32} = zeros(Float32, xdim, ydim)  # humidity
 
     # LW radiation buffers
-    e_co2::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial CO2 buffer
-    e_vapor::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial water vapor buffer
     em::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial emissivity buffer
     LW_surf::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface longwave
     LW_down::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Downwelling longwave
@@ -84,7 +82,7 @@ end
         name -= expr
     end
 
-Declares the monthly output fields, one row per field. A row says what one
+Declare the monthly output fields, one row per field. A row says what one
 timestep adds to the monthly sum of `name`; each `struct.field` in `expr` is an
 `(xdim, ydim)` array, read cell by cell. `args` are the arguments of
 `accumulate!` after the accumulator.
@@ -140,8 +138,7 @@ macro output_fields(args, rows)
             return nothing
         end
 
-        monthly_means(acc::MonthlyAccumulator, nstep) =
-            $(Expr(:tuple, (Expr(:(=), name, :(acc.$name ./ nstep)) for name in names)...))
+        monthly_means(acc::MonthlyAccumulator, nstep) = $(Expr(:tuple, (Expr(:(=), name, :(acc.$name ./ nstep)) for name in names)...))
 
         function reset!(acc::MonthlyAccumulator)
             $((:(fill!(acc.$name, 0.0f0)) for name in names)...)
@@ -152,20 +149,20 @@ end
 
 # `tend` is what `tendencies!` returns
 @output_fields (surf::SurfaceState, tend, ws::ModelWorkspace) begin
-    Ts     += surf.Ts
-    Ta     += surf.Ta
-    To     += surf.To
-    q      += surf.q
+    Ts += surf.Ts
+    Ta += surf.Ta
+    To += surf.To
+    q += surf.q
     albedo += tend.albedo
-    ice    += tend.ice_cover
+    ice += tend.ice_cover
     precip += ws.precip
-    evap   += ws.evap
-    qcrcl  += ws.qcrcl
-    sw     += tend.SW
-    lw     += tend.LW_surf
-    qlat   += tend.Q_lat
-    qsens  += tend.Q_sens
-    olr    -= tend.LW_up + (1.0f0 - tend.em) * tend.LW_surf
+    evap += ws.evap
+    qcrcl += ws.qcrcl
+    sw += tend.SW
+    lw += tend.LW_surf
+    qlat += tend.Q_lat
+    qsens += tend.Q_sens
+    olr -= tend.LW_up + (1.0f0 - tend.em) * tend.LW_surf
     lwdown -= tend.LW_down
 end
 
@@ -330,6 +327,7 @@ function derive_fields!(fields::ClimateFields, p::Processes)
 
     cap_surf = fields.cap_surf
     for j in 1:ydim, i in 1:xdim
+
         cap_surf[i, j] = is_land(z_topo[i, j]) || p.ocean === :none ? cap_land : cap_ocean * mld_clim[i, j, 1]
     end
 

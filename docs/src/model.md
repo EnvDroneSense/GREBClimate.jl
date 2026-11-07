@@ -29,7 +29,7 @@ c_{surf} \frac{dT_{surf}}{dt} = F_{solar} + F_{thermal} + F_{latent} + F_{sense}
 ```
 
 - `c_surf`: surface heat capacity - the ocean mixed layer over ice-free ocean,
-  2 m of soil over land, falling to 2 m of water where sea ice forms
+  2 m of soil over land; where sea ice forms, the ocean value blends towards the land value
 - `F_solar`, `F_thermal`: absorbed sunlight, and longwave emission minus back-radiation
 - `F_latent`, `F_sense`: evaporative cooling, and turbulent heat exchange with the atmosphere
 - `F_ocean`: heat exchange with the deep ocean
@@ -71,7 +71,7 @@ terms, integrates the four prognostic fields, then updates sea ice.
 | Phase | CO₂ | Purpose |
 |:------|:----|:--------|
 | Flux-correction spin-up ([`SpinUp`](@ref)`(years)` in the config) | control | [`qflux_correction!`](@ref) derives the corrections for `Ts`, `To` and `q` that hold the control at the observed climatology; without them the model drifts by several K |
-| Control (`ctrl` years of the [`RunSpec`](@ref)) | control: 340 ppm (280 for the IPCC scenarios) | The reference climate |
+| Control (`ctrl` years of the [`RunSpec`](@ref)) | control: 340 ppm (280 for the CO₂-table presets) | The reference climate |
 | Scenario (`scnr` years) | set by [`forcing`](@ref) from the scenario | The experiment |
 
 The result holds monthly means (`MonthlyRecord`s) of 15 fields for the control

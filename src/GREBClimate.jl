@@ -6,20 +6,17 @@ module GREBClimate
 # A global climate model that steps surface/air/ocean temperature and
 # humidity forward under shortwave/longwave radiation, hydrology, sea ice,
 # deep-ocean coupling, and atmospheric circulation (diffusion, advection,
-# moisture convergence). An interactive Pluto version of the same model
-# lives in `viz/notebooks/GREB_explorer.jl`; see the package docs or README for
-# usage.
-#
-# Files below are included in dependency order: constants -> calendar ->
-# config/{processes,scenario,presets} -> data -> state -> io -> config/resolve
-# -> physics/{radiation,hydrology,ocean,circulation} -> tendencies -> budgets
-# -> forcing -> output -> postprocess -> model -> ensemble.
+# moisture convergence). The Pluto notebook `viz/notebooks/GREB_explorer.jl`
+# runs it interactively; the package docs and README cover usage.
 # =============================================================================
 
-using LoopVectorization   # @turbo SIMD
-using JLD2
 using Logging: with_logger, NullLogger
+
 using DataDeps: DataDeps, DataDep, register, unpack, @datadep_str
+using JLD2: JLD2, jldopen
+using LoopVectorization: LoopVectorization, @turbo   # SIMD
+using SLEEFPirates: SLEEFPirates
+using PrecompileTools: @compile_workload
 
 export Config, preset, preset_names, Scenario, Processes, Hydrology, mscm_hydrology
 export resolve, ResolvedConfig, ResolvedHydrology
@@ -30,9 +27,9 @@ export Solar, ModernSolar, SolarConstant, SolarCycle, SolarTable, EarthSunDistan
 export SurfaceForcing, NoSurfaceForcing, BoundaryAnomaly, SSTOffset
 export RunSpec, ModelWorkspace, MonthlyAccumulator, MonthlyRecord
 export ClimateFields, ModelState, SurfaceState
-export greb_data_dir
+export greb_data_dir, download_greb_pack
 export load_climatology, load_flux_corrections!, load_boundary_anomaly!, read_field
-export load_co2_scenario, load_co2_custom, load_solar_forcing
+export load_co2_scenario, co2_scenario_label, load_co2_custom, load_solar_forcing
 export apply_co2_mask!, apply_surface_mask!, forcing
 export monthly_climatology, scenario_anomalies, ice_climatology, global_mean
 export greb_model!, run_ensemble
@@ -44,10 +41,14 @@ include("core/calendar.jl")
 include("config/processes.jl")
 include("config/scenario.jl")
 include("config/presets.jl")
-include("data.jl")
 include("core/state.jl")
 include("io.jl")
+include("data.jl")
 include("config/resolve.jl")
+# The fast scalar log/exp that @turbo uses internally, callable from plain loops
+# (autodiff rules for them live in ext/GREBEnzymeExt.jl).
+@inline fastlog(x::AbstractFloat) = SLEEFPirates.log_fast(x)
+@inline fastexp(x::AbstractFloat) = SLEEFPirates.exp(x)
 include("physics/radiation.jl")
 include("physics/hydrology.jl")
 include("physics/ocean.jl")
@@ -67,16 +68,14 @@ function __init__()
     return nothing
 end
 
-using PrecompileTools: @compile_workload
-
 @compile_workload begin
     with_logger(NullLogger()) do
         # A control and a scenario year, so the scenario phase is compiled too
         greb_model!(RunSpec(ctrl=1, scnr=1), preset(:co2_double; corrections=NoCorrections());
-                    jld2_dir="", allow_uninitialized=true)
+            jld2_dir="", allow_uninitialized=true)
         greb_model!(RunSpec(scnr=0), preset(:full_model; hydrology=(evaporation=:skin,),
-                                             corrections=NoCorrections());
-                    jld2_dir="", allow_uninitialized=true)
+                corrections=NoCorrections());
+            jld2_dir="", allow_uninitialized=true)
     end
 end
 

@@ -1,5 +1,6 @@
-# One-time setup of the viz/ environment: link it to this clone of GREBClimate
-# (not registered) and install Plots, Pluto and PlutoUI.
+# Set up the viz/ environment: link it to this clone of GREBClimate (not
+# registered) and install Plots, Pluto and PlutoUI. Run it again after updating
+# the repository, so the environment follows the package's dependencies.
 #
 #   julia viz/setup.jl
 

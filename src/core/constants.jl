@@ -21,7 +21,7 @@ const pi_f32 = Float32(pi)   # π (model precision)
 const σ = 5.6704f-8            # Stefan-Boltzmann constant [W/m²/K⁴]
 const ρ_ocean = 999.1f0        # density of water at T=15°C [kg/m³]
 const ρ_land = 2600.0f0        # density of solid rock [kg/m³]
-const ρ_air = 1.2f0            # density of air at 20°C at sea
+const ρ_air = 1.2f0            # density of air at 20°C at sea level [kg/m³]
 const grav = 9.81f0            # gravitational acceleration [m/s²]
 const cp_ocean = 4186.0f0      # specific heat of water at T=15°C [J/kg/K]
 const cp_land = cp_ocean / 4.5f0 # specific heat of dry land [J/kg/K]
@@ -33,7 +33,7 @@ const d_land = 2.0f0                        # land column
 const d_air = 5000.0f0                      # air column
 
 # ── Heat capacities [J/K/m²] ────────────────────────────────────
-const cap_ocean = cp_ocean * ρ_ocean        # 1m ocean
+const cap_ocean = cp_ocean * ρ_ocean        # per metre of water [J/K/m³]; times a depth gives J/K/m²
 const cap_land = cp_land * ρ_land * d_land  # land column
 const cap_air = cp_air * ρ_air * d_air      # air column
 const ΔT_air_factor = Δt / cap_air           # [K m²/W]: flux to air temperature change per step
@@ -68,10 +68,10 @@ const c_effmix = 0.5f0                       # mixing efficiency
 const turb_coeff = Δt * co_turb / cap_ocean  # precomputed mixing coefficient
 
 # ── Atmospheric transport ───────────────────────────────────────
-const κ = 8f5                          # diffusion coefficient [m²/s]
+const κ = 8.0f5                          # diffusion coefficient [m²/s]
 
 # ── Latent heat / hydrology ─────────────────────────────────────
-const ce = 2f-3                        # latent heat transfer coefficient
+const ce = 2.0f-3                        # latent heat transfer coefficient
 const cq_latent = 2.257f6              # latent heat of evaporation [J/kg]
 const cq_rain = -0.1f0 / 24.0f0 / 3600.0f0   # rain-related vapor decrease [1/s]
 
@@ -89,7 +89,7 @@ const solar_percent = 100.0f0        # default 100%
 
 # ── Emissivity parameters (LWradiation!) ──────────────────────────
 const emissivity_fit = Float32[9.0721, 106.7252, 61.5562, 0.0179, 0.0028,
-                      0.0570, 0.3462, 2.3406, 0.7032, 1.0662]
+    0.0570, 0.3462, 2.3406, 0.7032, 1.0662]
 
 # ── Transport geometry [m, degrees] ───────────────────────────────
 const deg_grid = 2.0f0 * pi_f32 * 6.371f6 / 360.0f0
@@ -118,7 +118,7 @@ the other:
     row    1 … 3  │  4 … 99         │  100 … 102
     holds  94…96  │  1 … 96 (real)  │  1 … 3
 
-So `A[j-1, k]` is just `P[j+2, k]`.
+So `A[j-1, k]` is `P[j+2, k]`.
 
 `nghost` is the zonal stencils' reach, so it is 3 and they spell their offsets
 out literally (`j` … `j+6`); widening the stencil means widening both.
@@ -134,17 +134,16 @@ const xghost = xdim + 2 * nghost
 const polar_threshold = 2.5f5  # 250 km in meters
 const is_polar = [dxlat_grid[k] <= polar_threshold for k in 1:ydim]
 
+# Sub-steps per timestep for a row whose longest stable sub-step is `dt_max`
+_polar_substeps(dt_max) = max(1, round(Int, Δt_crcl / dt_max))
+
 function _polar_diff_step(k)
-    dd = max(1, round(Int, Δt_crcl / (dxlat_grid[k]^2 / κ)))
-    dtdff2 = Δt_crcl / dd
-    time2 = max(1, round(Int, Δt_crcl / dtdff2))
-    return (time2=time2, ccx2=κ * dtdff2 / dxlat_grid[k]^2)
+    time2 = _polar_substeps(dxlat_grid[k]^2 / κ)
+    return (time2=time2, ccx2=κ * (Δt_crcl / time2) / dxlat_grid[k]^2)
 end
 function _polar_adv_step(k)
-    dd = max(1, round(Int, Δt_crcl / (dxlat_grid[k] / 10.0f0)))
-    dtdff2 = Δt_crcl / dd
-    time2 = max(1, round(Int, Δt_crcl / dtdff2))
-    return (time2=time2, ccx2=dtdff2 / dxlat_grid[k] / 2.0f0)
+    time2 = _polar_substeps(dxlat_grid[k] / 10.0f0)
+    return (time2=time2, ccx2=(Δt_crcl / time2) / dxlat_grid[k] / 2.0f0)
 end
 
 const polar_diff_time2 = [_polar_diff_step(k).time2 for k in 1:ydim]

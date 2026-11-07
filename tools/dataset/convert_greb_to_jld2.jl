@@ -1,435 +1,240 @@
-### Convert GREB binary files to JLD2 (JuliaIO/JLD2.jl) files ###
+# Convert the raw GREB files (layout in DATA_README.md) into the `.jld2` dataset
+# read by `load_climatology` and `GREBClimate.read_field`. MAINTAINER TOOL: users
+# get the prepared packs (see README.md).
 #
-# MAINTAINER TOOL - users get the prepared `.jld2` bundle directly (see
-# README.md).
+# Each field becomes one file with the keys "data", "dim_names", "coords" (the
+# values of each axis), "description", "units", "source", "period" and
+# "dataset_version"; a GrADS `.bin` also keeps the text of its `.ctl` under "ctl".
+# The flux corrections, the solar scenario families and the CO2 text files are
+# combined into one file each (see below). Any failure stops the script.
 #
-# Converts the raw GREB `.bin` files (layout in DATA_README.md) into the
-# `.jld2` dataset read by `load_climatology`/`GREBClimate.read_field`.
-#
-# Each field becomes its own `.jld2` file with keys "data" (Array{Float32})
-# and "dim_names", plus optional "coords" and "ctl".
-#
-# Solar scenario families (eccentricity, obliquity) are discovered by globbing
-# `greb.solar.<prefix>.<N>.bin` and sorted numerically. CO₂ scenario text
-# files (`ipcc.scenario.<key>.forcing*.txt`) are parsed into `year => CO2`
-# tables and combined into `scenario/ipcc_scenarios.jld2`.
-#
-# Usage:
 #   julia --project=. tools/dataset/convert_greb_to_jld2.jl [input_dir] [output_dir] [--all]
-#   # defaults: input_dir = Data, output_dir = greb_input_data
-#   # --all: also convert fields the model never reads
+#   # defaults: Data, greb_input_data
+#   # --all also converts fields the model never reads (the packager refuses them)
 
 using JLD2
 
-# ============================================================================
-# CONSTANTS
-# ============================================================================
+include(joinpath(@__DIR__, "fields.jl"))   # file list, packs, metadata text
 
 const LON, LAT, TIME = 96, 48, 730
-const SIZE_2D = LON * LAT * 4
-const SIZE_3D = LON * LAT * TIME * 4
-const SIZE_SOLAR = LAT * TIME * 4
 
-# ============================================================================
-# CLASSIFICATION
-# ============================================================================
+# the layout of a raw file, by its size in bytes
+const LAYOUTS = Dict(
+    LON * LAT * 4 => ((LON, LAT), ["lon", "lat"]),
+    LON * LAT * TIME * 4 => ((LON, LAT, TIME), ["lon", "lat", "time"]),
+    LAT * TIME * 4 => ((LAT, TIME), ["lat", "time"])
+)
 
-function classify_by_size(size_bytes::Int)
-    if size_bytes == SIZE_2D
-        return (layout="lon_lat", dims=(LON, LAT), dim_names=["lon", "lat"])
-    elseif size_bytes == SIZE_3D
-        return (layout="lon_lat_time", dims=(LON, LAT, TIME), dim_names=["lon", "lat", "time"])
-    elseif size_bytes == SIZE_SOLAR
-        return (layout="lat_time", dims=(LAT, TIME), dim_names=["lat", "time"])
-    else
-        error("Unknown file size: $size_bytes")
-    end
-end
-
-# ============================================================================
-# RAW BINARY READER
-# ============================================================================
-
-function read_bin(bin_path::String, dims::Tuple)
+function read_bin(path::AbstractString, dims::Tuple)
     data = Vector{Float32}(undef, prod(dims))
-    open(bin_path, "r") do io; read!(io, data); end
+    read!(path, data)
     return reshape(data, dims)
 end
 
-# ============================================================================
-# JLD2 FIELD WRITER / READER
-# ============================================================================
-
-function write_jld2_field(filepath::String, data, dim_names::Vector{String};
-                           coords::Union{Nothing,Dict{Int,Vector{Float64}}}=nothing,
-                           ctl::Union{Nothing,String}=nothing)
-    mkpath(dirname(filepath))
-    jldopen(filepath, "w") do file
-        file["data"] = data
-        file["dim_names"] = dim_names
-        coords !== nothing && !isempty(coords) && (file["coords"] = coords)
-        ctl !== nothing && (file["ctl"] = ctl)
-    end
-end
-
-function read_jld2_field(filepath::String)
-    jldopen(filepath, "r") do file
-        return (
-            data=file["data"],
-            dim_names=file["dim_names"],
-            coords=haskey(file, "coords") ? file["coords"] : nothing,
-            ctl=haskey(file, "ctl") ? file["ctl"] : nothing,
-        )
-    end
-end
-
-function read_ctl_text(bin_path::String)
+function read_ctl_text(bin_path::AbstractString)
     ctl_path = splitext(bin_path)[1] * ".ctl"
     return isfile(ctl_path) ? read(ctl_path, String) : nothing
 end
 
-# ============================================================================
-# BATCH CONVERSION (main dataset)
-# ============================================================================
+# Axis values of the axes named in `dim_names`, keyed by axis number
+axis_coords(dim_names) = Dict{Int,Vector{Float64}}(
+    i => GRID_COORDS[Symbol(n)] for (i, n) in enumerate(dim_names) if haskey(GRID_COORDS, Symbol(n)))
 
-# The file list (MODEL_FIELD_NAMES, FLUX_CORRECTION_NAMES) is shared with the packager and
-# test/test_io.jl.
-include(joinpath(@__DIR__, "fields.jl"))
-
-function convert_all(input_path::String, output_dir::String)
-    println("🔄 CONVERTING TO JLD2")
-    println("="^50)
-    println("Input:  $input_path")
-    println("Output: $output_dir\n")
-
-    all_bins = filter(readdir(input_path; join=true)) do p
-        endswith(p, ".bin") && splitext(basename(p))[1] ∉ FLUX_CORRECTION_NAMES
+# The metadata of `info` (description, units, source, and period when it has one)
+function write_info(file, info)
+    for key in (:description, :units, :source, :period)
+        haskey(info, key) && (file[String(key)] = info[key])
     end
-
-    # Only convert fields the model reads. See MODEL_FIELD_NAMES above; pass
-    # `--all` to convert everything present.
-    convert_everything = "--all" in ARGS
-    bin_files = convert_everything ? all_bins :
-        filter(p -> splitext(basename(p))[1] ∈ MODEL_FIELD_NAMES, all_bins)
-    skipped = length(all_bins) - length(bin_files)
-
-    println("Found $(length(all_bins)) .bin files (flux corrections combined separately, see below)")
-    if convert_everything
-        println("--all given: converting all $(length(bin_files)), including fields the model never reads.")
-    else
-        println("Converting $(length(bin_files)) the model reads; skipping $skipped (pass --all to include them).")
-        for q in sort(filter(p -> splitext(basename(p))[1] ∉ MODEL_FIELD_NAMES, all_bins))
-            println("    skip  $(basename(q))")
-        end
-    end
-    println()
-
-    missing_fields = setdiff(MODEL_FIELD_NAMES,
-                             Set(splitext(basename(p))[1] for p in all_bins))
-    if !isempty(missing_fields)
-        @warn "Input directory is missing $(length(missing_fields)) field(s) the model reads; " *
-              "the resulting dataset will be incomplete." missing=sort(collect(missing_fields))
-    end
-
-    success, failed, total_bytes = 0, 0, 0
-
-    for bin_path in sort(bin_files)
-        name = splitext(basename(bin_path))[1]
-        size_bytes = stat(bin_path).size
-        class = classify_by_size(size_bytes)
-
-        if occursin(r"topography|glacier", name)
-            out_path = joinpath(output_dir, "static", "$name.jld2")
-        elseif occursin(r"solar_radiation", name)
-            out_path = joinpath(output_dir, "solar", "$name.jld2")
-        else
-            out_path = joinpath(output_dir, "climatology", "$name.jld2")
-        end
-
-        try
-            arr = read_bin(bin_path, class.dims)
-            write_jld2_field(out_path, arr, class.dim_names; ctl=read_ctl_text(bin_path))
-            total_bytes += size_bytes
-            println("  ✓ $name → $(size_bytes ÷ 1024) KB [$(join(class.dim_names, "×"))]")
-            success += 1
-        catch e
-            println("  ❌ $name: $e")
-            failed += 1
-        end
-    end
-
-    println("\n" * "="^50)
-    println("✅ CONVERSION COMPLETE")
-    println("  Successful: $success files")
-    println("  Failed: $failed files")
-    println("  Total data: $(round(total_bytes / 1e6, digits=1)) MB")
-    println("  Output: $output_dir")
+    file["dataset_version"] = DATASET_VERSION
 end
 
-"""Combine the three flux-correction fields into one `climatology/flux_corrections.jld2`, keyed by field name."""
-function convert_flux_corrections(input_path::String, output_dir::String)
-    println("\n🔄 CONVERTING FLUX CORRECTIONS (COMBINED)")
-    println("="^50)
+"Write a field file: the array, its axes, the metadata in `info`. `coords` adds or replaces axis values."
+function write_jld2_field(path::AbstractString, data, dim_names::Vector{String}, info;
+        coords::AbstractDict=Dict{Int,Vector{Float64}}(), ctl::Union{Nothing,String}=nothing)
+    mkpath(dirname(path))
+    jldopen(path, "w") do file
+        file["data"] = data
+        file["dim_names"] = dim_names
+        file["coords"] = merge(axis_coords(dim_names), coords)
+        write_info(file, info)
+        ctl === nothing || (file["ctl"] = ctl)
+    end
+end
 
-    out_path = joinpath(output_dir, "climatology", "flux_corrections.jld2")
-    mkpath(dirname(out_path))
-    jldopen(out_path, "w") do file
+# ---- the single fields ----
+
+function convert_fields(input_dir, output_dir; all::Bool)
+    bins = filter(p -> endswith(p, ".bin") && splitext(basename(p))[1] ∉ FLUX_CORRECTION_NAMES, readdir(input_dir; join=true))
+    name_of(p) = splitext(basename(p))[1]
+    skipped = filter(p -> name_of(p) ∉ MODEL_FIELD_NAMES, bins)
+    all || filter!(p -> name_of(p) ∈ MODEL_FIELD_NAMES, bins)
+    all || isempty(skipped) || println("  skipped $(length(skipped)) raw files the model never reads (--all converts them)")
+
+    absent = setdiff(MODEL_FIELD_NAMES, name_of.(bins))
+    isempty(absent) || error("$input_dir lacks $(length(absent)) field(s) the model reads: ", join(sort(collect(absent)), ", "))
+
+    folders = String[]
+    for path in sort(bins)
+        name = name_of(path)
+        dims, dim_names = LAYOUTS[stat(path).size]
+        folder = occursin(r"topography|glacier", name) ? "static" : occursin("solar_radiation", name) ? "solar" : "climatology"
+        write_jld2_field(joinpath(output_dir, folder, "$name.jld2"), read_bin(path, dims), dim_names, field_info(name);
+            ctl=read_ctl_text(path))
+        push!(folders, folder)
+    end
+    println("  fields: $(length(bins)) raw .bin files -> ", join(("$(count(==(f), folders)) in $f/" for f in unique(folders)), ", "))
+end
+
+"The three flux corrections in one file, keyed by field name."
+function convert_flux_corrections(input_dir, output_dir)
+    path = joinpath(output_dir, "climatology", "flux_corrections.jld2")
+    mkpath(dirname(path))
+    jldopen(path, "w") do file
         for name in FLUX_CORRECTION_NAMES
-            bin_path = joinpath(input_path, "$name.bin")
-            if isfile(bin_path)
-                arr = read_bin(bin_path, (LON, LAT, TIME))
-                file[name] = arr
-                println("  ✓ $name → combined")
-            else
-                println("  ⚠ $name.bin not found - omitted; load_climatology needs it")
+            file[name] = read_bin(joinpath(input_dir, "$name.bin"), (LON, LAT, TIME))
+        end
+        dim_names = ["lon", "lat", "time"]
+        file["dim_names"] = dim_names
+        file["coords"] = axis_coords(dim_names)
+        file["description"] = Dict(String(k) => v.description for (k, v) in pairs(FLUX_CORRECTION_INFO))
+        file["units"] = Dict(String(k) => v.units for (k, v) in pairs(FLUX_CORRECTION_INFO))
+        write_info(file, (source=SOURCE_GREB, period="mean year"))
+    end
+    println("  flux corrections: ", join(FLUX_CORRECTION_NAMES, ", "), " -> climatology/flux_corrections.jld2")
+end
+
+# ---- the solar scenarios: the paleo file, and the eccentricity and obliquity families ----
+
+"Stack the files `greb.solar.<prefix>.<N>.bin` of `dir`, sorted by the number N, along a new first axis called `index_name`."
+function convert_solar_family(dir, prefix, out_path, index_name, description)
+    found = [(parse(Float64, m[1]), joinpath(dir, f)) for f in readdir(dir)
+             for m in (match(Regex("^greb\\.solar\\.$prefix\\.(\\d+)\\.bin\$"), f),) if m !== nothing]
+    isempty(found) && error("no files greb.solar.$prefix.<N>.bin in $dir")
+    sort!(found; by=first)
+    stack = permutedims(cat((read_bin(p, (LAT, TIME)) for (_, p) in found)...; dims=3), (3, 1, 2))
+    write_jld2_field(out_path, stack, [index_name, "lat", "time"],
+        (description=description, units="W m-2", source=SOURCE_GREB, period="mean year");
+        coords=Dict(1 => first.(found), 2 => GRID_COORDS.lat, 3 => GRID_COORDS.time))
+    return length(found)
+end
+
+function convert_solar_scenarios(input_dir, output_dir)
+    dir = joinpath(input_dir, "solar_forcing_scenarios")
+    isdir(dir) || error("$dir not found (the solar pack needs it)")
+    paleo = joinpath(dir, "greb.solar.231K_hybers.corrected.bin")
+    write_jld2_field(joinpath(output_dir, "solar_paleo.jld2"), read_bin(paleo, (LAT, TIME)), ["lat", "time"],
+        (description="Top-of-atmosphere solar radiation of the 231 kyr paleo experiment", units="W m-2",
+            source=SOURCE_GREB, period="mean year"); ctl=read_ctl_text(paleo))
+    counts = map((("eccentricity", "ecc_index"), ("obliquity", "obl_index"))) do (prefix, index_name)
+        convert_solar_family(dir, prefix, joinpath(output_dir, "solar_$prefix.jld2"), index_name,
+            "Top-of-atmosphere solar radiation for each orbital $prefix scenario")
+    end
+    println("  solar scenarios: the paleo table, $(counts[1]) eccentricity and $(counts[2]) obliquity tables -> solar_scenarios/")
+end
+
+# ---- the CO2 text files (RCP, SSP, historical), combined into one file ----
+
+# The Fortran file names call the RCP6.0 table "rcp6"; the dataset calls it "rcp60".
+const TABLE_KEY_RENAMES = Dict("rcp6" => "rcp60")
+
+# The SSP files hold the RCP (CO2-equivalent) history up to 2008 and CO2 only from
+# this year on. The dataset replaces their earlier years with the historical CO2
+# record, so each SSP table is CO2 only throughout.
+const SSP_FIRST_CO2_YEAR = 2009
+
+"What a table holds: `co2` for the SSP and historical tables, `co2_equivalent` for the RCP tables."
+co2_label(key::AbstractString) = startswith(key, "rcp") ? "co2_equivalent" : "co2"
+
+"Read a text file of `year value ...` lines into a `year => column` table (`column` is the column of the value)."
+function parse_table(path::AbstractString, column::Int=2)
+    cols = [split(strip(line)) for line in eachline(path) if !isempty(strip(line))]
+    return Dict(parse(Int, c[1]) => parse(Float64, c[column]) for c in cols)
+end
+
+"""
+Replace the years before `SSP_FIRST_CO2_YEAR` of every SSP table with the historical
+CO2 record `hist`, and return the set of years replaced. An SSP table must equal `hist`
+in its first CO2-only year, or the tables are not what this assumes.
+"""
+function splice_co2_history!(scenarios::Dict{String,Dict{Int,Float64}})
+    hist = get(scenarios, "hist") do
+        error("the historical CO2 table (ipcc.scenario.hist.forcing*.txt) is missing")
+    end
+    replaced = Set{Int}()
+    for (key, table) in scenarios
+        startswith(key, "ssp") || continue
+        isapprox(table[SSP_FIRST_CO2_YEAR], hist[SSP_FIRST_CO2_YEAR]; atol=0.01) ||
+            error("$key in $SSP_FIRST_CO2_YEAR is $(table[SSP_FIRST_CO2_YEAR]) but the historical CO2 is " *
+                  "$(hist[SSP_FIRST_CO2_YEAR]): the tables do not meet")
+        for year in filter(<(SSP_FIRST_CO2_YEAR), collect(keys(table)))
+            table[year] = get(hist, year) do
+                error("the historical CO2 table has no value for $year (needed by $key)")
             end
+            push!(replaced, year)
         end
     end
-    println("✅ Wrote flux corrections → $out_path\n")
-end
-
-# ============================================================================
-# SOLAR SCENARIOS (GROUPED) - discovered by glob, not a hardcoded stride
-# ============================================================================
-
-function read_solar_bin(filepath::String)
-    return read_bin(filepath, (LAT, TIME))
-end
-
-"""Find `greb.solar.<prefix>.<N>.bin` files in `dir`, sorted by N (not lexicographically)."""
-function discover_indexed_scenario_files(dir::String, prefix::String)
-    pattern = Regex("^greb\\.solar\\.$(prefix)\\.(\\d+)\\.bin\$")
-    matches = Tuple{Float64,String}[]
-    for fname in readdir(dir)
-        m = match(pattern, fname)
-        m === nothing && continue
-        push!(matches, (parse(Float64, m.captures[1]), joinpath(dir, fname)))
-    end
-    isempty(matches) && error("No files found matching greb.solar.$(prefix).<N>.bin in $dir")
-    sort!(matches, by=first)
-    values = first.(matches)
-    paths = last.(matches)
-    return values, paths
-end
-
-function convert_scenario_family(dir::String, prefix::String, output_path::String, index_name::String)
-    values, paths = discover_indexed_scenario_files(dir, prefix)
-
-    stack = Vector{Any}(undef, length(paths))
-    missing_idx = Int[]
-    for (i, path) in enumerate(paths)
-        if isfile(path)
-            stack[i] = read_solar_bin(path)
-        else
-            push!(missing_idx, i)
-        end
-    end
-
-    if !isempty(missing_idx)
-        error("$(length(missing_idx))/$(length(paths)) expected $prefix files went missing between listing and reading: " *
-              join(paths[missing_idx], ", "))
-    end
-
-    arr_3d = permutedims(cat(stack..., dims=3), [3, 1, 2])
-    write_jld2_field(output_path, arr_3d, [index_name, "lat", "time"];
-                      coords=Dict(1 => values))
-    return length(paths)
-end
-
-function convert_solar_scenarios(input_path::String, output_dir::String)
-    println("🔄 CONVERTING SOLAR SCENARIOS (GROUPED)")
-    println("="^60)
-
-    solar_dir = joinpath(input_path, "solar_forcing_scenarios")
-    if !isdir(solar_dir)
-        println("  ⚠ $solar_dir not found - skipping solar scenarios (optional, see DATA_README.md)")
-        return
-    end
-    mkpath(output_dir)
-
-    # Paleo (single file, not an indexed family)
-    paleo_path = joinpath(solar_dir, "greb.solar.231K_hybers.corrected.bin")
-    if isfile(paleo_path)
-        try
-            write_jld2_field(joinpath(output_dir, "solar_paleo.jld2"),
-                              read_solar_bin(paleo_path), ["lat", "time"];
-                              ctl=read_ctl_text(paleo_path))
-            println("  ✓ Paleo (48×730)")
-        catch e
-            println("  ❌ Paleo: $e")
-        end
-    else
-        println("  ⚠ Paleo file not found, skipping: $paleo_path")
-    end
-
-    # Eccentricity (all greb.solar.eccentricity.<N>.bin files, whatever N range exists)
-    try
-        n = convert_scenario_family(solar_dir, "eccentricity",
-                                     joinpath(output_dir, "solar_eccentricity.jld2"), "ecc_index")
-        println("  ✓ Eccentricity ($(n)×48×730)")
-    catch e
-        println("  ❌ Eccentricity: $e")
-    end
-
-    # Obliquity (all greb.solar.obliquity.<N>.bin files)
-    try
-        n = convert_scenario_family(solar_dir, "obliquity",
-                                     joinpath(output_dir, "solar_obliquity.jld2"), "obl_index")
-        println("  ✓ Obliquity ($(n)×48×730)")
-    catch e
-        println("  ❌ Obliquity: $e")
-    end
-
-    println("\n✅ Solar scenarios converted to 3 grouped files")
-end
-
-# ============================================================================
-# CO₂ SCENARIO TEXT FILES (RCP/SSP/historical) - combined into one JLD2 file
-# ============================================================================
-
-"""Parse `ipcc.scenario.*.forcing*.txt` (`year CO2 [...]` per line) into a `year => CO2` table; extra columns are ignored."""
-function parse_co2_scenario(path::String)
-    table = Dict{Int,Float64}()
-    for line in eachline(path)
-        cols = split(strip(line))
-        isempty(cols) && continue
-        table[parse(Int, cols[1])] = parse(Float64, cols[2])
-    end
-    return table
+    return replaced
 end
 
 """
-Parse `ipcc.scenario.hist.forcing.CO2.emission.pop.txt`'s columns 3-4 (`year
-CO2 emissions population` per line) into a `year => (co2_emissions_gt_co2_yr,
-population_billions)` table.
-
-column 3: global annual CO2 emissions in Gt CO2/yr
-column 4: world population in billions over 1850-2017)
+Combine every `ipcc.scenario.<key>.forcing*.txt` of `input_dir` into
+`ipcc_scenarios.jld2` (RCP6.0 as `rcp60`, with a label per table), and the emissions
+and population columns of the historical file into `historical_emissions_population.jld2`.
 """
-function parse_historical_emissions_population(path::String)
-    table = Dict{Int,NamedTuple{(:co2_emissions_gt_co2_yr, :population_billions),Tuple{Float64,Float64}}}()
-    for line in eachline(path)
-        cols = split(strip(line))
-        isempty(cols) && continue
-        table[parse(Int, cols[1])] = (
-            co2_emissions_gt_co2_yr=parse(Float64, cols[3]),
-            population_billions=parse(Float64, cols[4]),
-        )
-    end
-    return table
-end
-
-"""Parse every `ipcc.scenario.<key>.forcing*.txt` in `input_path` into one combined `scenario/ipcc_scenarios.jld2`, keyed by `<key>`."""
-function convert_scenario_texts(input_path::String, output_dir::String)
-    println("🔄 CONVERTING CO₂ SCENARIO FILES")
-    println("="^50)
-
+function convert_scenario_texts(input_dir, output_dir)
     pattern = r"^ipcc\.scenario\.(.+)\.forcing.*\.txt$"
-    txt_files = filter(f -> match(pattern, basename(f)) !== nothing,
-                        readdir(input_path; join=true))
+    paths = [(String(get(TABLE_KEY_RENAMES, m[1], m[1])), joinpath(input_dir, f))
+             for f in readdir(input_dir) for m in (match(pattern, f),) if m !== nothing]
+    scenarios = Dict(key => parse_table(path) for (key, path) in paths)
+    replaced = splice_co2_history!(scenarios)
 
-    if isempty(txt_files)
-        println("  ⚠ No ipcc.scenario.*.forcing*.txt files found in $input_path - skipping\n")
-        return
-    end
-
-    scenarios = Dict{String,Dict{Int,Float64}}()
-    hist_path = nothing
-    for path in sort(txt_files)
-        key = match(pattern, basename(path)).captures[1]
-        key == "hist" && (hist_path = path)
-        try
-            scenarios[key] = parse_co2_scenario(path)
-            println("  ✓ $(basename(path)) → \"$key\" ($(length(scenarios[key])) years)")
-        catch e
-            println("  ❌ $(basename(path)): $e")
-        end
-    end
-
-    out_path = joinpath(output_dir, "ipcc_scenarios.jld2")
-    mkpath(dirname(out_path))
-    jldopen(out_path, "w") do file
+    mkpath(output_dir)
+    jldopen(joinpath(output_dir, "ipcc_scenarios.jld2"), "w") do file
         file["scenarios"] = scenarios
+        file["labels"] = Dict(key => co2_label(key) for key in keys(scenarios))
+        file["periods"] = Dict(key => "$(minimum(keys(t)))-$(maximum(keys(t)))" for (key, t) in scenarios)
+        write_info(file, (description="CO2 per year of each scenario. labels: co2 is CO2 only, co2_equivalent is an " *
+                                      "equivalent concentration that includes the other gases and aerosol. " *
+                                      "The SSP tables hold the historical CO2 record before $SSP_FIRST_CO2_YEAR.",
+            units="ppm", source=SOURCE_IPCC))
     end
-    println("✅ Wrote $(length(scenarios)) scenario table(s) → $out_path\n")
 
-    if hist_path !== nothing
-        try
-            emissions_pop = parse_historical_emissions_population(hist_path)
-            ep_path = joinpath(output_dir, "historical_emissions_population.jld2")
-            jldopen(ep_path, "w") do file
-                file["data"] = emissions_pop
-            end
-            println("✅ Wrote historical emissions/population ($(length(emissions_pop)) years) → $ep_path\n")
-        catch e
-            println("  ❌ historical emissions/population: $e\n")
-        end
+    # columns 3-4 of the historical file: CO2 emissions in Gt CO2/yr, world population in billions
+    hist_path = last(paths[findfirst(p -> first(p) == "hist", paths)])
+    emissions = parse_table(hist_path, 3)
+    population = parse_table(hist_path, 4)
+    data = Dict(year => (co2_emissions_gt_co2_yr=emissions[year], population_billions=population[year])
+    for year in sort(collect(keys(emissions))))
+    jldopen(joinpath(output_dir, "historical_emissions_population.jld2"), "w") do file
+        file["data"] = data
+        write_info(file, (description="Historical CO2 emissions and world population per year",
+            units=Dict("co2_emissions_gt_co2_yr" => "Gt CO2 yr-1", "population_billions" => "1e9"),
+            source=SOURCE_IPCC, period="$(minimum(keys(data)))-$(maximum(keys(data)))"))
     end
+    ssp = sort!([k for k in keys(scenarios) if startswith(k, "ssp")])
+    println("  CO2 tables: ", join(sort!(collect(keys(scenarios))), ", "), " -> scenario/ipcc_scenarios.jld2")
+    println("    rcp6 is stored as rcp60; $(join(ssp, ", ")) take the historical CO2 for ",
+        "$(minimum(replaced))-$(maximum(replaced)) (labels: co2 for ssp* and hist, co2_equivalent for rcp*)")
+    println("  historical emissions and population, $(minimum(keys(data)))-$(maximum(keys(data))) -> scenario/historical_emissions_population.jld2")
 end
 
-# ============================================================================
-# VERIFICATION
-# ============================================================================
-
-function verify(output_dir::String)
-    println("\n" * "="^60)
-    println("🔍 VERIFICATION")
-    println("="^60)
-
-    for (name, path) in [
-        ("Static", joinpath(output_dir, "static", "global.topography.jld2")),
-        ("Solar", joinpath(output_dir, "solar", "solar_radiation.clim.jld2")),
-        ("3D", joinpath(output_dir, "climatology", "ncep.tsurf.1948-2007.clim.jld2")),
-        ("Paleo", joinpath(output_dir, "solar_scenarios", "solar_paleo.jld2")),
-        ("Eccentricity", joinpath(output_dir, "solar_scenarios", "solar_eccentricity.jld2")),
-        ("Obliquity", joinpath(output_dir, "solar_scenarios", "solar_obliquity.jld2")),
-    ]
-        if isfile(path)
-            result = read_jld2_field(path)
-            println("✅ $name: $(size(result.data)) → $(join(result.dim_names, "×"))")
-        end
-    end
-
-    scenario_path = joinpath(output_dir, "scenario", "ipcc_scenarios.jld2")
-    if isfile(scenario_path)
-        scenarios = jldopen(scenario_path, "r") do file
-            file["scenarios"]
-        end
-        println("✅ CO2 scenarios: $(sort(collect(keys(scenarios))))")
-    end
-
-    println("\n✅ Done!")
-end
-
-# ============================================================================
-# ENTRY POINT
-# ============================================================================
-
-function main(input_path::String, output_dir::String)
-    if !isdir(input_path)
-        error("Input directory not found: $input_path (see DATA_README.md for the expected layout)")
-    end
-    convert_all(input_path, output_dir)
-    convert_flux_corrections(input_path, output_dir)
-    convert_solar_scenarios(input_path, joinpath(output_dir, "solar_scenarios"))
-    convert_scenario_texts(input_path, joinpath(output_dir, "scenario"))
-    verify(output_dir)
+function main(input_dir, output_dir; all::Bool=false)
+    isdir(input_dir) || error("""
+        Raw input directory not found: $input_dir (layout: DATA_README.md). Pass it explicitly:
+            julia --project=. tools/dataset/convert_greb_to_jld2.jl <input_dir> [output_dir]""")
+    println("Converting $input_dir -> $output_dir")
+    convert_fields(input_dir, output_dir; all)
+    convert_flux_corrections(input_dir, output_dir)
+    convert_solar_scenarios(input_dir, joinpath(output_dir, "solar_scenarios"))
+    convert_scenario_texts(input_dir, joinpath(output_dir, "scenario"))
+    files = [f for (root, _, names) in walkdir(output_dir) for f in joinpath.(root, names) if endswith(f, ".jld2")]
+    println("Done: $(length(files)) .jld2 files, $(round(sum(filesize, files) / 1048576; digits=1)) MB in $output_dir.")
+    println("Next: julia --project=. tools/dataset/package_dataset.jl $output_dir (checks the tree, builds the packs).")
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    input_path = length(ARGS) >= 1 ? ARGS[1] : joinpath(@__DIR__, "..", "..", "Data")
-    if !isdir(input_path)
-        error("""
-              Raw .bin input directory not found: $input_path
-
-              Pass it explicitly:
-                  julia --project=. tools/dataset/convert_greb_to_jld2.jl <input_dir> [output_dir]
-
-              This is a maintainer tool for regenerating the .jld2 bundle from raw
-              GREB .bin files; see DATA_README.md. To *use* the package you only
-              need the prepared .jld2 dataset - see README.md, "Getting the data".
-              """)
-    end
-    output_dir = length(ARGS) >= 2 ? ARGS[2] : joinpath(@__DIR__, "..", "..", "greb_input_data")
-    main(input_path, output_dir)
+    positional = filter(a -> !startswith(a, "--"), ARGS)
+    main(length(positional) >= 1 ? positional[1] : joinpath(@__DIR__, "..", "..", "Data"),
+        length(positional) >= 2 ? positional[2] : joinpath(@__DIR__, "..", "..", "greb_input_data");
+        all="--all" in ARGS)
 end

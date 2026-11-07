@@ -1,8 +1,9 @@
 # Tutorial
 
-This walks through the same flow as [`examples/run_greb.jl`](https://github.com/EnvDroneSense/GREBClimate.jl/blob/main/examples/run_greb.jl):
-load input data, configure an experiment, run the model, and inspect the
-result.
+This explains the steps of a run: load input data, configure an experiment, run
+the model, and inspect the result. The [Examples](examples.md) page shows the
+same steps as scripts you can run, and an ensemble that asks which processes
+carry the warming.
 
 ## 1. Load input data
 
@@ -13,24 +14,24 @@ jld2_dir = greb_data_dir()                            # see below
 fields = load_climatology(jld2_dir; dataset = :ncep)   # or :era
 ```
 
-[`greb_data_dir`](@ref) returns the dataset directory, downloading and caching
-it (~353 MB) on first use if no local copy is found. It checks an explicit path,
-then `$GREB_DATA`, then `greb_input_data/` beside the package, and only then the
-network - so if you already have the data, nothing is fetched. Pass a path
-directly if you prefer: `greb_data_dir("/path/to/greb_input_data")`, or hand
-`load_climatology` the path itself. See [Input data](@ref).
+[`greb_data_dir`](@ref) returns the dataset directory. It looks in this order:
+an explicit path, `$GREB_DATA`, `greb_input_data/` in the package's top folder,
+and an earlier download. Only when none of them exists does it download and cache
+the dataset (a 321 MB download), so a local copy is never fetched again. You can pass the
+path yourself, as in `greb_data_dir("/path/to/greb_input_data")`, or give
+`load_climatology` the path directly. See [Input data](@ref).
 
-`fields` is a [`ClimateFields`](@ref) - climatology, grid geometry, flux
-corrections, and the regional-CO₂ mask/solar table. Every physics function
-takes it as an explicit argument; nothing is shared as module-global state,
-so you can hold several independent `fields` instances (e.g. for parameter
-sweeps) in the same session.
+`fields` is a [`ClimateFields`](@ref): the climatology, the grid geometry, the
+flux corrections, and the regional-CO₂ mask and solar table. Every physics
+function takes it as an argument and nothing is kept in module-global state, so
+one session can hold several independent `fields`, for example for parameter
+sweeps.
 
-!!! warning "`load_climatology` returns the data - it does not set globals"
-    The returned `fields` must be passed to [`greb_model!`](@ref) explicitly
-    (step 3). A bare [`ClimateFields`](@ref) is all zeros, and stepping the
-    model on a zero climatology runs to completion and returns NaN in
-    every field. `greb_model!` therefore refuses unloaded fields; see [Data-free runs](@ref) below.
+!!! warning "`load_climatology` returns the data and sets no globals"
+    Pass the returned `fields` to [`greb_model!`](@ref) (step 3). A bare
+    [`ClimateFields`](@ref) is all zeros, and a model stepped on a zero climatology
+    finishes without an error and returns NaN in every field. `greb_model!`
+    therefore refuses unloaded fields; see [Data-free runs](@ref) below.
 
 ## 2. Configure the experiment
 
@@ -41,9 +42,9 @@ sweeps) in the same session.
 cfg = preset(:full_model)   # or :co2_double, :elnino, :ssp585, ...
 ```
 
-A `Config` is immutable. Change a preset's physics with a NamedTuple of
+A `Config` is immutable. To change a preset's physics, pass a NamedTuple of
 [`Processes`](@ref) or [`Hydrology`](@ref) options, or build a config from its
-parts; the [Configuration](@ref) page lists every option.
+parts. The [Configuration](@ref) page lists every option.
 
 ```julia
 cfg = preset(:co2_double; hydrology = (rain = :rh,))
@@ -65,11 +66,11 @@ run = RunSpec(ctrl = 5, scnr = 15)
 result = greb_model!(run, cfg; jld2_dir = jld2_dir, fields = fields)
 ```
 
-This runs, in order: a flux-correction spin-up that holds the control climate
-at the observed climatology, a control run, and a scenario run under the
-experiment's forcing. The spin-up and control run at the scenario's control
-CO₂, 340 ppm (280 ppm for the IPCC CO₂-table scenarios); the scenario sets its
-own CO₂.
+A run has three phases, in this order: a flux-correction spin-up that holds the
+control climate at the observed climatology, a control run, and a scenario run
+under the experiment's forcing. The spin-up and the control run use the control
+CO₂: 340 ppm, or 280 ppm for the presets that read a CO₂ table (`:rcp*`,
+`:ssp*`, `:historical_co2`, `:a1b`, `:custom_co2`). The scenario sets its own CO₂.
 
 The run reports its progress through the logger, one line per phase and per
 simulated year:
@@ -81,8 +82,8 @@ simulated year:
 [ Info: 1970: Ts global mean 13.82 °C; 178 E 9 N 26.79; 58 E 51 N 4.85
 ```
 
-The yearly line is the area-weighted annual mean of the surface temperature
-and its value in two cells. To run without these lines, use a null logger:
+Each yearly line gives the area-weighted annual mean of the surface temperature
+and its value in two cells. To silence these lines, run under a null logger:
 
 ```julia
 using Logging
@@ -91,13 +92,13 @@ result = with_logger(NullLogger()) do
 end
 ```
 
-The spin-up is part of the config: `corrections = SpinUp(3)`, the original
-GREB spin-up, is the default. `Stored()` uses the dataset's corrections
-without a spin-up. They were computed with the MSCM physics, so with the
-default hydrology the control drifts (about +2 K over 5 years in a
-`:full_model` run), which shows up in the scenario anomaly. `NoCorrections()`
-runs without any; with the default hydrology such a run diverges within about
-15 years.
+The spin-up is part of the config. The default is `corrections = SpinUp(3)`, the
+original GREB spin-up. `Stored()` uses the dataset's corrections and skips the
+spin-up. Those corrections were computed with the MSCM physics, so with the
+default hydrology the control drifts (about +2 K over 5 years in a `:full_model`
+run), and the drift shows up in the scenario anomaly. `NoCorrections()` runs
+without any corrections; with the default hydrology such a run diverges within
+about 15 years.
 
 ## 4. Inspect results
 
@@ -120,9 +121,9 @@ absolute for the orbital experiments (`:obliquity`, `:eccentricity`,
 `:earth_sun_distance`, whose scenario `output` is `:absolute`) and when
 `ctrl = 0`.
 
-A plain `mean` over the grid over-weights the polar rows (for the surface
-temperature it reads 8 to 11 K too cold). [`global_mean`](@ref) weights each
-row by the cosine of its latitude:
+A plain `mean` over the grid gives the polar rows too much weight; for the
+surface temperature it reads 8 to 11 K too cold. [`global_mean`](@ref) weights
+each row by the cosine of its latitude:
 
 ```julia
 Ts_global_mean = [global_mean(rec.Ts) for rec in result.ctrl]
@@ -135,19 +136,18 @@ The year and month of record `i` are `result.ctrl_time[i]` and
 july = [rec.Ts for (rec, time) in zip(result.scnr, result.scnr_time) if time.month == 7]
 ```
 
-For the model's own calendar (365 days, 730 steps a year, no
-leap years) there are [`step_of_year`](@ref), [`day_of_year`](@ref),
-[`month_of_step`](@ref) and [`decimal_year`](@ref).
+The model's own calendar has 365 days, 730 steps a year and no leap years.
+[`step_of_year`](@ref), [`day_of_year`](@ref), [`month_of_step`](@ref) and
+[`decimal_year`](@ref) convert between them.
 
 The [Plots and notebook](@ref) page shows how to plot a result.
 
 ## 5. Run many configurations
 
-[`run_ensemble`](@ref) runs a list of configs side by side, one task per
-member, and returns one entry per config in the same order. Each member runs
-on its own copy of `fields` and gives exactly the result of running it alone.
-The function passed first is applied to each result inside its task, so only
-what it returns is kept:
+[`run_ensemble`](@ref) runs a list of configs side by side and returns one entry
+per config, in the same order. Each member gives exactly the result of running
+it alone. The function passed first is applied to each result inside its task,
+so only what it returns is kept:
 
 ```julia
 configs = [preset(:co2_double; hydrology = (evaporation = e,))
@@ -158,18 +158,18 @@ warming = run_ensemble(RunSpec(ctrl = 1, scnr = 30), configs;
 end
 ```
 
-Start Julia with several threads (`julia -t 8,0`) for the members to run in
-parallel. `ntasks` sets how many run at once; each needs a copy of `fields`,
-about 370 MB. A member whose physics differs from the default needs its own
-spin-up (the default `SpinUp(3)`), because the stored corrections fit one
-configuration only.
+Start Julia with several threads (`julia -t 8,0`) so that the members run in
+parallel. `ntasks` sets how many run at once (default: the number of threads).
+Each task works on its own copy of `fields`, about 370 MB. A member whose
+physics differs from the default needs its own spin-up (the default
+`SpinUp(3)`), because the stored corrections fit one configuration only.
 
 ## 6. Check a run
 
-`greb_model!` takes an `observer`, a function called twice per step with the
-state. Two are included. `GREBClimate.RangeCheck()` notices a run that leaves
-the physical range without going non-finite, which can otherwise pass for a
-result:
+`greb_model!` takes an `observer`, a function that is called twice per step with
+the state. Two observers are included. `GREBClimate.RangeCheck()` catches a run
+that leaves the physical range without turning non-finite, which could otherwise
+pass for a result:
 
 ```julia
 check = GREBClimate.RangeCheck()
@@ -179,23 +179,22 @@ check.first                   # the first step outside, or nothing
 check.seen                    # lowest and highest value of each field
 ```
 
-`GREBClimate.BudgetCheck()` checks the model's bookkeeping: that each store
-changes by the sum of its flows. See their docstrings in the
-[API Reference](@ref).
+`GREBClimate.BudgetCheck()` checks the model's bookkeeping: each store must
+change by the sum of its flows. Both have docstrings in the
+[API Reference](@ref), and [Diagnostics](dev/diagnostics.md) shows a budget report.
 
 ## Data-free runs
 
-Some runs legitimately need no dataset: tests that exercise configuration or
-CO₂-scenario plumbing rather than physics, and the package's own
-precompilation, which must not require a 353 MB download. These opt in
-explicitly:
+Some runs need no dataset: tests of the configuration or the CO₂-scenario
+plumbing rather than the physics, and the package's own precompilation, which
+must not require a 321 MB download. These runs opt in explicitly:
 
 ```julia
 greb_model!(RunSpec(scnr = 0), cfg; jld2_dir = "", allow_uninitialized = true)
 ```
 
-Results from such a run are structurally valid but physically meaningless -
-use them to check shapes and code paths, never climate numbers.
+The results of such a run have the right shape but no physical meaning. Use them
+to check shapes and code paths, never to read climate numbers.
 
 ## Next steps
 
@@ -203,9 +202,4 @@ use them to check shapes and code paths, never climate numbers.
 - The [Configuration](@ref) page documents every option and preset.
 - The [Model overview](@ref) explains what each component computes.
 - [Plots and notebook](@ref) shows how to plot a result and explore it interactively.
-- `benchmark/run_benchmarks.jl` micro-benchmarks the per-timestep physics
-  kernels (`year`, `stages`, `threads`, `alloc` and `years` modes - the last
-  runs a `--ctrl`/`--scnr`-year control+scenario run, for long-run cost and
-  stability rather than one year).
-- `test/runtests.jl` doubles as executable documentation for individual
-  kernels' behavior under different configurations.
+- The `test/` directory has one file per subject and shows how the kernels behave under different configurations.

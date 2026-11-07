@@ -6,5 +6,5 @@
 using Aqua
 
 @testset "Aqua quality assurance" begin
-    Aqua.test_all(GREBClimate; persistent_tasks = false)
+    Aqua.test_all(GREBClimate; persistent_tasks=false)
 end

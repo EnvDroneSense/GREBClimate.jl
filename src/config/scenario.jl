@@ -70,8 +70,8 @@ end
     SeasonalCO2(in_season, out_of_season, season)
 
 `in_season` ppm during `season`, `out_of_season` ppm for the rest of the year.
-`:boreal_winter` is 1 October through the first step of 1 April (steps 547-730 and 1-181), half the year,
-`:boreal_summer` is April to September.
+Each season is half the year: `:boreal_winter` is steps 547-730 and 1-181 (1
+October to the first step of 1 April), `:boreal_summer` the steps between.
 """
 struct SeasonalCO2 <: CO2Path
     in_season::Float32
@@ -213,8 +213,8 @@ struct NoSurfaceForcing <: SurfaceForcing end
     BoundaryAnomaly(source)
 
 Anomalies of surface temperature, winds and vertical velocity added to the
-climatology for the scenario, with surface temperature held at it: `source`
-is `:cmip5_rcp85`, `:elnino` or `:lanina`.
+climatology for the scenario, and the surface temperature is held at the
+result. `source` is `:cmip5_rcp85`, `:elnino` or `:lanina`.
 """
 struct BoundaryAnomaly <: SurfaceForcing
     source::Symbol
@@ -254,7 +254,7 @@ struct Scenario
 end
 
 function Scenario(; co2=ConstantCO2(340), co2_mask=UniformMask(), solar=ModernSolar(),
-    surface=NoSurfaceForcing(), control_co2=340, start_year=1950, output=:anomaly)
+        surface=NoSurfaceForcing(), control_co2=340, start_year=1950, output=:anomaly)
     _check_option(:output, output, (:anomaly, :absolute))
     return Scenario(co2, co2_mask, solar, surface, control_co2, start_year, output)
 end
