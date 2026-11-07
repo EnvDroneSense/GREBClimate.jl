@@ -1,6 +1,6 @@
 # Every experiment preset is what the reference recorded: its forcing and its
 # physics (test/support/data/preset_reference.jl, written by
-# tools/validation/preset_reference.jl). A preset changed on purpose means
+# test/support/preset_reference.jl). A preset changed on purpose means
 # regenerating the reference in the same commit.
 
 include(joinpath("support", "presetcapture.jl"))

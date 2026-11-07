@@ -41,6 +41,7 @@ The exact source-to-test map is `SOURCE_MAP` in `support/selection.jl`.
 | `support/presetcapture.jl` | Captures what each preset imposes, for `test_presets` and the reference tool |
 | `support/selection.jl` | `SHARD` (file, CI shard, tier, cost), `OPT_IN`, `SOURCE_MAP`, `tests_for` |
 | `support/changed.jl`, `parallel.jl`, `live.jl` | The three runner scripts above |
+| `support/preset_reference.jl` | Regenerates `support/data/preset_reference.jl` (on purpose only) |
 | `support/data/` | Generated references: `golden_reference.jl`, `preset_reference.jl` |
 
 ## Adding a test

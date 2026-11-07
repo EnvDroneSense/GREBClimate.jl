@@ -1,12 +1,9 @@
-# Shared helpers for experiment scripts: reduce a `greb_model!` result to a few
-# numbers and compute the usual diagnostics from maps and series.
+# Helpers for experiment scripts: reduce a `greb_model!` result to a few numbers
+# and compute the usual diagnostics from maps and series. Pure functions; none
+# runs the model. Every mean is area-weighted. `summarize` reads the result's
+# `scnr_anomaly` to tell anomalies from absolute records.
 #
 #   include("helpers.jl"); using .ExperimentTools: summarize, gregory
-#
-# Pure functions on records, series and maps; none of them runs the model.
-# Every mean is area-weighted. The scenario records of a `greb_model!` result are
-# anomalies when its `scnr_anomaly` is true; the reducer and the sensitivity
-# estimate read that entry.
 
 module ExperimentTools
 
@@ -96,12 +93,12 @@ function annual_means(records, times, f)
     length(records) == length(times) || throw(DimensionMismatch("$(length(records)) records, $(length(times)) times"))
     value(rec) = f isa Symbol ? global_mean(getproperty(rec, f)) : Float64(f(rec))
     sums = Dict{Int,Float64}()
-    count = Dict{Int,Int}()
+    months = Dict{Int,Int}()
     for (rec, t) in zip(records, times)
         sums[t.year] = get(sums, t.year, 0.0) + value(rec)
-        count[t.year] = get(count, t.year, 0) + 1
+        months[t.year] = get(months, t.year, 0) + 1
     end
-    years = sort!([y for (y, n) in count if n == 12])
+    years = sort!([y for (y, n) in months if n == 12])
     return years, [sums[y] / 12 for y in years]
 end
 

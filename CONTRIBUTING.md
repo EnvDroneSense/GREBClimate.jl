@@ -128,7 +128,7 @@ Things worth knowing before you add tests:
 - `test/test_presets.jl` compares every preset (its forcing, masks, physics,
   hydrology and corrections) with `test/support/data/preset_reference.jl`. If you
   change a preset on purpose, regenerate the file in the same commit with
-  `julia --project=. tools/validation/preset_reference.jl` and say so in the
+  `julia --project=. test/support/preset_reference.jl` and say so in the
   PR; never edit it by hand.
 
 ## Performance conventions
