@@ -15,14 +15,17 @@ julia --project=benchmark -t 2,0 benchmark/run_benchmarks.jl [mode] [jld2_dir] [
 
 | Mode | Measures | Default reps | Notes |
 |:-----|:---------|:-------------|:------|
-| `year` (default) | One control year of `:full_model` on the stored flux corrections | 3 | Prints each run and the min and median in seconds. `--out=PATH` also writes the run times to a file, one per line |
+| `year` (default) | One control year of `:full_model` on the stored flux corrections | 3 | Prints each run, the min and median in seconds, and seconds per simulated year. `--out=PATH` also writes the run times to a file, one per line |
 | `stages` | One call of each physics stage: `circulation!` (air, vapor), `SWradiation!`, `LWradiation!`, `hydro!`, `deep_ocean!` | none | `--seconds=S` per stage (default 0.5) instead of a rep count. Prints min and median per call; the share is of the minima. Single workspace, so threads are not used. Leaves out `seaice!`, output and the tendency assembly |
-| `threads` | `year` in a fresh process at `-t 1`, 2, 3, 4 | 3 | Prints the speedup against `-t 1` |
-| `alloc` | Bytes allocated by one `tendencies!` call | none | Compared with the 256-byte budget in `test/test_invariants.jl`; the two numbers are kept in sync by hand |
+| `threads` | `year` in a fresh process at `-t 1`, 2, 3, 4 | 3 | Prints min, median and the speedup of the median against `-t 1` |
 | `years` | `--ctrl=N` control years plus `--scnr=N` scenario years of `--experiment=<preset>` | 1 | Defaults 10, 10, `full_model`. Stored corrections, no spin-up. Prints seconds per simulated year |
 | `compare` | `circulation!(Ta)` against `circulation!(q)` in one process, interleaved | none | `--seconds=S` per variant (default 5), `--counters` (below). A fixed demo of `compare_kernels`; exits 1 when the self-check fails |
 
 Example: `julia --project=benchmark -t 2,0 benchmark/run_benchmarks.jl years --ctrl=10 --scnr=100 --experiment=co2_double`.
+
+A flag a mode does not take, a reps argument where none is allowed, and a missing dataset all stop the run with an error. Run the setup line again after updating the repository: the `benchmark` environment is not rebuilt for you.
+
+Allocations are not a mode: `test/test_invariants.jl` checks every kernel, `tendencies!` included, and runs in CI (`Pkg.test(test_args=["invariants"])`).
 
 ## Reading the numbers
 

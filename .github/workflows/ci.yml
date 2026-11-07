@@ -46,6 +46,8 @@ jobs:
           x = rand(1000)
           ok = compare_kernels("sum" => () -> sum(x), "sum twice" => () -> sum(x) + sum(x); seconds=1)
           println("self-check passed: ", ok)
+          # Loads the harness without running a mode, so a renamed internal name breaks here.
+          include(joinpath(pwd(), "benchmark", "run_benchmarks.jl"))
         shell: julia --color=yes {0}
 
   test:

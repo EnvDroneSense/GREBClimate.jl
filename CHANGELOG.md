@@ -101,7 +101,9 @@ An entry outside "Changes to model results" leaves results unchanged.
   and notebook, the plots, building blocks for your own plots, and how to read
   the plots. The pages show three figures, which `viz/docs_figures.jl`
   regenerates.
-- A "Developer tools" section of the docs site, with a page for the dataset tools.
+- A "Developer tools" section of the docs site, with a page for the dataset tools
+  and a page on the benchmark harness that shows an example session and how to
+  read its output.
 - The `dev` version of the docs site follows the `dev` branch instead of the
   last release. The README and CONTRIBUTING link to the `stable` version.
 
@@ -127,6 +129,12 @@ An entry outside "Changes to model results" leaves results unchanged.
 - The benchmark harness times with Chairmarks. Its new `compare` mode runs the
   variants in a shuffled order each round and checks itself against a second
   copy of the baseline.
+- `benchmark/run_benchmarks.jl` times each run once (it ran the model twice per
+  run and copied the climatology each time), and `year` is the `years` mode with
+  one control year. The `alloc` mode is removed: `test/test_invariants.jl` checks
+  the same budget. A mistyped flag, a reps argument a mode does not take, an
+  unknown mode and a missing dataset now stop the run with exit code 1.
+  `threads` reports the median, as the other modes do. CI also loads the harness.
 - The test that every physics kernel has an allocation budget checked nothing
   since 2.1.0, because it listed only exported names. It now finds unexported
   kernels, fails when it finds none, and covers `to_ghosted!` and

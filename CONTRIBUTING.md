@@ -36,7 +36,7 @@ GREBClimate.jl/
 ├── ext/                        # GREBEnzymeExt.jl: Enzyme rules, loaded only with Enzyme
 ├── test/                       # one file per subject; SHARD in support/selection.jl lists them
 │   └── data/                   # golden and preset references (see below)
-├── benchmark/                  # timing/allocation suite (run_benchmarks.jl, README.md)
+├── benchmark/                  # timing harness (run_benchmarks.jl, README.md)
 ├── docs/                       # Documenter site
 ├── examples/                   # user examples: quickstart.jl, feedback_deconstruction.jl
 ├── viz/                        # plotting toolbox + Pluto notebook (notebooks/), own Project.toml

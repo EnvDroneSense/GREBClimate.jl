@@ -5,50 +5,47 @@ using Dates
 const REPO = normpath(joinpath(@__DIR__, ".."))
 const JULIA_BIN = joinpath(Sys.BINDIR, Base.julia_exename())
 
-"The local dataset directory; never downloads."
+"The local dataset directory; never downloads. Stops when there is none, or when `GREB_DATA` points nowhere."
 function default_data_dir()
-    resolved = try
-        greb_data_dir(; allow_download=false)
-    catch err
-        @warn "greb_data_dir could not resolve a dataset; falling back to the repo-local path" err
-        nothing
-    end
-    something(resolved, joinpath(REPO, "greb_input_data"))
+    dir = greb_data_dir(; allow_download=false)
+    dir === nothing && error("no dataset found. Set GREB_DATA or pass the dataset directory.")
+    return dir
+end
+
+"Parse an integer of at least `min` (default 0), e.g. for `--ctrl=10`."
+function parse_nonneg_int(name::AbstractString, s::AbstractString; min::Int=0)
+    n = tryparse(Int, s)
+    n === nothing && error("$name must be an integer, got $(repr(s))")
+    n >= min || error("$name must be at least $min, got $n")
+    n
 end
 
 "Parse a repetition count (an integer >= 1)."
-function parse_reps(s::AbstractString)
-    n = tryparse(Int, s)
-    n === nothing && error("reps must be an integer, got $(repr(s))")
-    n >= 1 || error("reps must be at least 1, got $n")
-    n
-end
-
-"Parse a non-negative integer flag value, e.g. for `--ctrl=10`."
-function parse_nonneg_int(name::AbstractString, s::AbstractString)
-    n = tryparse(Int, s)
-    n === nothing && error("$name must be an integer, got $(repr(s))")
-    n >= 0 || error("$name must be >= 0, got $n")
-    n
-end
+parse_reps(s::AbstractString) = parse_nonneg_int("reps", s; min=1)
 
 """
-Split `--name=value` flags out of `args`. Returns `(flags, positional)`, a
-`Dict{String,String}` of flag name to value and the remaining args in order.
-Flags can appear anywhere; they don't have to come first.
+Split flags out of `args`. Returns `(flags, positional)`: a `Dict{String,String}`
+of flag name to value (`--name=value`; a bare `--name` gets `"true"`) and the
+remaining args in order. Flags can appear anywhere; they don't have to come first.
 """
 function split_flags(args::Vector{String})
     flags = Dict{String,String}()
     positional = String[]
     for a in args
-        m = match(r"^--([\w-]+)=(.*)$", a)
+        m = match(r"^--([\w-]+)(?:=(.*))?$", a)
         if m === nothing
             push!(positional, a)
         else
-            flags[m.captures[1]] = m.captures[2]
+            flags[m.captures[1]] = something(m.captures[2], "true")
         end
     end
     return flags, positional
+end
+
+"The median of `v`: the mean of the two middle values for an even length."
+function _median(v::AbstractVector{<:Real})
+    sorted = sort(v)
+    return (sorted[(end+1)÷2] + sorted[(end+2)÷2]) / 2
 end
 
 # ----- Machine state -----
@@ -159,8 +156,7 @@ function machine_footer(before::Float64, times::Vector{Float64}=Float64[])
     worst > NOISE_LIMIT && push!(reasons, "calibration $(round(worst, digits=2))x the best")
     power_profile() == "power-saver" && push!(reasons, "power profile power-saver")
     if length(times) >= 3
-        sorted = sort(times)
-        spread = sorted[(end+1)÷2] / sorted[1]
+        spread = _median(times) / minimum(times)
         println("median / minimum of the runs: ", round(spread, digits=2))
         spread > NOISE_LIMIT && push!(reasons, "runs spread $(round(spread, digits=2))x")
     end
@@ -182,11 +178,9 @@ ratio or `nothing`; `quiet` is what `machine_footer` returned.
 """
 function record_result(mode::AbstractString, name::AbstractString, times::Vector{Float64}, quiet::Bool;
         ratios=nothing, selfcheck=nothing)
-    sorted = sort(times)
-    median_t = (sorted[(end+1)÷2] + sorted[(end+2)÷2]) / 2
     commit, dirty = repo_state()
     fields = (Dates.format(now(), "yyyy-mm-ddTHH:MM:SS"), commit * (dirty ? "-dirty" : ""), mode, name,
-        Threads.nthreads(), length(times), sorted[1], median_t,
+        Threads.nthreads(), length(times), minimum(times), _median(times),
         ratios === nothing ? "" : ratios[1], ratios === nothing ? "" : ratios[2],
         selfcheck === nothing ? "" : selfcheck, quiet ? "quiet" : "NOISY")
     mkpath(RESULTS_DIR)
