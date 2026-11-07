@@ -19,6 +19,8 @@ An entry outside "Changes to model results" leaves results unchanged.
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-11-07
+
 ### Breaking changes
 
 - The loaders and setup functions take `fields` first:
