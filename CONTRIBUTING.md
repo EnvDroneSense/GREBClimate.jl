@@ -33,8 +33,9 @@ GREBClimate.jl/
 │   ├── physics/                # radiation.jl, hydrology.jl, ocean.jl, circulation.jl
 │   ├── data.jl                 # greb_data_dir(): dataset location + DataDep
 │   └── io.jl                   # JLD2 loaders
+├── ext/                        # GREBEnzymeExt.jl: Enzyme rules, loaded only with Enzyme
 ├── test/                       # one file per subject; SHARD in support/selection.jl lists them
-│   └── data/                   # generated preset reference (see below)
+│   └── data/                   # golden and preset references (see below)
 ├── benchmark/                  # timing/allocation suite (run_benchmarks.jl, README.md)
 ├── docs/                       # Documenter site
 ├── examples/                   # plain-Julia drivers: run_greb.jl, parameter_sweep.jl
@@ -54,10 +55,11 @@ The package needs the GREB input climatology (about 353 MB) to run the model.
 
 1. an explicit path you pass
 2. the `GREB_DATA` environment variable
-3. a local `greb_input_data/` directory
-4. a download via [DataDeps.jl](https://github.com/oxinabox/DataDeps.jl)
+3. `greb_input_data/` in the package's top folder
+4. a copy downloaded earlier
+5. a download via [DataDeps.jl](https://github.com/oxinabox/DataDeps.jl)
 
-Only step 4 touches the network, and it prompts before downloading. See
+Only step 5 touches the network, and it prompts before downloading. See
 [DATA_README.md](DATA_README.md) for the raw-file inventory.
 
 You do **not** need the dataset to contribute. Tests that require it resolve
@@ -140,8 +142,13 @@ around that:
   budget per physics kernel and checks its return type is concrete - a change
   that allocates per grid cell will fail it immediately. A new kernel must be
   added to both tables in that file. Only the allocation table is checked
-  for completeness (an assertion fails if an exported `!` kernel is missing);
-  the return-type table is not, so add the kernel there yourself.
+  for completeness (an assertion fails if a `!` kernel, exported or not, is
+  missing); the return-type table is not, so add the kernel there yourself.
+- `LWradiation!`, `hydro!`, `SWradiation!` and `seaice!` use plain loops, not
+  `@turbo`, so Enzyme can differentiate them; their `log` and `exp` go through
+  `fastlog` and `fastexp`, whose derivative rules are in `ext/GREBEnzymeExt.jl`.
+  Keep `@turbo` out of these four. `circulation!` and the other kernels still
+  use it.
 - Configuration is passed explicitly. Nothing is held as module-global
   mutable state.
 
@@ -154,6 +161,8 @@ julia --project=. -t 1 tools/validation/bit_identity.jl save snap_t1.jld2
 julia --project=. -t 1 tools/validation/bit_identity.jl compare snap_t1.jld2
 ```
 
+Repeat both with `-t 2,0` and a second snapshot.
+
 Snapshots depend on the CPU and the Julia version and are not committed. For
 a change to the flux sums or the humidity limiters,
 `tools/diagnostics/budget.jl <preset>` prints how well each store closes.
@@ -161,12 +170,28 @@ a change to the flux sums or the humidity limiters,
 **Benchmarks:**
 
 ```bash
+julia --project=benchmark -e 'using Pkg; Pkg.develop(path="."); Pkg.instantiate()'
 julia --project=benchmark -t 2,0 benchmark/run_benchmarks.jl year
 ```
+
+The first line is needed once: the benchmark environment holds Chairmarks.
+`benchmark/run_benchmarks.jl compare` times variants in a shuffled order each
+round and checks itself against a second copy of the baseline;
+[benchmark/README.md](benchmark/README.md) lists every mode.
 
 Two threads is the current recommendation: the temperature and humidity
 transport run in parallel, and a third thread has measured no consistent gain.
 It has not been re-measured since the circulation was last optimised.
+
+## Formatting
+
+`src/`, `test/` and `benchmark/` follow `.JuliaFormatter.toml`, and a CI job
+fails when a file is not formatted. With JuliaFormatter 2 in your global
+environment, format before you push:
+
+```bash
+julia -e 'using JuliaFormatter; foreach(format, ("src", "test", "benchmark"))'
+```
 
 ## Documentation
 
@@ -178,6 +203,11 @@ julia --project=docs docs/make.jl
 Docstring examples in ```` ```jldoctest ```` blocks are executed during the
 docs build, and a mismatch fails the build. If you change an exported
 function's behaviour or signature, check whether an example needs updating.
+
+The site has two live versions: [stable](https://EnvDroneSense.github.io/GREBClimate.jl/stable/)
+is the latest release (built when the release tag is created), and
+[dev](https://EnvDroneSense.github.io/GREBClimate.jl/dev/) follows the `dev`
+branch. Pull requests build the docs and run the doctests but deploy nothing.
 
 ## Branches
 
@@ -220,7 +250,7 @@ Contributions towards these are especially welcome:
 - **Visualisation dashboard** - interactive maps and time series, similar to the
   [MSCM interactive database](https://mscm.dkrz.de/GREB_model.html?locale=EN).
 - **Physics guide** - a derivation-level companion to the
-  [Model overview](https://EnvDroneSense.github.io/GREBClimate.jl/dev/model/).
+  [Model overview](https://EnvDroneSense.github.io/GREBClimate.jl/stable/model/).
 
 ## Credits
 

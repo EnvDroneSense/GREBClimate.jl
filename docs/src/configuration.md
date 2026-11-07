@@ -51,7 +51,7 @@ Markdown.parse("| Preset | CO₂ | Where | Sunlight | Surface | Control CO₂ | 
                "|:--|:--|:--|:--|:--|:--|:--|:--|:--|\n" * join(rows, "\n"))
 ```
 
-Three presets take a parameter: `preset(:obliquity; index = ...)` and
+Four presets take a parameter: `preset(:obliquity; index = ...)` and
 `preset(:eccentricity; index = ...)` pick the table row (default: the row
 nearest today), `preset(:earth_sun_distance; percent = ...)` the distance change,
 `preset(:custom_co2; path = ...)` the CO₂ file. `:decon_mean_climate` is the
@@ -101,9 +101,3 @@ Modules = [GREBClimate]
 Pages = ["config/presets.jl", "config/processes.jl", "config/scenario.jl", "config/resolve.jl"]
 ```
 
-## References
-
-1. Dommenget, D., and Flöter, J. (2011). Conceptual Understanding of Climate Change with a Globally Resolved Energy Balance Model. *Climate Dynamics*, 37: 2143. [doi:10.1007/s00382-011-1026-0](https://doi.org/10.1007/s00382-011-1026-0)
-2. Stassen, C., Dommenget, D., and Loveday, N. (2019). A hydrological cycle model for the Globally Resolved Energy Balance (GREB) model v1.0. *Geoscientific Model Development*, 12, 425-440. [doi:10.5194/gmd-12-425-2019](https://doi.org/10.5194/gmd-12-425-2019)
-
-See the repository [README](https://github.com/EnvDroneSense/GREBClimate.jl#references)'s References section for the original GREB model homepage link.

@@ -15,8 +15,8 @@ fields = load_climatology(jld2_dir; dataset = :ncep)   # or :era
 
 [`greb_data_dir`](@ref) returns the dataset directory, downloading and caching
 it (~353 MB) on first use if no local copy is found. It checks an explicit path,
-then `$GREB_DATA`, then `greb_input_data/` beside the package, and only then the
-network - so if you already have the data, nothing is fetched. Pass a path
+then `$GREB_DATA`, then `greb_input_data/` in the package's top folder, then a
+earlier download, and only then the network - so if you already have the data, nothing is fetched. Pass a path
 directly if you prefer: `greb_data_dir("/path/to/greb_input_data")`, or hand
 `load_climatology` the path itself. See [Input data](@ref).
 
@@ -68,7 +68,7 @@ result = greb_model!(run, cfg; jld2_dir = jld2_dir, fields = fields)
 This runs, in order: a flux-correction spin-up that holds the control climate
 at the observed climatology, a control run, and a scenario run under the
 experiment's forcing. The spin-up and control run at the scenario's control
-CO₂, 340 ppm (280 ppm for the IPCC CO₂-table scenarios); the scenario sets its
+CO₂, 340 ppm (280 ppm for the CO₂-table presets (`:rcp*`, `:ssp*`, `:historical_co2`, `:a1b`, `:custom_co2`)); the scenario sets its
 own CO₂.
 
 The run reports its progress through the logger, one line per phase and per
@@ -143,9 +143,9 @@ The [Plots and notebook](@ref) page shows how to plot a result.
 
 ## 5. Run many configurations
 
-[`run_ensemble`](@ref) runs a list of configs side by side, one task per
-member, and returns one entry per config in the same order. Each member runs
-on its own copy of `fields` and gives exactly the result of running it alone.
+[`run_ensemble`](@ref) runs a list of configs side by side and returns one
+entry per config in the same order. Each member gives exactly the result of
+running it alone.
 The function passed first is applied to each result inside its task, so only
 what it returns is kept:
 
@@ -159,8 +159,8 @@ end
 ```
 
 Start Julia with several threads (`julia -t 8,0`) for the members to run in
-parallel. `ntasks` sets how many run at once; each needs a copy of `fields`,
-about 370 MB. A member whose physics differs from the default needs its own
+parallel. `ntasks` sets how many run at once (default: the number of
+threads); each of these tasks works on its own copy of `fields`, about 370 MB. A member whose physics differs from the default needs its own
 spin-up (the default `SpinUp(3)`), because the stored corrections fit one
 configuration only.
 
@@ -203,9 +203,4 @@ use them to check shapes and code paths, never climate numbers.
 - The [Configuration](@ref) page documents every option and preset.
 - The [Model overview](@ref) explains what each component computes.
 - [Plots and notebook](@ref) shows how to plot a result and explore it interactively.
-- `benchmark/run_benchmarks.jl` micro-benchmarks the per-timestep physics
-  kernels (`year`, `stages`, `threads`, `alloc` and `years` modes - the last
-  runs a `--ctrl`/`--scnr`-year control+scenario run, for long-run cost and
-  stability rather than one year).
-- `test/runtests.jl` doubles as executable documentation for individual
-  kernels' behavior under different configurations.
+- The `test/` directory has one file per subject and shows how individual kernels behave under different configurations.

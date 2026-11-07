@@ -3,7 +3,7 @@
 #
 # Control at 280 ppm (the control CO2 of :custom_co2); scenario phase run at
 # each level in co2_grid, the levels side by side with `run_ensemble`. Records
-# scenario-minus-control anomalies of Ts, ice extent and precipitation as
+# scenario-minus-control anomalies of Ts, ice cover and precipitation as
 # area-weighted global means.
 #
 # Run as script:  julia --project=. -t 4,0 examples/parameter_sweep.jl [data_dir]

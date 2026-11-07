@@ -5,9 +5,10 @@
     forcing(t::ModelTime, r::ResolvedConfig) -> (CO2, sw_solar_forcing)
 
 The scenario's CO2 (ppm) and solar multiplier at time `t`, from its
-[`CO2Path`](@ref) and [`Solar`](@ref) parts. CO2 is
-0 with `Processes(co2 = false)`. Pure: where the CO2 applies is set once, at
-the start of the scenario, by `apply_co2_mask!` and `apply_surface_mask!`.
+[`CO2Path`](@ref) and [`Solar`](@ref) parts. CO2 is 0 with
+`Processes(co2 = false)`. It changes nothing: where the CO2 applies is set
+once, at the start of the scenario, by `apply_co2_mask!` and
+`apply_surface_mask!`.
 """
 function forcing(t::ModelTime, r::ResolvedConfig)
     s = r.config.scenario
@@ -103,8 +104,10 @@ end
     apply_surface_mask!(fields::ClimateFields, mask::CO2Mask, icmn_ctrl)
 
 Set `fields.co2_part` for a [`SurfaceMask`](@ref) from the control run's
-annual-mean ice cover `icmn_ctrl`: `:ocean` halves CO2 over land and over ice,
-`:land_ice` halves it over ice-free ocean. A no-op for every other mask.
+monthly ice cover `icmn_ctrl` (`xdim × ydim × 12`, from
+[`ice_climatology`](@ref)), averaged over the year: a cell with an annual mean
+of 0.5 or more is ice. `:ocean` halves CO2 over land and over ice, `:land_ice`
+halves it over ice-free ocean. A no-op for every other mask.
 """
 apply_surface_mask!(fields::ClimateFields, ::CO2Mask, icmn_ctrl) = nothing
 
@@ -114,8 +117,6 @@ function apply_surface_mask!(fields::ClimateFields, mask::SurfaceMask, icmn_ctrl
     land = is_land.(fields.z_topo)
     ice = icmn_ctrl1 .>= 0.5f0
 
-    # :ocean (2xCO2 ocean only) halves CO2 over land and over annual-mean ice;
-    # :land_ice (2xCO2 land/ice only) halves it over ocean without ice
     if mask.surface === :ocean
         @. fields.co2_part = ifelse(land | ice, 0.5f0, 1.0f0)
     else

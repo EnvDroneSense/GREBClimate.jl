@@ -11,7 +11,7 @@
 # Snapshots are only comparable on the same machine and Julia version:
 # `@turbo` code differs between CPUs (AVX2, AVX-512) and Julia releases. Take
 # the snapshot on the commit before the change, compare on the commit after.
-# Run once with `-t 1` and once with `-t 2`; the thread count is stored and a
+# Run once with `-t 1` and once with `-t 2,0`; the thread count is stored and a
 # mismatch is refused.
 #
 # Usage:

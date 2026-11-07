@@ -52,7 +52,7 @@ Return the directory holding the JLD2 input dataset, resolving in this order:
 
 1. `path`, if given and non-empty.
 2. `ENV["GREB_DATA"]`, if set.
-3. `greb_input_data/` next to the package, if it exists.
+3. `greb_input_data/` in the package's top folder, if it exists.
 4. An already-downloaded `$DATA_DEP_NAME` DataDep, if its cache is present.
 5. The `$DATA_DEP_NAME` DataDep - downloading it on first use, after asking.
 

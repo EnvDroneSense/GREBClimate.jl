@@ -4,7 +4,7 @@
 #   2. build a Config
 #   3. run the model
 #   4. print a summary
-#   5. plot the mean Ts
+#   5. plot the global-mean Ts (only if Plots.jl is installed)
 # The means printed and plotted here are area-weighted (`global_mean`).
 #
 # Two ways to run:

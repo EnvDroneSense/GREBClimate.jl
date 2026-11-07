@@ -2,36 +2,20 @@
 paths: ["benchmark/**/*.jl"]
 ---
 
-**Cross-session wall-clock comparison on this machine is worthless** — an
-untouched `convergence!` measured 0.45 µs in one session and 1.28 µs in
-another with zero code change. Compile old and new kernels into one process
-and interleave the trials, shuffling order within each trial (a fixed order
-measurably penalizes whichever variant runs last). Always time a second
-identical copy of the baseline as a control; if that self-check is not
-~1.00x, the run is not trustworthy and gets thrown away, not reported.
-`compare_kernels` in `benchmark/compare.jl` does all of this (run under
-`--project=benchmark`; `compare` mode is its demo, and the self-check fails a
-run beyond 1 %). On Linux pin with `taskset -c <P-core>`, and use `--counters`
-for effects the clock cannot resolve; Windows has neither, so year-scale
-effects below about 5 % cannot be shown there. Chairmarks stays in
-`benchmark/Project.toml`, and `common.jl` stays free of it because `profile.jl`
-includes it.
+`benchmark/README.md` documents every mode, the noise rules and the profiler.
+The rules that matter while editing here:
 
-Use `-t 2,0` for the `year`/`stages` modes (two compute threads, no
-interactive thread: 0.259 s per year against 0.303 s for plain `-t 2`,
-measured 2026-10-01). Re-measured 2026-09-22 on a quiet machine, plain `-t 2`
-was the best count but only 1.01-1.26x over `-t 1` (mean 1.13x);
-`-t 3`/`-t 4` never help. The gain may depend on background load, so judge a
-threading change with a same-process comparison.
-
-Never record wall-clock test timings as if they were benchmark results.
-Assertion counts from the test suite are stable across runs; timings from
-this harness are not — don't conflate the two kinds of number.
-
-To find where the time goes, use `benchmark/profile.jl` (modes `step`,
-`setup`, `allocs`, `dispatch`, `compare`; see `benchmark/README.md`) and read
-`category.txt`, then `owned.txt`. Run it at `-t 1`: on Windows the sampler
-records the first thread only. A share in a profile is the ceiling of a gain,
-not a measurement of one - a row smaller than three of its standard errors
-(the `+/-` column) is noise, and a speed-up still needs the same-process
-comparison above.
+- **Wall-clock times from different sessions are not comparable** on this
+  machine (an untouched `convergence!` read 0.45 µs in one session and 1.28 µs
+  in another). A speed-up is shown only with `compare_kernels` in
+  `benchmark/compare.jl`: one process, shuffled order each round, and a second
+  copy of the baseline as a self-check. Discard a run whose self-check fails.
+- Linux can pin (`taskset -c <P-core>`) and count (`--counters`); Windows can do
+  neither, so effects below about 5 % of a year cannot be shown there.
+- Time with `-t 2,0`. Profile with `-t 1`: on Windows the sampler records the
+  first thread only.
+- A profile share is the ceiling of a gain, not a gain. A row smaller than
+  three of its standard errors (the `+/-` column) is noise.
+- Chairmarks lives only in `benchmark/Project.toml`. `common.jl` must stay free
+  of it, because `profile.jl` includes it under `--project=.`.
+- Never record test-suite wall-clock times as benchmark results.

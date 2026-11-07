@@ -24,8 +24,9 @@ It resolves in this order; only the last step touches the network:
 |--:|:-------|
 | 1 | an explicit path, `greb_data_dir("/path/to/greb_input_data")` |
 | 2 | `ENV["GREB_DATA"]` |
-| 3 | `greb_input_data/` beside the package |
-| 4 | the `GREB-input-data` DataDep, downloaded and SHA256-verified |
+| 3 | `greb_input_data/` in the package's top folder |
+| 4 | the `GREB-input-data` DataDep, if it was downloaded before |
+| 5 | the same DataDep, downloaded (after asking) and SHA256-verified |
 
 The download is cached under `~/.julia/scratchspaces/.../datadeps/GREB-input-data`,
 so it happens once per machine. Two environment variables matter:
@@ -36,7 +37,8 @@ so it happens once per machine. Two environment variables matter:
 | `DATADEPS_DISABLE_DOWNLOAD=true` | Make a would-be download throw instead. |
 
 The tests and benchmarks never download: they resolve with
-`allow_download=false` and skip data-dependent work when no local copy exists.
+`allow_download=false`, which stops after step 4, and skip data-dependent work
+when no local copy exists.
 
 ## Loading
 
@@ -46,9 +48,7 @@ global state: pass the value to [`greb_model!`](@ref) with `fields = ...`. You
 can hold several independent instances in one session, e.g. for parameter
 sweeps.
 
-A bare `ClimateFields()` is all zeros. Stepping the model on it runs to
-completion but returns NaN in every field, so `greb_model!` refuses it. Runs that legitimately need no data
-opt in explicitly; see [Data-free runs](@ref).
+A bare `ClimateFields()` is all zeros, so `greb_model!` refuses it; runs that need no data opt in explicitly (see [Data-free runs](@ref)).
 
 ## Directory structure
 

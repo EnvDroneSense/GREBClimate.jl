@@ -2,7 +2,7 @@
 
 > **You do not need this to run the model.** GREBClimate reads a prepared
 > `.jld2` dataset that it downloads on first use; see
-> [Input data](https://EnvDroneSense.github.io/GREBClimate.jl/dev/data/).
+> [Input data](https://EnvDroneSense.github.io/GREBClimate.jl/stable/data/).
 > This page lists the **raw** GREB `.bin` files that dataset is generated from.
 > They are collated from several upstream sources (NCEP, ERA-Interim, ISCCP,
 > WOCE, CMIP5, IPCC scenario tables) and are not redistributed here.
@@ -24,6 +24,9 @@ It requires your own [CDS API access](https://cds.climate.copernicus.eu/how-to-a
 python -m pip install cdsapi netCDF4 numpy
 python tools/dataset/fetch_era5_data.py --start-year 1991 --end-year 2020 --out-dir era5_raw
 julia --project=. tools/dataset/convert_greb_to_jld2.jl era5_raw greb_input_data_era5
+```
+
+## Input layout
 
 The converter reads the `.bin` files (and matching `.ctl` files, if present)
 **flat** from the input directory:

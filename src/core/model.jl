@@ -91,10 +91,11 @@ const _control_start_year = 1970
 """
     qflux_correction!(CO2_ctrl, Ts, Ta, To, q, fields, state, r::ResolvedConfig, ws, years; ws_a=ws, ws_q=ws)
 
-Run `years` years of `tendencies!` to derive the ocean/atmosphere flux
-corrections (`fields.Ts_flux_correction`/`q_flux_correction`/`To_flux_correction`) that make the
-control climate match observed climatology. Mutates `Ts`/`Ta`/`To`/`q` in
-place as it integrates. `ws_a`/`ws_q` are forwarded to [`tendencies!`](@ref).
+Run `years` years of `tendencies!` to derive the flux corrections of the
+surface temperature, the deep ocean and the humidity
+(`fields.Ts_flux_correction`, `To_flux_correction`, `q_flux_correction`) that
+hold the control climate at the observed climatology. Updates
+`Ts`/`Ta`/`To`/`q` in place as it integrates. `ws_a`/`ws_q` are forwarded to [`tendencies!`](@ref).
 """
 function qflux_correction!(CO2_ctrl, Ts, Ta, To, q, fields::ClimateFields, state::ModelState, r::ResolvedConfig, ws::ModelWorkspace, years;
         ws_a::ModelWorkspace=ws, ws_q::ModelWorkspace=ws)
@@ -286,7 +287,8 @@ the state is still the old one) and at `:after_step` (the state is updated).
 `view` is a `NamedTuple` with `time` (the [`ModelTime`](@ref)) and, read from
 it, `phase` (`GREBClimate.control` or `GREBClimate.scenario`), `step`, `year`
 and `step_of_year`; `CO2`, the state `Ts`, `Ta`, `To`, `q`, the flows `tend` (what
-[`tendencies!`](@ref) returns), `fields` and `config`. These are the model's
+[`tendencies!`](@ref) returns), `fields` and `resolved` (the run's
+[`ResolvedConfig`](@ref)). These are the model's
 own arrays: read or copy them, do not write to them. The spin-up does not
 call the observer. `GREBClimate.BudgetCheck` is one.
 """
@@ -312,9 +314,9 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
     run.ctrl == 0 && run.scnr > 0 && s.co2_mask isa SurfaceMask &&
         throw(ArgumentError("a SurfaceMask is built from the control run's ice cover: use ctrl >= 1"))
     # The run overwrites these in place; restore them so a reused `fields`
-    # does not carry one run's changes into the next
-    # Stored corrections that `fields` already holds from this file are neither
-    # reloaded nor saved: a `Stored` run does not write them
+    # does not carry one run's changes into the next. Stored corrections that
+    # `fields` already holds from this file are neither reloaded nor saved: a
+    # `Stored` run does not write them
     saved_flux_source = fields.flux_source
     flux_file = isempty(jld2_dir) ? "" : _flux_file(jld2_dir)
     flux_in_place = config.corrections isa Stored && !isempty(flux_file) && fields.flux_source == flux_file

@@ -21,13 +21,14 @@ const _skin_coeff_ocean = 0.79f0
 """
     hydro!(ws::ModelWorkspace, Ts, q, fields::ClimateFields, slice, p::Processes, h::ResolvedHydrology)
 
-Compute latent heat flux and evaporation/rain tendencies. `h.evaporation`
-selects the evaporation scheme; `h.rain` and its coefficients
-(`c_q`/`c_rq`/`c_omega`/`c_omega_std`) the rain regression. Returns zeros
+Compute the latent heat fluxes and the evaporation and rain tendencies;
+returns `(Q_lat, Q_lat_air, dq_eva, dq_rain)`. `h.evaporation` selects the
+evaporation scheme, `h.rain` and its coefficients
+(`c_q`/`c_rq`/`c_omega`/`c_omega_std`) the rain regression. All four are zero
 without an atmosphere or with `p.hydrology` other than `:full`.
-Returns `(Q_lat, Q_lat_air, dq_eva, dq_rain)`. The saturation formula is not
-finite for `Ts` at or below 38.975 K; a run stays above it through the 40 K
-floor.
+
+The saturation formula is not finite for `Ts` at or below 38.975 K; the 40 K
+floor (`min_T_K`) keeps a run above it.
 """
 function hydro!(ws::ModelWorkspace, Ts, q, fields::ClimateFields, slice::Int, p::Processes, h::ResolvedHydrology)
     c_q = h.c_q

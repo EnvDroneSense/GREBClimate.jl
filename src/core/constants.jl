@@ -21,7 +21,7 @@ const pi_f32 = Float32(pi)   # π (model precision)
 const σ = 5.6704f-8            # Stefan-Boltzmann constant [W/m²/K⁴]
 const ρ_ocean = 999.1f0        # density of water at T=15°C [kg/m³]
 const ρ_land = 2600.0f0        # density of solid rock [kg/m³]
-const ρ_air = 1.2f0            # density of air at 20°C at sea
+const ρ_air = 1.2f0            # density of air at 20°C at sea level [kg/m³]
 const grav = 9.81f0            # gravitational acceleration [m/s²]
 const cp_ocean = 4186.0f0      # specific heat of water at T=15°C [J/kg/K]
 const cp_land = cp_ocean / 4.5f0 # specific heat of dry land [J/kg/K]
@@ -33,7 +33,7 @@ const d_land = 2.0f0                        # land column
 const d_air = 5000.0f0                      # air column
 
 # ── Heat capacities [J/K/m²] ────────────────────────────────────
-const cap_ocean = cp_ocean * ρ_ocean        # 1m ocean
+const cap_ocean = cp_ocean * ρ_ocean        # per metre of water [J/K/m³]; times a depth gives J/K/m²
 const cap_land = cp_land * ρ_land * d_land  # land column
 const cap_air = cp_air * ρ_air * d_air      # air column
 const ΔT_air_factor = Δt / cap_air           # [K m²/W]: flux to air temperature change per step

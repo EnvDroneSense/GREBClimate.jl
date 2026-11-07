@@ -1,9 +1,11 @@
 """
     seaice!(fields::ClimateFields, Ts0, slice, p::Processes)
 
-Update `fields.cap_surf` (surface heat capacity) for ocean points based on
-`Ts0`-derived ice fraction, blending land/open-ocean/ice capacities. No-op
-with `p.ocean = :none`; skips the ice blend with `p.ice_albedo = false`.
+Update the surface heat capacity `fields.cap_surf` at ocean cells from the
+sea-ice fraction of `Ts0`: the open-water value (`cap_ocean` times the
+mixed-layer depth) blends towards the land value as ice forms. Glacier cells
+get the land value. No-op with `p.ocean = :none`; with `p.ice_albedo = false`
+ocean cells keep the open-water value.
 """
 function seaice!(fields::ClimateFields, Ts0, slice::Int, p::Processes)
     mld = clim_slice(fields.mld_clim, slice)
@@ -49,10 +51,11 @@ end
 """
     deep_ocean!(ws::ModelWorkspace, Ts, To, fields::ClimateFields, slice, p::Processes)
 
-Compute surface/deep-ocean coupling tendencies (`dT_ocean`, `dTo`) from
-mixed-layer-depth entrainment/detrainment and turbulent mixing, active only
-where the point is ocean and above the sea-ice threshold. Returns zeros
-unless `p.ocean` is `:full`.
+Compute the exchange between the mixed layer and the deep ocean as the
+tendencies `dT_ocean` (surface) and `dTo` (deep ocean). Entrainment and
+detrainment, from the change in mixed-layer depth, act at ocean cells at or
+above the sea-ice threshold `To_ice2`; turbulent mixing acts at every ocean
+cell. Returns zeros unless `p.ocean` is `:full`.
 """
 function deep_ocean!(ws::ModelWorkspace, Ts, To, fields::ClimateFields, slice::Int, p::Processes)
     # Pre-allocated buffers; the loop below writes every cell

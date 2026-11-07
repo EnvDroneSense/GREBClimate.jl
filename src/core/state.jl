@@ -15,16 +15,16 @@ Base.@kwdef struct ModelWorkspace
     wz_ghost::Matrix{Float32} = zeros(Float32, xghost, ydim)  # ghosted copy of wz_air/wz_vapor
     dX_diff::Matrix{Float32} = zeros(Float32, xdim, ydim)  # diffusion output
     dX_adv::Matrix{Float32} = zeros(Float32, xdim, ydim)  # advection output
-    dX_conv::Matrix{Float32} = zeros(Float32, xdim, ydim)  # convection output
+    dX_conv::Matrix{Float32} = zeros(Float32, xdim, ydim)  # moisture-convergence output
 
     # Tendency buffers
     Q_sens::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Sensible heat flux buffer
 
-    # State buffers
-    Ts0::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Surface temperature output
-    Ta0::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Air temperature output
-    To0::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Ocean temperature output
-    q0::Matrix{Float32} = zeros(Float32, xdim, ydim)  # Humidity output
+    # The next state during the flux-correction spin-up
+    Ts0::Matrix{Float32} = zeros(Float32, xdim, ydim)  # surface temperature
+    Ta0::Matrix{Float32} = zeros(Float32, xdim, ydim)  # air temperature
+    To0::Matrix{Float32} = zeros(Float32, xdim, ydim)  # deep-ocean temperature
+    q0::Matrix{Float32} = zeros(Float32, xdim, ydim)  # humidity
 
     # LW radiation buffers
     em::Matrix{Float32} = zeros(Float32, xdim, ydim)  # spatial emissivity buffer

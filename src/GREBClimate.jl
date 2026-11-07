@@ -6,10 +6,8 @@ module GREBClimate
 # A global climate model that steps surface/air/ocean temperature and
 # humidity forward under shortwave/longwave radiation, hydrology, sea ice,
 # deep-ocean coupling, and atmospheric circulation (diffusion, advection,
-# moisture convergence). An interactive Pluto version of the same model
-# lives in `viz/notebooks/GREB_explorer.jl`; see the package docs or README for
-# usage.
-#
+# moisture convergence). The Pluto notebook `viz/notebooks/GREB_explorer.jl`
+# runs it interactively; the package docs and README cover usage.
 # =============================================================================
 
 using Logging: with_logger, NullLogger

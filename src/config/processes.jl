@@ -67,7 +67,7 @@ et al. (2019); [`mscm_hydrology`](@ref) gives the original GREB scheme.
 |:--------|:-------|
 | `rain` | `:fitted` (Stassen et al. 2019), `:original` (proportional to humidity), `:rh` (+ relative humidity, with a minimum rain rate), `:omega` (+ vertical velocity), `:rh_omega` |
 | `rain_fit` | `:era`, `:ncep`: which reanalysis the `:fitted` coefficients were fitted to; only for `rain = :fitted` |
-| `evaporation` | `:original` (climatological wind plus a fixed gust term), `:skin` (skin temperature, land/ocean exchange coefficients), `:original_gust` (`:original` with larger gust terms and land/ocean coefficients), `:skin_gust` (wind-speed climatology with its own gust terms and land/ocean coefficients; no skin temperature) |
+| `evaporation` | `:original` (climatological wind plus a fixed gust term), `:skin` (skin temperature, wind-speed climatology, land/ocean exchange coefficients), `:original_gust` (`:original` with larger gust terms and land/ocean coefficients), `:skin_gust` (wind-speed climatology with its own gust terms and land/ocean coefficients; no skin temperature) |
 """
 struct Hydrology
     rain::Symbol

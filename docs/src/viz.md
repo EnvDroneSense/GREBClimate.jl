@@ -16,8 +16,8 @@ julia viz/notebooks/launch_pluto.jl
 This opens Pluto in the browser with the explorer loaded; the first launch also
 sets up the `viz/` environment, which takes a few minutes. Pick an experiment
 and the number of control and scenario years, tick **Run the model**, then
-choose a variable. The notebook runs a 3-year flux-correction spin-up before
-the control, and shows the plots below plus a frame-by-frame view of the run
+choose a variable. The notebook runs the preset's flux-correction spin-up
+(3 years for most presets) before the control, and shows the plots below plus a frame-by-frame view of the run
 that can be played or exported as a GIF.
 
 ## From a script

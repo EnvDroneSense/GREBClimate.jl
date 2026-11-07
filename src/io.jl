@@ -208,11 +208,11 @@ end
 """
     load_climatology(jld2_dir::AbstractString; dataset::Symbol=:ncep, corrections::Bool=true)
 
-Load all GREB input data from JLD2 formatted files, returning a fresh
-[`ClimateFields`](@ref). `dataset` (`:ncep`/`:era`) selects which
-climatology *files* to read, and any other value is an `ArgumentError`; this
-is independent of `Hydrology.rain_fit`, which only selects the
-rain-regression *coefficients* (see [`Hydrology`](@ref)).
+Load the static fields, the climatologies, the solar table and the stored flux
+corrections from the dataset in `jld2_dir` into a new [`ClimateFields`](@ref).
+`dataset` (`:ncep` or `:era`) selects the climatology files; any other value
+is an `ArgumentError`. It does not change the rain coefficients, which
+`Hydrology(rain_fit = ...)` selects.
 
 Every file must be there: a missing one is an `ArgumentError`. `corrections = false`
 leaves out the stored flux corrections (`climatology/flux_corrections.jld2`),

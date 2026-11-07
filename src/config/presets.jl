@@ -34,8 +34,9 @@ Base.@kwdef struct RunSpec
     scnr::Int = 1
 end
 
-# The scenario of every named experiment. IPCC-table and A1B runs start from a
-# 280 ppm control; orbital runs start in year 1 and are returned absolute.
+# The scenario of every named experiment. The CO2-table runs (IPCC tables,
+# historical, a user's file) and A1B start from a 280 ppm control; orbital runs
+# start in year 1 and are returned absolute.
 const _TABLE = (control_co2=280,)
 const _ORBITAL = (start_year=1, output=:absolute)
 const _PRESET_SCENARIOS = Dict{Symbol,Scenario}(

@@ -56,12 +56,12 @@ end
 """
     LWradiation!(ws::ModelWorkspace, Ts, Ta, q, CO2, fields::ClimateFields, slice, p::Processes)
 
-Compute atmospheric emissivity from CO2/water-vapor/cloud columns, then
-surface/upward/downward longwave flux. Without an atmosphere (`p.atmosphere = false`) only
-`LW_down` is zeroed: `LW_up` is written equal to the downward emission first
-and keeps that value (decouples surface from atmospheric downwelling feedback
-without touching the atmosphere's own emission term). Returns
+Compute the atmospheric emissivity from the CO2, water-vapour and cloud
+columns, then the surface, upward and downward longwave fluxes. Returns
 `(LW_surf, LW_up, LW_down, em)`.
+
+Without an atmosphere (`p.atmosphere = false`) `LW_down` is set to 0, so the
+surface gets no back-radiation; `LW_up`, the air's own emission, is kept.
 """
 function LWradiation!(ws::ModelWorkspace, Ts, Ta, q, CO2, fields::ClimateFields, slice::Int, p::Processes)
     # Extract workspace buffers

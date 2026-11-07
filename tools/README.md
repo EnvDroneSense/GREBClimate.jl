@@ -1,7 +1,8 @@
 # Maintainer tools
 
 Scripts for maintainers. None of them is needed to use the package. Run them
-from the repository root with `julia --project=. tools/<folder>/<script>.jl`.
+from the repository root with `julia --project=. tools/<folder>/<script>.jl`
+(the one Python script with `python`).
 
 | Folder | Purpose | Script | What it does |
 |:-------|:--------|:-------|:-------------|
@@ -19,7 +20,7 @@ Where a new script goes:
 | produces or publishes `greb_input_data/` | `dataset/` |
 | runs the model to measure a property of the model | `diagnostics/` |
 | runs the model many times, or reduces its output, to answer a question | `experiments/` |
-| runs the model and compares with observed data | `validation/` |
+| compares the model with a reference: observations, a saved snapshot or a stored table | `validation/` |
 
 Scripts that run the model should read the local dataset with
 `greb_data_dir(; allow_download=false)` and never download it.

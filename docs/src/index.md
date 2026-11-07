@@ -4,14 +4,12 @@ A Julia translation of the **Globally Resolved Energy Balance (GREB)**
 climate model, originally developed by Dietmar Dommenget and colleagues at
 Monash University.
 
-The model simulates the global energy balance on a **3.75° × 3.75°** grid
-(96 longitudes × 48 latitudes), stepping every 12 hours with 30-minute
-sub-steps for atmospheric circulation (730 time steps per year). The
+It runs on a fixed 96 × 48 grid with a 12-hour step; the
 [Model overview](@ref) explains its components.
 
 ## Installation
 
-Requires Julia 1.10 (the current LTS) or later.
+Requires Julia 1.10 or later.
 
 ```julia
 using Pkg

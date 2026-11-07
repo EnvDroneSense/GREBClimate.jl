@@ -35,5 +35,5 @@ makedocs(
 
 deploydocs(
     repo = "github.com/EnvDroneSense/GREBClimate.jl.git",
-    devbranch = "main",
+    devbranch = "dev",
 )

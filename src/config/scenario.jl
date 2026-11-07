@@ -70,8 +70,8 @@ end
     SeasonalCO2(in_season, out_of_season, season)
 
 `in_season` ppm during `season`, `out_of_season` ppm for the rest of the year.
-`:boreal_winter` is 1 October through the first step of 1 April (steps 547-730 and 1-181), half the year,
-`:boreal_summer` is April to September.
+Each season is half the year: `:boreal_winter` is steps 547-730 and 1-181 (1
+October to the first step of 1 April), `:boreal_summer` the steps between.
 """
 struct SeasonalCO2 <: CO2Path
     in_season::Float32

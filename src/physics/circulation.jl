@@ -125,7 +125,7 @@ function _diffusion!(ws::ModelWorkspace, Tp::Matrix{Float32}, wzp::Matrix{Float3
                 dX_diff[i, k] = wzp[i+nghost, k] * term_north[i]
             end
         else
-            # Mid-latitudes: no precomputation possible (depends on k-1, k+1)
+            # Interior rows: depends on k-1 and k+1, so nothing to precompute
             @turbo for i in 1:xdim
                 dX_diff[i, k] = wzp[i+nghost, k] * ccy * (
                     wzp[i+nghost, k-1] * (Tp[i+nghost, k-1] - Tp[i+nghost, k]) +
@@ -392,8 +392,8 @@ end
 Sub-steps `X_in` through `ntime` iterations of [`diffusion!`](@ref),
 [`advection!`](@ref), and [`convergence!`](@ref) (each gated by its
 [`Processes`](@ref) option), writing the total change into `dX_out`. Zero
-without an atmosphere or transport. The sub-step loop is a genuine sequential
-recurrence and is not parallelized.
+without an atmosphere or transport. Each sub-step reads the previous one, so
+the loop runs in sequence.
 """
 function circulation!(dX_out, X_in, h_scl, fields::ClimateFields, ws::ModelWorkspace, slice::Int, p::Processes)
     # Early exit if atmospheric processes disabled
