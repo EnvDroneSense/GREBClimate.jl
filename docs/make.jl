@@ -38,6 +38,7 @@ makedocs(
             "Overview" => "dev/index.md",
             "Dataset tools" => "dev/dataset_tools.md",
             "Benchmarks" => "dev/benchmarks.md",
+            "Profiling" => "dev/profiling.md",
         ],
         "API Reference" => "api.md",
     ],

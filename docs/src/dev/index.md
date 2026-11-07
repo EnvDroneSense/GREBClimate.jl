@@ -6,6 +6,7 @@ The scripts in `tools/` and the timing harness in `benchmark/` are for maintaine
 |:-------|:--------|:-----|
 | `tools/dataset/` | Build and publish the input dataset | [Dataset tools](dataset_tools.md) |
 | `benchmark/` | Time the model and compare kernel variants | [Benchmarks](benchmarks.md) |
+| `benchmark/profile.jl` | Find where the time and memory of a run go | [Profiling](profiling.md) |
 | `tools/diagnostics/` | Measure a property of the model, such as its budgets | `tools/README.md` |
 | `tools/experiments/` | Run the model to answer a question, such as its climate sensitivity | `tools/README.md` |
 | `tools/validation/` | Compare the model with a reference | `tools/README.md` |

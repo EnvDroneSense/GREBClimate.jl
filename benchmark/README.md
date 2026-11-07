@@ -113,19 +113,23 @@ julia --project=. -t 1 benchmark/profile.jl [mode] [jld2_dir] [--years=N] [--sam
 | `allocs` | Every allocation of one run | 1 year | Which lines allocate, and how much |
 | `dispatch` | Nothing is run: JET's optimization analysis of one `time_loop!` step | - | Whether any call in the step is dispatched at run time |
 
-Reports go to `benchmark/profiles/<date>-<commit>-<mode>/`, which is gitignored:
+Reports go to `benchmark/profiles/<date>-<commit>-<mode>/` (or `--out`), which is gitignored. Every mode writes `report.md`: a Markdown file with a table of the run (commit, Julia version, threads, runs, elapsed time, samples) followed by the result tables, padded so it also reads as plain text. The run prints the top eight rows of the same tables. In a REPL: `include("benchmark/profile.jl")`, then `main(["step", "--years=1"])`; load this file or `run_benchmarks.jl` in a session, not both.
 
-| File | Modes | Content | Read it for |
-|:-----|:------|:--------|:------------|
-| `header.txt` | all | Commit, Julia version, threads, runs, elapsed time, sample count and interval | Whether the run is usable |
-| `category.txt` | `step`, `setup` | Samples per kind of cost, judged by the innermost frame: vectorized kernel, Base array access, package code, allocation and GC, copies, dispatch, compilation, waiting, I/O | What kind of time there is |
-| `owned.txt` | `step`, `setup` | Samples per package function and per package line; a sample belongs to its innermost frame in `src/`, so library time is charged to the line that called it. The `ms` column is the function's share of one run | Which line of the model owns the time |
-| `flat.txt` | `step`, `setup` | Self time per frame, libraries included, largest last | The single hottest frames |
-| `tree.txt` | `step`, `setup` | The call tree from `greb_model!` down, rows below 0.1 percent left out | The call path behind a row |
-| `stacks.folded` | `step`, `setup` | One line per distinct stack: the frames from `greb_model!` inwards separated by `;`, then the sample count | A flame graph: load the file in speedscope or any tool that reads collapsed stacks. Also plain text to search |
-| `profile.pb.gz` | `step`, `setup`, with `--viewer=pprof` | The same samples in pprof format | The pprof web view, and its `-list=<function>` report of counts beside the source |
-| `dispatch.txt` | `dispatch` | The number of runtime-dispatch reports inside the package, and each report with its call chain | Type instabilities in the step; zero reports is the expected state |
-| `allocs.txt` | `allocs` | Bytes and counts per package function and per package line, with the type holding the most bytes | Where memory is allocated |
+| Mode | `report.md` holds | Read it for |
+|:-----|:------------------|:------------|
+| `step`, `setup` | Samples by class (the kind of cost: vectorized kernel, Base array access, package code, allocation and GC, copies, dispatch, compilation, waiting, I/O), with the largest frames of each; by package function (self and on-stack samples, and the `ms` of one run); by package line. A sample belongs to its innermost frame in `src/`, so library time is charged to the line that called it | What kind of time there is, and which line of the model owns it |
+| `allocs` | Bytes and counts per package function and per package line (the 40 largest), with the type holding the most bytes | Where memory is allocated |
+| `dispatch` | The number of runtime-dispatch reports inside the package, and each report with its call chain | Type instabilities in the step; zero reports is the expected state |
+
+`step` and `setup` also write:
+
+| File | Content | Read it for |
+|:-----|:--------|:------------|
+| `counts.tsv` | Self samples of every class, function and line, uncut, as `table`, `row`, `value` columns, plus the commit and sample count | What `compare` reads; also easy to load into a script |
+| `tree.txt` | The call tree from `greb_model!` down, rows below 0.1 percent left out | The call path behind a row |
+| `flat.txt` | Self time per frame, libraries included, largest last | The single hottest frames |
+| `stacks.folded` | One line per distinct stack: the frames from `greb_model!` inwards separated by `;`, then the sample count | A flame graph: load the file in speedscope or any tool that reads collapsed stacks. Also plain text to search |
+| `profile.pb.gz` | With `--viewer=pprof`: the same samples in pprof format | The pprof web view, and its `-list=<function>` report of counts beside the source |
 
 | Rule | Why |
 |:-----|:----|
@@ -146,14 +150,17 @@ julia --project=. benchmark/profile.jl compare <run before> <run after>
 ```
 
 A run is a report directory or its name under `benchmark/profiles/`. The
-output lists, by class, function and line, each row's share in both runs, the
-difference in percentage points and its standard error, largest change first;
-`*` marks a difference of three standard errors or more. When one row grows,
-the shares of all others fall, so read the row that rose and ignore the rest.
+output has one table each for classes, functions and lines, with each row's
+share in both runs, the difference in percentage points and its standard
+error, largest change first; a `*` in the last column marks a difference of
+three standard errors or more. A row one run lacks counts as zero there. When
+one row grows, the shares of all others fall, so read the row that rose and
+ignore the rest. A run made before `counts.tsv` existed must be profiled again.
+The page "Profiling" in the developer docs shows the output.
 
 The sampler's rate varies on this machine (2 to 13 ms per sample has been
-seen), which is why a run is repeated up to a sample target. In `allocs.txt`,
-`Profile.Allocs.BufferType` is the data buffer of an array.
+seen), which is why a run is repeated up to a sample target. In the `allocs`
+report, `Profile.Allocs.BufferType` is the data buffer of an array.
 
 ## Files
 
@@ -163,6 +170,6 @@ seen), which is why a run is repeated up to a sample target. In `allocs.txt`,
 | `compare.jl` | `compare_kernels`: the interleaved comparison |
 | `counters.jl` | Hardware counters through LinuxPerf; loaded only by `--counters` |
 | `profile.jl` | The sampling profile above |
-| `common.jl` | Argument parsing, dataset lookup, machine state and result records, shared with `profile.jl` and the Fortran comparison. Needs no Chairmarks |
+| `common.jl` | Argument and flag parsing, dataset lookup, the inputs of a single stage, silenced logging, machine state and result records, shared with `profile.jl` and the Fortran comparison. Needs no Chairmarks |
 | `Project.toml` | Chairmarks and the package for `run_benchmarks.jl`. `Manifest.toml` is gitignored. `profile.jl` still runs in the package environment (`--project=.`) |
 | `fortran/` | Local only (excluded in `.git/info/exclude`, not in the repository). `run_fortran_comparison.jl` times and checks GREBClimate.jl against the original Fortran GREB (modes `compare`, `memory`, `verify`, `io`, `build`, `selftest`); `peak_memory.ps1` is its Windows peak-memory helper. Needs gfortran and the Fortran source (`GREB_GFORTRAN`, `GREB_FORTRAN_DIR`) |

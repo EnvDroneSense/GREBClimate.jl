@@ -11,20 +11,16 @@
 #   compare  - the change in shares between two step or setup runs; a run is a
 #              report directory or its name under benchmark/profiles/
 #
-# Reports go to benchmark/profiles/<date>-<commit>-<mode>/ (or `--out`):
+# Reports go to benchmark/profiles/<date>-<commit>-<mode>/ (or `--out`): report.md
+# for every mode; step and setup add counts.tsv, flat.txt, tree.txt, stacks.folded
+# and, with `--viewer=pprof`, profile.pb.gz. Details: benchmark/README.md.
 #
-#   step, setup - header.txt, category.txt, owned.txt, flat.txt, tree.txt,
-#                 stacks.folded, and profile.pb.gz with `--viewer=pprof`
-#   allocs      - header.txt, allocs.txt
-#   dispatch    - header.txt, dispatch.txt
-#
-# Run step and setup at `-t 1`: on Windows the sampler records the first thread
-# only, so work on other threads shows up as waiting. `--viewer=pprof` needs
-# PProf.jl and `dispatch` needs JET.jl in the default environment; neither is a
-# dependency of the package.
+# Run step and setup at `-t 1` (the Windows sampler records the first thread
+# only). `--viewer=pprof` needs PProf.jl and `dispatch` needs JET.jl in the
+# default environment. Load one harness per Julia session: this file and
+# run_benchmarks.jl both define `main`.
 
 using GREBClimate
-using GREBClimate: tendencies!, time_loop!, init_model!
 using Dates
 using Printf
 using Profile
@@ -42,6 +38,7 @@ const TARGET_SAMPLES = 10_000
 const MIN_SAMPLES = 5_000        # below this only the largest rows mean anything
 const PROFILE_BUFFER = 10_000_000
 const META_WORDS = 6             # threadid, taskid, cycle clock, sleep state, 0, 0 close each sample
+const CONSOLE_ROWS = 8           # rows of each table that a run prints
 
 const NO_OWNER = "(outside the package)"
 
@@ -87,7 +84,8 @@ function split_samples(data::Vector{UInt64})
     samples = Tuple{UnitRange{Int},UnitRange{Int}}[]
     start = 1
     for i in eachindex(data)
-        if data[i] == 0 && i - start + 1 >= META_WORDS && data[i-1] == 0
+        # The sleep state before the two closing zeros is never zero (Profile's own rule).
+        if data[i] == 0 && i - start + 1 >= META_WORDS && data[i-1] == 0 && data[i-2] != 0
             push!(samples, (start:(i-META_WORDS), (i-META_WORDS+1):i))
             start = i + 1
         end
@@ -95,12 +93,7 @@ function split_samples(data::Vector{UInt64})
     return samples
 end
 
-"""
-Copy of `data` with the frames outside the package's outermost frame removed
-from every sample, so a tree starts at the model and not at Julia's start-up.
-A sample with no package frame is kept whole. `frames_at` maps an instruction
-pointer to its frames.
-"""
+"`data` with the frames outside the outermost package frame cut from every sample; `frames_at` maps an instruction pointer to its frames."
 function trim_to_package(data::Vector{UInt64}, samples, frames_at::AbstractDict)
     owned = Set(ip for (ip, frames) in frames_at if any(fr -> fr.owned, frames))
     trimmed = UInt64[]
@@ -115,12 +108,13 @@ function trim_to_package(data::Vector{UInt64}, samples, frames_at::AbstractDict)
     return trimmed
 end
 
-"""
-The distinct stacks of a profile as `frames => samples` pairs: frames innermost
-first, inlined frames included, cut at the package's outermost frame. A profile
-of the time loop has far fewer distinct stacks than samples, so the reports are
-built from these.
-"""
+"`lidict` with the inlined frames outside the outermost package frame cut, as `trim_to_package` does for the samples."
+function trim_lidict(lidict::AbstractDict, frames_at::AbstractDict)
+    return Dict(ip => (i = findlast(fr -> fr.owned, frames_at[ip]); i === nothing ? frames : frames[1:i])
+                for (ip, frames) in lidict)
+end
+
+"The distinct stacks as `frames => samples` pairs, innermost first, inlined frames included, cut at the outermost package frame."
 function distinct_stacks(data::Vector{UInt64}, samples, frames_at::AbstractDict)
     counts = Dict{Vector{UInt64},Int}()
     for (frames, _) in samples
@@ -137,10 +131,7 @@ function distinct_stacks(data::Vector{UInt64}, samples, frames_at::AbstractDict)
     end
 end
 
-"""
-The innermost package frame of `stack` and the function it belongs to, or
-`nothing` if the stack has no package frame.
-"""
+"The innermost package frame of `stack` and its function, or `nothing` if there is none."
 function owner(stack::Vector{Frame})
     i = findfirst(fr -> fr.owned, stack)
     i === nothing && return nothing
@@ -169,26 +160,52 @@ function classify(fr::Frame)
     return "Base (array access, scalar ops)"
 end
 
-# ----- Reports of a sampled run -----
+# ----- Markdown tables -----
 
-"`count` of `n` samples as a percentage and its standard error in percentage points, as padded strings."
-function share(count::Int, n::Int)
-    p = count / n
-    return @sprintf("%7.2f", 100p), @sprintf("%6.2f", 100 * sqrt(p * (1 - p) / n))
+"Write a padded Markdown table; the columns in `left` are left-aligned, the others right-aligned."
+function md_table(io::IO, header::Vector{String}, rows; left=(1,))
+    cell(s) = replace(string(s), "|" => "\\|")
+    all_rows = [map(cell, header), (map(cell, r) for r in rows)...]
+    widths = [maximum(length(r[j]) for r in all_rows) for j in eachindex(header)]
+    line(r) = string("| ", join((j in left ? rpad(r[j], widths[j]) : lpad(r[j], widths[j]) for j in eachindex(r)), " | "), " |")
+    println(io, line(all_rows[1]))
+    println(io, "|", join((j in left ? string(":", "-"^(widths[j] + 1)) : string("-"^(widths[j] + 1), ":")
+                           for j in eachindex(header)), "|"), "|")
+    for r in Iterators.drop(all_rows, 1)
+        println(io, line(r))
+    end
+    println(io)
 end
 
-"""
-Write `owned.txt`: samples per package function and per package line, where a
-sample belongs to its innermost package frame, so library time is charged to
-the line that called it.
-"""
-function write_owned(path::AbstractString, stacks; mincount::Int, ms_per_run::Float64)
-    n = sum(last, stacks)
-    self = Dict{String,Int}()
-    onstack = Dict{String,Int}()
-    lines = Dict{String,Int}()
+"`name` in backticks, so a Markdown viewer shows it as code."
+code(name) = string("`", name, "`")
+
+"The share of `count` in `n` samples and its standard error in percentage points, as strings."
+function share(count::Int, n::Int)
+    p = count / n
+    return @sprintf("%.2f", 100p), @sprintf("%.2f", 100 * sqrt(p * (1 - p) / n))
+end
+
+"`bytes` with a unit, for a table."
+format_bytes(bytes::Integer) = bytes >= 2^20 ? @sprintf("%.2f MB", bytes / 2^20) : @sprintf("%.2f kB", bytes / 2^10)
+
+# ----- Reports of a sampled run -----
+
+"Count the samples of `stacks` per class, per package function (`self`: innermost package frame, `onstack`: anywhere) and per package line."
+function tally(stacks)
+    classes = Dict{String,Int}()
+    class_frames = Dict{String,Dict{String,Int}}()
+    class_owners = Dict{String,Dict{String,Int}}()
+    self, onstack, lines = Dict{String,Int}(), Dict{String,Int}(), Dict{String,Int}()
+    n = 0
     for (stack, count) in stacks
+        isempty(stack) && continue
+        n += count
         o = owner(stack)
+        class = classify(first(stack))
+        bump!(classes, class, count)
+        bump!(get!(Dict{String,Int}, class_frames, class), label(first(stack)), count)
+        bump!(get!(Dict{String,Int}, class_owners, class), o === nothing ? NO_OWNER : o[2], count)
         if o === nothing
             bump!(self, NO_OWNER, count)
             continue
@@ -200,75 +217,56 @@ function write_owned(path::AbstractString, stacks; mincount::Int, ms_per_run::Fl
             bump!(onstack, name, count)
         end
     end
+    return (; samples=n, classes, class_frames, class_owners, self, onstack, lines)
+end
 
+"Write `counts.tsv` (`table`, `row`, `value`), which `compare` reads."
+function write_counts(path::AbstractString, t, commit::AbstractString)
     open(path, "w") do io
-        println(io, "Samples: ", n, ". Shares in percent, +/- is one standard error in percentage points.")
-        println(io, "Rows below ", mincount, " samples are left out of the tables but counted in the total.\n")
-        println(io, "By function. self: the function holds the innermost package frame. on stack: it is anywhere in the stack.")
-        println(io, "ms: the on-stack share of one run (", round(ms_per_run, digits=1), " ms).")
-        println(io, "   self  share%    +/-  on stack  share%        ms  function")
-        names = sort!(collect(union(keys(self), keys(onstack))); by=k -> (-get(self, k, 0), -get(onstack, k, 0), k))
-        for name in names
-            s, t = get(self, name, 0), get(onstack, name, 0)
-            max(s, t) >= mincount || continue
-            p, se = share(s, n)
-            println(io, lpad(s, 7), " ", p, " ", se, lpad(t, 10), " ", share(t, n)[1],
-                @sprintf("%10.2f", ms_per_run * t / n), "  ", name)
-        end
-        println(io, lpad(n, 7), " ", share(n, n)[1], "         total\n")
-
-        println(io, "By line: the innermost package frame. A `@turbo` loop is one row, at its `@turbo for` line.")
-        println(io, "   self  share%    +/-  line")
-        for (line, count) in ranked(lines)
-            count >= mincount || break
-            p, se = share(count, n)
-            println(io, lpad(count, 7), " ", p, " ", se, "  ", line)
+        println(io, "table\trow\tvalue")
+        println(io, "run\tcommit\t", commit)
+        println(io, "run\tsamples\t", t.samples)
+        for (name, table) in (("class", t.classes), ("function", t.self), ("line", t.lines)), (row, count) in ranked(table)
+            println(io, name, "\t", row, "\t", count)
         end
     end
 end
 
-"""
-Write `category.txt`: samples per kind of cost, judged by the innermost frame,
-with the largest frames and the package functions they are charged to.
-"""
-function write_category(path::AbstractString, stacks)
-    n = sum(last, stacks)
-    classes = Dict{String,Int}()
-    frames = Dict{String,Dict{String,Int}}()
-    owners = Dict{String,Dict{String,Int}}()
-    for (stack, count) in stacks
-        isempty(stack) && continue
-        fr = first(stack)
-        class = classify(fr)
-        o = owner(stack)
-        bump!(classes, class, count)
-        bump!(get!(Dict{String,Int}, frames, class), label(fr), count)
-        bump!(get!(Dict{String,Int}, owners, class), o === nothing ? NO_OWNER : o[2], count)
+"Write the class, function and line tables; `top` limits the rows (console), without it all rows of `mincount` samples or more."
+function write_sampled(io::IO, t; mincount::Int, ms_per_run::Float64, top=nothing)
+    n = t.samples
+    rows_of(items) = top === nothing ? items : first(items, top)
+
+    println(io, "## By class\n")
+    println(io, "Each sample is classed by its innermost frame. Shares are of ", n, " samples; +/- is one standard error in percentage points.\n")
+    md_table(io, ["Class", "Samples", "Share %", "+/-"],
+        ([class, string(c), share(c, n)...] for (class, c) in ranked(t.classes)))
+    if top === nothing
+        println(io, "Largest frames of each class, and the package function they are charged to:\n")
+        md_table(io, ["Class", "Largest frames", "Charged to"],
+            ([class, largest(t.class_frames[class]), largest(t.class_owners[class])] for (class, _) in ranked(t.classes)))
     end
 
-    open(path, "w") do io
-        println(io, "Samples: ", n, ". Each sample is classed by its innermost frame.")
-        println(io, "Shares in percent, +/- is one standard error in percentage points.\n")
-        println(io, "samples  share%    +/-  class")
-        for (class, count) in ranked(classes)
-            p, se = share(count, n)
-            println(io, lpad(count, 7), " ", p, " ", se, "  ", class)
-        end
-        total = sum(values(classes))
-        println(io, lpad(total, 7), " ", share(total, n)[1], "         total")
-        for (class, _) in ranked(classes)
-            println(io, "\n", class)
-            println(io, "  frames:     ", largest(frames[class]))
-            println(io, "  charged to: ", largest(owners[class]))
-        end
-    end
+    println(io, "## By function\n")
+    println(io, "Self: the function holds the innermost package frame. On stack: it is anywhere in the stack. ",
+        "ms: the on-stack share of one run (", round(ms_per_run, digits=1), " ms).",
+        top === nothing ? string(" Rows below ", mincount, " samples are left out but counted in the total.") : "", "\n")
+    names = sort!(collect(union(keys(t.self), keys(t.onstack))); by=k -> (-get(t.self, k, 0), -get(t.onstack, k, 0), k))
+    filter!(k -> max(get(t.self, k, 0), get(t.onstack, k, 0)) >= mincount, names)
+    md_table(io, ["Function", "Self", "Share %", "+/-", "On stack", "Share %", "ms"],
+        ([code(k), string(get(t.self, k, 0)), share(get(t.self, k, 0), n)...,
+          string(get(t.onstack, k, 0)), share(get(t.onstack, k, 0), n)[1],
+          @sprintf("%.2f", ms_per_run * get(t.onstack, k, 0) / n)] for k in rows_of(names));
+        left=(1,))
+
+    println(io, "## By line\n")
+    println(io, "The innermost package frame. A `@turbo` loop is one row, at its `@turbo for` line.\n")
+    lines = filter(kv -> last(kv) >= mincount, ranked(t.lines))
+    md_table(io, ["Line", "Self", "Share %", "+/-"],
+        ([code(line), string(c), share(c, n)...] for (line, c) in rows_of(lines)))
 end
 
-"""
-Write `stacks.folded`: one line per distinct stack, outermost frame first, the
-frames separated by `;` and followed by the sample count. This is the collapsed
-format flame graph tools read (speedscope, FlameGraph, inferno).
-"""
+"Write `stacks.folded`, the collapsed-stack format flame graph tools read."
 function write_folded(path::AbstractString, stacks)
     folded = Dict{String,Int}()
     for (stack, count) in stacks
@@ -290,11 +288,7 @@ end
 
 # ----- Runs -----
 
-"""
-An optional package, loaded from the active load path. PProf.jl and JET.jl are
-not dependencies of this script, so they have to be installed in the default
-environment.
-"""
+"An optional package from the default environment (PProf, JET); not a dependency of this script."
 function load_optional(name::AbstractString, uuid::AbstractString)
     try
         Base.require(Base.PkgId(Base.UUID(uuid), name))
@@ -303,17 +297,7 @@ function load_optional(name::AbstractString, uuid::AbstractString)
     end
 end
 
-load_pprof() = load_optional("PProf", "e4faabce-9ead-11e9-39d9-4379958e3056")
-load_jet() = load_optional("JET", "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b")
-
-"One aligned `name: value` line of a header."
-header_line(name::AbstractString, value) = string(rpad(name * ":", 13), value, "\n")
-
-"""
-Make the directory for a run's reports, `out_dir` or a new one under
-`benchmark/profiles/` (numbered if the name is taken), and return it with the
-lines every header starts with.
-"""
+"Make the report directory (`out_dir`, or a new numbered one under `benchmark/profiles/`); returns it and the `item => value` rows every report starts with."
 function open_report(mode::AbstractString, description::AbstractString, out_dir)
     commit, dirty = repo_state()
     dir = out_dir
@@ -326,55 +310,44 @@ function open_report(mode::AbstractString, description::AbstractString, out_dir)
         end
     end
     mkpath(dir)
-    header = header_line("mode", "$mode ($description)") *
-             header_line("commit", commit * (dirty ? " (tracked files modified)" : "")) *
-             header_line("date", Dates.format(Dates.now(), "yyyy-mm-dd HH:MM")) *
-             header_line("julia", VERSION)
-    return dir, header
+    info = ["mode" => "$mode ($description)",
+            "commit" => commit * (dirty ? " (tracked files modified)" : ""),
+            "date" => Dates.format(Dates.now(), "yyyy-mm-dd HH:MM"),
+            "julia" => string(VERSION)]
+    return dir, info
 end
 
-"Write `header` to the run's `header.txt`, print it, and return `dir`."
-function close_report(dir::AbstractString, header::AbstractString)
-    write(joinpath(dir, "header.txt"), header)
-    print(header)
-    println("reports written to ", dir)
+"Write `report.md` and print its top rows; `body(io, top)` writes the tables (`top === nothing`: all rows)."
+function close_report(body, dir::AbstractString, title::AbstractString, info)
+    head(io) = (println(io, "# ", title, "\n"); md_table(io, ["Item", "Value"], ([k, v] for (k, v) in info); left=(1, 2)))
+    open(joinpath(dir, "report.md"), "w") do io
+        head(io)
+        body(io, nothing)
+    end
+    head(stdout)
+    body(stdout, CONSOLE_ROWS)
+    println("full report: ", joinpath(dir, "report.md"))
     return dir
 end
 
-"Run `f` with the run's progress lines and log messages discarded; they are not part of the workload."
-quiet(f) = redirect_stdout(devnull) do
-    Base.CoreLogging.with_logger(f, Base.CoreLogging.NullLogger())
-end
-
-"""
-The configuration and the loaded fields that every mode runs: `:full_model` on
-the stored flux corrections, no spin-up. One year is run first, so compilation
-is not profiled. `greb_model!` restores what it overwrites in `fields`, so the
-same fields serve every run; a copy per run would leave garbage for the
-collector to clear inside the profiled run.
-"""
+"The configuration and fields every mode runs. One year is run first so compilation is not profiled; `greb_model!` restores `fields`, so they are reused."
 function workload(jld2_dir::AbstractString)
     isdir(jld2_dir) || error("JLD2 data directory not found: $jld2_dir. Set GREB_DATA or pass a path.")
     cfg = preset(:full_model; corrections=Stored())
     fields = load_climatology(jld2_dir; dataset=:ncep)
-    quiet() do
+    without_logs() do
         greb_model!(RunSpec(ctrl=1, scnr=0), cfg; jld2_dir=jld2_dir, fields=fields)
     end
     GC.gc()
     return cfg, fields
 end
 
-"""
-Sample `years`-year control runs, repeated until `target` samples are collected
-or the mode's run limit is reached, and write the reports to `out_dir`; returns
-it. `mode` is `:step` (long runs, so the time loop dominates) or `:setup`
-(1-year runs, so the cost of one `greb_model!` call shows).
-"""
+"Sample `years`-year runs until `target` samples or the mode's run limit; `mode` is `:step` or `:setup`. Returns the report directory."
 function profile_cpu(jld2_dir::AbstractString, mode::Symbol; years::Int=CPU_MODES[mode].years,
         target::Int=TARGET_SAMPLES, out_dir=nothing, viewer=nothing)
     years >= 1 || throw(ArgumentError("years must be at least 1, got $years"))
     viewer in (nothing, "pprof") || throw(ArgumentError("unknown viewer $(repr(viewer)); expected pprof"))
-    PProf = viewer === nothing ? nothing : load_pprof()   # before the run, so a missing package fails early
+    PProf = viewer === nothing ? nothing : load_optional("PProf", "e4faabce-9ead-11e9-39d9-4379958e3056")   # before the run, so a missing package fails early
     if Threads.nthreads() > 1
         @warn "Profiling with $(Threads.nthreads()) threads: on Windows only the first thread is sampled. Use -t 1."
     end
@@ -386,7 +359,7 @@ function profile_cpu(jld2_dir::AbstractString, mode::Symbol; years::Int=CPU_MODE
     runs = 0
     while runs < CPU_MODES[mode].max_runs &&
           (runs == 0 || length(split_samples(Profile.fetch(include_meta=true))) < target)
-        elapsed += @elapsed quiet() do
+        elapsed += @elapsed without_logs() do
             @profile greb_model!(RunSpec(ctrl=years, scnr=0), cfg; jld2_dir=jld2_dir, fields=fields)
         end
         runs += 1
@@ -400,27 +373,29 @@ function profile_cpu(jld2_dir::AbstractString, mode::Symbol; years::Int=CPU_MODE
     threads_seen = sort!(unique(Int(data[first(meta)]) for (_, meta) in samples))
     ms_per_run = 1000 * elapsed / runs
 
-    dir, header = open_report(string(mode), WORKLOAD, out_dir)
-    header *= header_line("threads", "$(Threads.nthreads()) (sampled: $(join(threads_seen, ", ")))") *
-              header_line("runs", "$runs of $years simulated year(s)") *
-              header_line("elapsed", "$(round(elapsed, digits=2)) s ($(round(ms_per_run, digits=1)) ms per run)") *
-              header_line("samples", n) *
-              header_line("interval", "$(round(1000 * elapsed / n, digits=2)) ms per sample")
+    dir, info = open_report(string(mode), WORKLOAD, out_dir)
+    push!(info, "threads" => "$(Threads.nthreads()) (sampled: $(join(threads_seen, ", ")))",
+                "runs" => "$runs of $years simulated year(s)",
+                "elapsed" => "$(round(elapsed, digits=2)) s ($(round(ms_per_run, digits=1)) ms per run)",
+                "samples" => "$n ($(round(1000 * elapsed / n, digits=2)) ms per sample)")
 
     frames_at = Dict(ip => Frame.(frames) for (ip, frames) in lidict)
     trimmed = trim_to_package(data, samples, frames_at)
+    trimmed_lidict = trim_lidict(lidict, frames_at)
     stacks = distinct_stacks(data, samples, frames_at)
+    t = tally(stacks)
     mincount = max(2, n ÷ 1000)   # rows below 0.1 percent are noise
-    write_category(joinpath(dir, "category.txt"), stacks)
-    write_owned(joinpath(dir, "owned.txt"), stacks; mincount, ms_per_run)
+    write_counts(joinpath(dir, "counts.tsv"), t, last(info[2]))
     # Sorted by self time, largest last.
-    write_report(joinpath(dir, "flat.txt"), trimmed, lidict; format=:flat, sortedby=:overhead, mincount)
-    write_report(joinpath(dir, "tree.txt"), trimmed, lidict; format=:tree, mincount, noisefloor=2)
+    write_report(joinpath(dir, "flat.txt"), trimmed, trimmed_lidict; format=:flat, sortedby=:overhead, mincount)
+    write_report(joinpath(dir, "tree.txt"), trimmed, trimmed_lidict; format=:tree, mincount, noisefloor=2)
     write_folded(joinpath(dir, "stacks.folded"), stacks)
-    PProf === nothing || Base.invokelatest(PProf.pprof, trimmed, lidict; web=false,
+    PProf === nothing || Base.invokelatest(PProf.pprof, trimmed, trimmed_lidict; web=false,
         out=joinpath(dir, "profile.pb.gz"), full_signatures=false)
 
-    close_report(dir, header)
+    close_report(dir, "Profile: $mode", info) do io, top
+        write_sampled(io, t; mincount, ms_per_run, top)
+    end
     n >= MIN_SAMPLES ||
         @warn "Only $n samples (fewer than $MIN_SAMPLES): shares of small rows are not reliable. Raise --samples or --years."
     return dir
@@ -441,23 +416,13 @@ function add!(row::AllocRow, type::AbstractString, bytes::Int)
     bump!(row.types, type, bytes)
 end
 
-"`bytes` with a unit, for a table."
-function format_bytes(bytes::Integer)
-    bytes >= 2^20 ? @sprintf("%9.2f MB", bytes / 2^20) : @sprintf("%9.2f kB", bytes / 2^10)
-end
-
-"""
-Record every allocation of one `years`-year control run and write `allocs.txt`
-to `out_dir`: bytes and counts per package function and per package line, an
-allocation belonging to the innermost package frame of its stack. Returns
-`out_dir`.
-"""
+"Record every allocation of one `years`-year run; returns the report directory."
 function profile_allocs(jld2_dir::AbstractString; years::Int=1, out_dir=nothing)
     years >= 1 || throw(ArgumentError("years must be at least 1, got $years"))
     cfg, fields = workload(jld2_dir)
 
     Profile.Allocs.clear()
-    quiet() do
+    without_logs() do
         Profile.Allocs.@profile sample_rate = 1 greb_model!(RunSpec(ctrl=years, scnr=0), cfg;
             jld2_dir=jld2_dir, fields=fields)
     end
@@ -479,52 +444,36 @@ function profile_allocs(jld2_dir::AbstractString; years::Int=1, out_dir=nothing)
         add!(get!(AllocRow, by_func, name), type, a.size)
         add!(get!(AllocRow, by_line, line), type, a.size)
     end
-    amount(row) = string(row.count, ", ", strip(format_bytes(row.bytes)))
+    amount(row) = string(row.count, ", ", format_bytes(row.bytes))
     largest_first(rows) = sort!(collect(rows); by=kv -> (-last(kv).bytes, first(kv)))
+    pct(row) = @sprintf("%.2f", 100 * row.bytes / total.bytes)
 
-    dir, header = open_report("allocs", WORKLOAD, out_dir)
-    header *= header_line("runs", "1 of $years simulated year(s)") *
-              header_line("allocations", amount(total)) *
-              header_line("in loop", amount(in_loop) * " (with `time_loop!` on the stack)")
+    dir, info = open_report("allocs", WORKLOAD, out_dir)
+    push!(info, "runs" => "1 of $years simulated year(s)",
+                "allocations" => amount(total),
+                "in loop" => amount(in_loop) * " (with `time_loop!` on the stack)")
 
-    open(joinpath(dir, "allocs.txt"), "w") do io
-        println(io, "Every allocation of one run, charged to the innermost package frame of its stack.")
-        println(io, "Total: ", amount(total), ". With `time_loop!` on the stack: ", amount(in_loop), ".\n")
-        println(io, "By function")
-        println(io, "       bytes  share%   count  function")
-        for (name, row) in largest_first(by_func)
-            println(io, format_bytes(row.bytes), " ", @sprintf("%7.2f", 100 * row.bytes / total.bytes),
-                lpad(row.count, 8), "  ", name)
-        end
-        println(io, "\nBy line (the 40 largest)")
-        println(io, "       bytes  share%   count  line, and the type holding the most bytes there (bytes)")
-        for (line, row) in first(largest_first(by_line), 40)
-            println(io, format_bytes(row.bytes), " ", @sprintf("%7.2f", 100 * row.bytes / total.bytes),
-                lpad(row.count, 8), "  ", line, "  [", first(largest(row.types, 1), 80), "]")
-        end
+    close_report(dir, "Allocations", info) do io, top
+        rows_of(items) = top === nothing ? items : first(items, top)
+        println(io, "## By function\n")
+        println(io, "Every allocation of one run, charged to the innermost package frame of its stack.\n")
+        md_table(io, ["Function", "Bytes", "Share %", "Count"],
+            ([code(name), format_bytes(row.bytes), pct(row), string(row.count)] for (name, row) in rows_of(largest_first(by_func))))
+        println(io, "## By line\n")
+        println(io, "The ", top === nothing ? 40 : top, " largest, with the type holding the most bytes there.\n")
+        md_table(io, ["Line", "Bytes", "Share %", "Count", "Largest type"],
+            ([code(line), format_bytes(row.bytes), pct(row), string(row.count), first(largest(row.types, 1), 80)]
+             for (line, row) in first(largest_first(by_line), top === nothing ? 40 : top)); left=(1, 5))
     end
-    return close_report(dir, header)
+    return dir
 end
 
-"""
-Check one model step for runtime dispatch with JET's optimization analysis and
-write `dispatch.txt` to `out_dir`; returns it. This is a static check of the
-compiled code: nothing is timed, and the serial and the threaded branch of
-`tendencies!` are both covered. A report names a call whose target is not
-known at compile time, inside the package only.
-"""
+"Check one model step for runtime dispatch with JET (static, nothing is timed); returns the report directory."
 function profile_dispatch(jld2_dir::AbstractString; out_dir=nothing)
-    JET = load_jet()   # before the set-up, so a missing package fails early
-    cfg, fields = workload(jld2_dir)
-    r = resolve(cfg; jld2_dir)
-    CO2 = init_model!(fields, r).CO2_ctrl
-    state = ModelState()
-    ws = ModelWorkspace()
+    JET = load_optional("JET", "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b")   # before the set-up, so a missing package fails early
+    isdir(jld2_dir) || error("JLD2 data directory not found: $jld2_dir. Set GREB_DATA or pass a path.")
+    (; fields, r, CO2, state, ws, Ts, Ta, To, q) = stage_inputs(jld2_dir, preset(:full_model))
     acc = GREBClimate.MonthlyAccumulator()
-    Ts = fields.Ts_clim[:, :, 1]
-    Ta = copy(Ts)
-    To = fields.To_clim[:, :, 1]
-    q = fields.q_clim[:, :, 1]
     records = GREBClimate.MonthlyRecord[]
     times = GREBClimate.RecordTime[]
     time = ModelTime(GREBClimate.control, 1970, 1)
@@ -533,13 +482,18 @@ function profile_dispatch(jld2_dir::AbstractString; out_dir=nothing)
     result = Base.invokelatest(JET.report_opt, step, (); target_modules=(GREBClimate,))
     n = length(Base.invokelatest(JET.get_reports, result))
 
-    dir, header = open_report("dispatch", "one time_loop! step of full_model", out_dir)
-    open(joinpath(dir, "dispatch.txt"), "w") do io
-        println(io, "JET optimization analysis of one `time_loop!` step, reports from the package only.")
-        println(io, "A report is a call that is dispatched at run time. Reports: ", n, ".\n")
-        n > 0 && Base.invokelatest(show, IOContext(io, :color => false), MIME"text/plain"(), result)
+    dir, info = open_report("dispatch", "one time_loop! step of full_model", out_dir)
+    push!(info, "reports" => string(n))
+    close_report(dir, "Runtime dispatch", info) do io, _
+        println(io, "JET optimization analysis of one `time_loop!` step, reports from the package only. ",
+            "A report is a call that is dispatched at run time; none is the expected state.\n")
+        if n > 0
+            println(io, "```")
+            Base.invokelatest(show, IOContext(io, :color => false), MIME"text/plain"(), result)
+            println(io, "\n```")
+        end
     end
-    return close_report(dir, header * header_line("reports", n))
+    return dir
 end
 
 # ----- Comparing two runs -----
@@ -552,39 +506,22 @@ function run_dir(path::AbstractString)
     return inside
 end
 
-"""
-The tables of a `step` or `setup` run read back from its reports:
-`(commit, samples, functions, lines, classes)`, the last three mapping a row
-name to its self samples.
-"""
+"Read a run's `counts.tsv` as `(commit, samples, functions, lines, classes)`."
 function read_run(dir::AbstractString)
-    header = read(joinpath(dir, "header.txt"), String)
-    commit = strip(match(r"commit:\s*(.*)", header).captures[1])
-    samples = parse(Int, match(r"samples:\s*(\d+)", header).captures[1])
-
-    functions, lines, classes = Dict{String,Int}(), Dict{String,Int}(), Dict{String,Int}()
-    table = functions
-    for row in eachline(joinpath(dir, "owned.txt"))
-        startswith(row, "By line") && (table = lines)
-        m = table === functions ?
-            match(r"^\s*(\d+)\s+[\d.]+\s+[\d.]+\s+\d+\s+[\d.]+(?:\s+[\d.]+)?\s+([^\d\s].*)$", row) :
-            match(r"^\s*(\d+)\s+[\d.]+\s+[\d.]+\s+(\S+:\d+\s+\S.*)$", row)
-        m === nothing || (table[m.captures[2]] = parse(Int, m.captures[1]))
+    path = joinpath(dir, "counts.tsv")
+    isfile(path) || error("$dir has no counts.tsv; run that profile again")
+    tables = Dict(name => Dict{String,String}() for name in ("run", "class", "function", "line"))
+    for row in Iterators.drop(eachline(path), 1)
+        name, key, value = split(row, '\t')
+        tables[name][key] = value
     end
-    for row in eachline(joinpath(dir, "category.txt"))
-        isempty(strip(row)) && !isempty(classes) && break   # the class table ends at the first blank line
-        m = match(r"^\s*(\d+)\s+[\d.]+\s+[\d.]+\s+([^\d\s].*)$", row)
-        m === nothing || (classes[m.captures[2]] = parse(Int, m.captures[1]))
-    end
-    return (; commit, samples, functions, lines, classes)
+    counts(name) = Dict(k => parse(Int, v) for (k, v) in tables[name])
+    return (; commit=tables["run"]["commit"], samples=parse(Int, tables["run"]["samples"]),
+        functions=counts("function"), lines=counts("line"), classes=counts("class"))
 end
 
-"""
-Print one table of `compare`: the share of each row in runs `a` and `b`, the
-difference in percentage points and its standard error. A `*` marks a
-difference of three standard errors or more, a `?` a row one run does not list.
-"""
-function print_changes(io::IO, title::AbstractString, a::Dict{String,Int}, na::Int, b::Dict{String,Int}, nb::Int;
+"Write one table of `compare`: each row's share in runs `a` and `b`, the difference and its standard error."
+function write_changes(io::IO, title::AbstractString, a::Dict{String,Int}, na::Int, b::Dict{String,Int}, nb::Int;
         top::Int=25)
     rows = map(collect(union(keys(a), keys(b)))) do name
         pa, pb = get(a, name, 0) / na, get(b, name, 0) / nb
@@ -592,31 +529,23 @@ function print_changes(io::IO, title::AbstractString, a::Dict{String,Int}, na::I
         (; name, pa, pb, diff=pb - pa, se)
     end
     sort!(rows; by=r -> (-abs(r.diff), r.name))
-    println(io, title)
-    println(io, "      A%      B%    diff    +/-     row")
-    for r in first(rows, top)
-        listed = haskey(a, r.name) && haskey(b, r.name)
-        flag = !listed ? " ? " : abs(r.diff) >= 3 * r.se ? " * " : "   "
-        println(io, @sprintf("%8.2f%8.2f%+8.2f%7.2f", 100r.pa, 100r.pb, 100r.diff, 100r.se), flag, " ", r.name)
-    end
-    println(io)
+    println(io, "## ", title, "\n")
+    md_table(io, ["Row", "A %", "B %", "Diff", "+/-", "3 SE"],
+        ([code(r.name), @sprintf("%.2f", 100r.pa), @sprintf("%.2f", 100r.pb), @sprintf("%+.2f", 100r.diff),
+          @sprintf("%.2f", 100r.se), abs(r.diff) >= 3 * r.se ? "*" : ""] for r in first(rows, top)))
 end
 
-"""
-Compare the shares of two `step` or `setup` runs, `a` before and `b` after,
-largest change first. Shares, not times: a row's share also falls when
-another row grows.
-"""
+"Compare the shares of two runs, largest change first."
 function compare_runs(dir_a::AbstractString, dir_b::AbstractString; io::IO=stdout)
     a, b = read_run(run_dir(dir_a)), read_run(run_dir(dir_b))
-    println(io, "A: ", dir_a, "  commit ", a.commit, ", ", a.samples, " samples")
-    println(io, "B: ", dir_b, "  commit ", b.commit, ", ", b.samples, " samples")
-    println(io, "Self shares in percent; diff is B minus A in percentage points, +/- its standard error.")
-    println(io, "* marks a difference of three standard errors or more. ? marks a row that one run's report")
-    println(io, "does not list (below its cut-off, or a line that moved); it counts as zero there.\n")
-    print_changes(io, "By class", a.classes, a.samples, b.classes, b.samples)
-    print_changes(io, "By function", a.functions, a.samples, b.functions, b.samples)
-    print_changes(io, "By line", a.lines, a.samples, b.lines, b.samples)
+    println(io, "# Profile comparison\n")
+    md_table(io, ["Run", "Directory", "Commit", "Samples"],
+        ([["A", dir_a, a.commit, string(a.samples)], ["B", dir_b, b.commit, string(b.samples)]]); left=(1, 2, 3))
+    println(io, "Self shares in percent; Diff is B minus A in percentage points, +/- its standard error. ",
+        "* marks a difference of three standard errors or more. A row one run lacks counts as zero there.\n")
+    write_changes(io, "By class", a.classes, a.samples, b.classes, b.samples)
+    write_changes(io, "By function", a.functions, a.samples, b.functions, b.samples)
+    write_changes(io, "By line", a.lines, a.samples, b.lines, b.samples)
     return nothing
 end
 
@@ -628,39 +557,33 @@ const _PROFILE_MODES = ("step", "setup", "allocs", "dispatch", "compare")
 const _MODE_FLAGS = (step=("years", "samples", "out", "viewer"), setup=("years", "samples", "out", "viewer"),
     allocs=("years", "out"), dispatch=("out",), compare=())
 
+"Run the profile named by `args`; returns the exit code."
 function main(args::Vector{String})
-    mode, rest = if isempty(args) || startswith(args[1], "--")
-        ("step", args)
-    elseif args[1] in _PROFILE_MODES
-        (args[1], args[2:end])
-    else
-        error("unknown mode $(repr(args[1])); expected one of $(join(_PROFILE_MODES, ", "))")
-    end
-
+    mode, rest = pick_mode(args, _PROFILE_MODES, "step")
     flags, rest = split_flags(rest)
-    for name in keys(flags)
-        name in _MODE_FLAGS[Symbol(mode)] || error("the $mode mode takes no --$name flag")
-    end
+    check_flags(mode, flags, _MODE_FLAGS[Symbol(mode)])
     if mode == "compare"
         length(rest) == 2 || error("compare takes two report directories: the run before and the run after")
-        return compare_runs(rest[1], rest[2])
+        compare_runs(rest[1], rest[2])
+        return 0
     end
+    length(rest) <= 1 || error("the $mode mode takes [jld2_dir], got: ", join(rest, " "))
 
     jld2_dir = !isempty(rest) ? rest[1] : default_data_dir()
     out_dir = get(flags, "out", nothing)
-    years = haskey(flags, "years") ? parse_nonneg_int("years", flags["years"]) : nothing
+    years = haskey(flags, "years") ? parse_nonneg_int("years", flags["years"]; min=1) : nothing
     if mode == "allocs"
         profile_allocs(jld2_dir; years=something(years, 1), out_dir)
     elseif mode == "dispatch"
         profile_dispatch(jld2_dir; out_dir)
     else
-        target = haskey(flags, "samples") ? parse_nonneg_int("samples", flags["samples"]) : TARGET_SAMPLES
+        target = haskey(flags, "samples") ? parse_nonneg_int("samples", flags["samples"]; min=1) : TARGET_SAMPLES
         profile_cpu(jld2_dir, Symbol(mode); years=something(years, CPU_MODES[Symbol(mode)].years), target, out_dir,
             viewer=get(flags, "viewer", nothing))
     end
-    return nothing
+    return 0
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    main(ARGS)
+    exit(main(ARGS))
 end

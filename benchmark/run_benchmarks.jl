@@ -19,14 +19,13 @@
 # test/test_invariants.jl, not here.
 
 using GREBClimate
-using GREBClimate: SWradiation!, LWradiation!, hydro!, convergence!, seaice!, deep_ocean!,
-                   circulation!, tendencies!, output!, diagnostics!, init_model!
+using GREBClimate: SWradiation!, LWradiation!, hydro!, deep_ocean!, circulation!
 
 include("common.jl")
 include("compare.jl")
 
 "Run `greb_model!` without its log output."
-quiet_run(spec, cfg, jld2_dir, fields) = Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
+quiet_run(spec, cfg, jld2_dir, fields) = without_logs() do
     greb_model!(spec, cfg; jld2_dir=jld2_dir, fields=fields)
 end
 
@@ -69,17 +68,6 @@ function time_years(jld2_dir::AbstractString; mode::AbstractString="years", expe
         "= ", round(_median(times) / total_years, digits=3), " s/simulated year (median) over ", total_years, " years")
     record_result(mode, mode == "year" ? "year" : String(experiment), times, machine_footer(calibration, times))
     return times
-end
-
-"The climatology, workspace and slice-1 state that the single-stage modes call the kernels with."
-function stage_inputs(jld2_dir::AbstractString, cfg)
-    fields = load_climatology(jld2_dir; dataset=:ncep)
-    r = resolve(cfg; jld2_dir)
-    CO2 = init_model!(fields, r).CO2_ctrl
-    slice = 1
-    Ts = copy(fields.Ts_clim[:, :, slice])
-    return (; fields, r, CO2, state=ModelState(), ws=ModelWorkspace(), slice, Ts, Ta=copy(Ts),
-        To=copy(fields.To_clim[:, :, slice]), q=copy(fields.q_clim[:, :, slice]))
 end
 
 "`x` with `digits` decimals (trailing zeros kept), right-aligned in `width` characters."
@@ -182,21 +170,13 @@ const _MODE_REPS = (year=true, stages=false, threads=true, years=true, compare=f
 
 "Run the benchmark named by `args`; returns the exit code."
 function main(args::Vector{String})
-    mode, rest = if isempty(args)
-        ("year", String[])
-    elseif args[1] in _MODES
-        (args[1], args[2:end])
-    else
-        error("unknown mode $(repr(args[1])); expected one of $(join(_MODES, ", "))")
-    end
+    mode, rest = pick_mode(args, _MODES, "year")
     sym = Symbol(mode)
 
     # Flags can appear anywhere in `rest`, so they are stripped before the
     # positional [jld2_dir] [reps].
     flags, rest = split_flags(rest)
-    for name in keys(flags)
-        name in _MODE_FLAGS[sym] || error("the $mode mode takes no --$name flag")
-    end
+    check_flags(mode, flags, _MODE_FLAGS[sym])
     length(rest) <= (_MODE_REPS[sym] ? 2 : 1) ||
         error("the $mode mode takes ", _MODE_REPS[sym] ? "[jld2_dir] [reps]" : "[jld2_dir] and no reps argument", ", got: ", join(rest, " "))
 

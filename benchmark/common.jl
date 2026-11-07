@@ -1,6 +1,7 @@
 # Helpers shared by the benchmark scripts.
 
 using Dates
+using Logging: with_logger, NullLogger
 
 const REPO = normpath(joinpath(@__DIR__, ".."))
 const JULIA_BIN = joinpath(Sys.BINDIR, Base.julia_exename())
@@ -40,6 +41,41 @@ function split_flags(args::Vector{String})
         end
     end
     return flags, positional
+end
+
+"""
+The mode named by the first of `args` and the remaining arguments. No arguments,
+or a first one that is a flag, selects `default`; any other first argument must
+be one of `modes`.
+"""
+function pick_mode(args::Vector{String}, modes, default::String)
+    (isempty(args) || startswith(args[1], "--")) && return default, args
+    args[1] in modes || error("unknown mode $(repr(args[1])); expected one of $(join(modes, ", "))")
+    return args[1], args[2:end]
+end
+
+"Stop unless every name in `flags` is one the `mode` takes (`allowed`)."
+function check_flags(mode::AbstractString, flags::Dict{String,String}, allowed)
+    for name in sort!(collect(keys(flags)))
+        name in allowed || error("the $mode mode takes no --$name flag")
+    end
+end
+
+"Run `f()` with log messages discarded; they are not part of a timed or profiled workload."
+without_logs(f) = with_logger(f, NullLogger())
+
+"""
+The climatology, workspace and slice-1 state that the single-stage modes, the
+comparison and the dispatch check call the kernels with.
+"""
+function stage_inputs(jld2_dir::AbstractString, cfg)
+    fields = load_climatology(jld2_dir; dataset=:ncep)
+    r = resolve(cfg; jld2_dir)
+    CO2 = GREBClimate.init_model!(fields, r).CO2_ctrl
+    slice = 1
+    Ts = copy(fields.Ts_clim[:, :, slice])
+    return (; fields, r, CO2, state=ModelState(), ws=ModelWorkspace(), slice, Ts, Ta=copy(Ts),
+        To=copy(fields.To_clim[:, :, slice]), q=copy(fields.q_clim[:, :, slice]))
 end
 
 "The median of `v`: the mean of the two middle values for an even length."

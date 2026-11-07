@@ -1,6 +1,6 @@
 # Benchmarks
 
-`benchmark/run_benchmarks.jl` times the model. It asserts nothing about results: the test suite is the correctness gate, and allocations are checked by `test/test_invariants.jl`. The full list of modes and flags is in `benchmark/README.md`.
+`benchmark/run_benchmarks.jl` times the model. It asserts nothing about results: the test suite is the correctness gate, and allocations are checked by `test/test_invariants.jl`. The full list of modes and flags is in `benchmark/README.md`. To find which function or line holds the time, see [Profiling](profiling.md).
 
 | Mode | Measures |
 |:-----|:---------|

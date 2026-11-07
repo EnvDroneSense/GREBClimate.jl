@@ -102,8 +102,8 @@ An entry outside "Changes to model results" leaves results unchanged.
   the plots. The pages show three figures, which `viz/docs_figures.jl`
   regenerates.
 - A "Developer tools" section of the docs site, with a page for the dataset tools
-  and a page on the benchmark harness that shows an example session and how to
-  read its output.
+  and pages on the benchmark harness and on the profiler that show an example
+  session and how to read its output.
 - The `dev` version of the docs site follows the `dev` branch instead of the
   last release. The README and CONTRIBUTING link to the `stable` version.
 
@@ -135,6 +135,15 @@ An entry outside "Changes to model results" leaves results unchanged.
   the same budget. A mistyped flag, a reps argument a mode does not take, an
   unknown mode and a missing dataset now stop the run with exit code 1.
   `threads` reports the median, as the other modes do. CI also loads the harness.
+- `benchmark/profile.jl` writes one `report.md` per run (Markdown tables that
+  also read as plain text) in place of `header.txt`, `category.txt`, `owned.txt`,
+  `allocs.txt` and `dispatch.txt`, and prints the top rows of the same tables.
+  `step` and `setup` also write `counts.tsv`, which `compare` reads instead of
+  parsing text reports; rows below a run's cut-off no longer rank first, so the
+  `?` marker is gone, and runs made before this change must be profiled again.
+  `tree.txt` and `flat.txt` now start at `greb_model!` and not at the profiler's
+  own frames, the script returns an exit code and rejects extra arguments, and
+  the helpers it shares with `run_benchmarks.jl` moved to `common.jl`.
 - The test that every physics kernel has an allocation budget checked nothing
   since 2.1.0, because it listed only exported names. It now finds unexported
   kernels, fails when it finds none, and covers `to_ghosted!` and

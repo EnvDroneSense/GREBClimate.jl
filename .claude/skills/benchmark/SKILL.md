@@ -38,7 +38,7 @@ The harness prints the machine state itself and marks a run NOISY; a NOISY run i
 
 ## Profiling
 
-`benchmark/profile.jl` shows where the time goes; the harness above shows how much there is. Reports land in `benchmark/profiles/<date>-<commit>-<mode>/` (gitignored).
+`benchmark/profile.jl` shows where the time goes; the harness above shows how much there is. It runs in the package environment (`--project=.`, `-t 1`), not the `benchmark` one. `benchmark/README.md` has the flags and the files of a run; the developer docs page "Profiling" shows the output. Reports land in `benchmark/profiles/<date>-<commit>-<mode>/` (gitignored), or in `--out`.
 
 | Mode | Answers | Command |
 |---|---|---|
@@ -48,17 +48,22 @@ The harness prints the machine state itself and marks a run NOISY; a NOISY run i
 | `dispatch` | Whether a call in the step is dispatched at run time (static; needs JET.jl in the default environment) | `julia --project=. benchmark/profile.jl dispatch` |
 | `compare` | What changed in the shares between two `step` or `setup` runs | `julia --project=. benchmark/profile.jl compare <before> <after>` |
 
+An unknown mode, a mistyped flag, an extra positional argument or a missing dataset stops the run with an error. In a REPL, `include("benchmark/profile.jl")` then `main(["step"])`; `main` returns the exit code. Do not load `run_benchmarks.jl` in the same session: both define `main`.
+
+A run writes `report.md` (a Markdown table of the run, then the result tables) and prints the top eight rows of the same tables. `step` and `setup` add `counts.tsv`, `tree.txt`, `flat.txt` and `stacks.folded`.
+
 | Rule | Why |
 |---|---|
 | Run at `-t 1` | On Windows the sampler records the first thread only |
-| Check `header.txt` first: 10000 samples or more | The sampler's rate varies (2 to 13 ms per sample); the script repeats the run up to a target and warns below 5000 |
-| Read `category.txt`, then `owned.txt`, then `tree.txt` | Kind of cost, then the owning line, then the call path |
-| Treat a row below three standard errors (`+/-`) as noise | Also for the `diff` column of `compare` |
+| Check the samples row of the run table first: 10000 or more | The sampler's rate varies (2 to 13 ms per sample); the script repeats the run up to a target and warns below 5000 |
+| Read the class table, then the function and line tables, then `tree.txt` | Kind of cost, then the owning function and line, then the call path |
+| Treat a row below three standard errors (`+/-`) as noise | Also for the `Diff` column of `compare` |
 | A `@turbo` loop is one row at its `@turbo for` line | Lines inside it are not resolved |
 | In `compare`, read the row that rose | The other rows fall by dilution without having changed |
+| Profile a run again if it predates `counts.tsv` | `compare` reads that file and stops without it |
 | A share is a ceiling, not a gain | Prove a gain with the same-process comparison at the end of this file |
 
-Reference shape of `step` (2026-10-05, release 2.0.1, `-t 1`): `circulation!` 89.5% on the stack (`_diffusion!` 40%, `_advection!` 35% self), 87% of samples inside `@turbo` code, no runtime dispatch, allocation only in `output!`.
+Quote shares only from a run of the default size, with its commit and sample count; the old reference shape was dropped because it went stale.
 
 ## Other checks
 
