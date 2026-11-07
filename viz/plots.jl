@@ -24,7 +24,7 @@ fieldinfo(v::Symbol) = get(VAR_INFO, v, (label=String(v), unit=""))
 unitlabel(v) = fieldinfo(v).unit == "" ? fieldinfo(v).label : "$(fieldinfo(v).label) [$(fieldinfo(v).unit)]"
 
 """
-    runs(x) -> Vector of (title, records, anomaly::Bool, times, dated::Bool)
+    runs(x) -> Vector of (; title, records, anomaly::Bool, times, dated::Bool)
 
 The non-empty runs of a `greb_model!` result, or one untitled run for a bare
 record vector. The scenario is an anomaly when the result's `scnr_anomaly` is
@@ -40,11 +40,13 @@ function runs(res::NamedTuple)
            for (name, run) in (("control", :ctrl), ("scenario", :scnr)) if !isempty(res[run])]
     isempty(out) ? error("the result has no control or scenario records") : out
 end
-runs(records::AbstractVector) = [("", records, false, by_position(length(records)), false)]
+runs(records::AbstractVector) =
+    [(title="", records=records, anomaly=false, times=by_position(length(records)), dated=false)]
 
 function tagged(name, recs, times, anom)
     dated = times !== nothing
-    (anom ? "$name anomaly" : name, recs, anom, dated ? times : by_position(length(recs)), dated)
+    return (title=anom ? "$name anomaly" : name, records=recs, anomaly=anom,
+            times=dated ? times : by_position(length(recs)), dated=dated)
 end
 
 "Panels stacked in one column, each `h` pixels tall."
@@ -53,28 +55,6 @@ stack(panels, h) = length(panels) == 1 ? only(panels) :
 
 "Diverging colours centred on zero for anomalies, viridis otherwise."
 colours(g, anom) = anom ? (c=:balance, clims=(-1, 1) .* max(maximum(abs, g), eps())) : (c=:viridis,)
-
-"""
-    coastlines!(p, fields; color=:black, lw=0.7)
-
-Outline the cells where `fields.z_topo > 0`. No-op when `fields` is `nothing`.
-Drawn as line segments, not a contour: a contour joins the heatmap's colour
-scale and is clipped when fixed `clims` exclude 0 m.
-"""
-function coastlines!(p, fields; color=:black, lw=0.7)
-    fields === nothing && return p
-    land = fields.z_topo .> 0
-    nx, ny = size(land)
-    dx, dy = 360 / nx, 180 / ny
-    xs, ys = Float64[], Float64[]
-    seg!(x1, y1, x2, y2) = (append!(xs, (x1, x2, NaN)); append!(ys, (y1, y2, NaN)))
-    for j in 1:ny, i in 1:nx
-        y0, y1 = -90 + (j - 1) * dy, -90 + j * dy
-        land[i, j] != land[mod1(i + 1, nx), j] && seg!(i * dx, y0, i * dx, y1)       # east edge, wraps
-        j < ny && land[i, j] != land[i, j + 1] && seg!((i - 1) * dx, y1, i * dx, y1) # north edge
-    end
-    Plots.plot!(p, xs, ys; linecolor=color, linewidth=lw, label="", xlims=(0, 360), ylims=(-90, 90))
-end
 
 "Heatmap of a lon x lat grid on degree axes, outlined when `fields` is given."
 function geomap(g::AbstractMatrix; fields=nothing, kw...)
@@ -113,15 +93,33 @@ function lines(f, x, var, xlabel; kw...)
 end
 
 """
-    plot_timeseries(x; var=:Ts, annual=false)
+    plot_timeseries(x; var=:Ts, annual=false, mask=nothing)
 
 Area-weighted global mean of `var` per month, or per year with `annual=true`.
+With a `mask` ([`land_mask`](@ref), [`band_mask`](@ref)) the mean is over its
+cells.
 """
-plot_timeseries(x; var::Symbol=:Ts, annual::Bool=false) =
+plot_timeseries(x; var::Symbol=:Ts, annual::Bool=false, mask=nothing) =
     lines(x, var, annual ? "year" : "month") do recs, times
-        s = series(recs, var)
+        s = series(recs, var; mask=mask)
         annual ? GREBViz.annual(s, times) : s
     end
+
+"""
+    plot_zonal(x; var=:Ts, month=:mean)
+
+Zonal mean of `var` against latitude, one panel per run. `month` is as in
+[`plot_map`](@ref).
+"""
+function plot_zonal(x; var::Symbol=:Ts, month=:mean)
+    panels = map(runs(x)) do (t, recs, anom)
+        z = zonal_mean(recs, var; month=month)
+        p = Plots.plot(z, lats(length(z)); xlabel=unitlabel(var), ylabel="latitude [°N]",
+                       yticks=-90:30:90, title=paneltitle(t, var), legend=false, lw=2)
+        anom ? Plots.vline!(p, [0]; color=:gray, ls=:dash) : p
+    end
+    stack(panels, 300)
+end
 
 """
     plot_seasonal(x; var=:Ts)

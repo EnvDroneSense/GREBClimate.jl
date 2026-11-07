@@ -46,12 +46,36 @@ fields = (z_topo=Float32[i <= NX ÷ 2 ? 100 : -100 for i in 1:NX, j in 1:NY],)
         @test length(map_frames([rec((i, j) -> 1) for _ in 1:30], :Ts; step=:year)) == 2
     end
 
+    @testset "masks and regions" begin
+        land = land_mask(fields.z_topo)
+        @test count(land) == NX * NY ÷ 2 && land[1, 1] && !land[NX, 1]
+        arctic = band_mask(NX, NY; south=66.5)
+        @test band_mask(rec((i, j) -> 0).Ts; south=66.5) == arctic
+        @test all(lats(NY)[j] >= 66.5 for j in 1:NY if arctic[1, j]) && count(arctic) > 0
+        # a whole-globe mask reproduces the global mean; a band reads its own latitudes
+        hot = [rec((i, j) -> lats(NY)[j])]
+        @test series(hot, :Ts; mask=trues(NX, NY)) ≈ series(hot, :Ts)
+        @test series(hot, :Ts; mask=arctic)[1] > 66.5
+        @test_throws ErrorException series(hot, :Ts; mask=falses(NX, NY))
+        # the outline: a half-globe land mask has two meridian edges (one wraps), no latitude edges
+        xs, ys = mask_outline(land)
+        @test count(isnan, xs) == 2 * NY
+        @test sort(unique(filter(!isnan, xs))) == [180.0, 360.0]
+        @test isempty(first(mask_outline(trues(NX, NY))))
+        # absolute again, and the zonal mean
+        c = [rec((i, j) -> 280 + m % 12) for m in 0:23]
+        a = [rec((i, j) -> 1f0) for _ in 1:24]
+        @test to_absolute(a, c)[13].Ts[1] ≈ 1f0 + c[13].Ts[1]
+        @test_throws ErrorException to_absolute(a, c[1:5])
+        @test zonal_mean(hot, :Ts) ≈ lats(NY)
+    end
+
     ctrl = [rec((i, j) -> 280 + m % 12) for m in 0:23]
     anom = [rec((i, j) -> 1f0 + m / 10) for m in 0:23]
     res = (ctrl=ctrl, scnr=anom, scnr_anomaly=true)
 
     @testset "runs" begin
-        @test [r[1] for r in GREBViz.runs(res)] == ["control", "scenario anomaly"]
+        @test [r.title for r in GREBViz.runs(res)] == ["control", "scenario anomaly"]
         @test GREBViz.runs((ctrl=ctrl, scnr=ctrl, scnr_anomaly=false))[2][3] == false   # orbital: stays absolute
         @test GREBViz.runs((ctrl=ctrl, scnr=anom))[2][3] == false          # no flag: absolute, no guessing
         @test length(GREBViz.runs((ctrl=ctrl, scnr=typeof(ctrl)()))) == 1
@@ -75,6 +99,19 @@ fields = (z_topo=Float32[i <= NX ÷ 2 ? 100 : -100 for i in 1:NX, j in 1:NY],)
             @test plot_seasonal(x; var=:q) isa GREBViz.Plots.Plot
             @test plot_hovmoller(x) isa GREBViz.Plots.Plot
         end
+        @test plot_timeseries(res; mask=band_mask(NX, NY; south=60)) isa GREBViz.Plots.Plot
+        @test plot_zonal(res) isa GREBViz.Plots.Plot
+        @test plot_difference(anom, ctrl; fields=fields) isa GREBViz.Plots.Plot
+        @test plot_difference(GREBViz.to_absolute(anom, ctrl), ctrl; month=:last) isa GREBViz.Plots.Plot
+        @test plot_compare(["a" => res, "b" => ctrl]; annual=false) isa GREBViz.Plots.Plot
+        @test plot_compare(["a" => res]; mask=land_mask(fields.z_topo)) isa GREBViz.Plots.Plot
+        @test_throws ErrorException plot_compare(Pair{String,Any}[])
+        members = ["full" => 2.8, "no ice albedo" => 2.5, "no water cycle" => 1.6]
+        @test plot_members(members; xlabel="warming [K]") isa GREBViz.Plots.Plot
+        @test plot_members(members; baseline="full") isa GREBViz.Plots.Plot
+        @test_throws ErrorException plot_members(members; baseline="missing")
+        p = plot_map(ctrl; fields=fields)
+        @test outline!(p, band_mask(NX, NY; south=60)) === p
         ev = evolution(res; step=:year)
         @test frame_count(ev) == 2
         @test ev.panels[2].clims[1] == -ev.panels[2].clims[2]              # anomaly: symmetric

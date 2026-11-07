@@ -78,22 +78,42 @@ An entry outside "Changes to model results" leaves results unchanged.
 - `read_field` raises an `ArgumentError` for a missing file (was a `jldopen`
   error). For a file of an optional pack the message names the pack.
 
+- `viz/` has new plots: `plot_zonal`, `plot_difference` (with `to_absolute`),
+  `plot_compare` (several runs as lines) and `plot_members` (one bar per ensemble
+  member). `plot_timeseries` and `series` take a `mask`. New building blocks:
+  `land_mask`, `band_mask`, `mask_outline`, `outline!` (`coastlines!` now uses
+  them) and `zonal_mean`.
+- `examples/` holds two new scripts: `quickstart.jl` (load, run, compare a
+  process on and off; `--data-free` runs without the dataset) and
+  `feedback_deconstruction.jl` (one `run_ensemble` that switches processes off one
+  at a time and writes the warming of each to a CSV). `run_greb.jl` and
+  `parameter_sweep.jl` are removed; the CO2 sweep is now
+  `tools/experiments/co2_sweep.jl` with small defaults.
+
 ### Fixes
 
-- `include("examples/run_greb.jl")` no longer resolves the dataset when the file
-  is loaded. It could prompt for a 353 MB download even when `run_greb` was then
-  given a directory.
 - The stand-alone `convergence!` fills the ghost cells through `to_ghosted!`,
   as the model does.
 
 ### Documentation
 
+- The "Plots and notebook" page of the docs site is a section of four pages: setup
+  and notebook, the plots, building blocks for your own plots, and how to read
+  the plots. The pages show three figures, which `viz/docs_figures.jl`
+  regenerates.
 - A "Developer tools" section of the docs site, with a page for the dataset tools.
 - The `dev` version of the docs site follows the `dev` branch instead of the
   last release. The README and CONTRIBUTING link to the `stable` version.
 
 ### Tools and tests
 
+- `viz/notebooks/launch_pluto.jl` brings the `viz/` environment up to date on every
+  start. Before, an environment set up once was never refreshed, and the notebook
+  stopped loading after the package gained a dependency. The notebook and
+  `viz/demo.jl` no longer copy `fields` per run.
+- The preset-reference generator moved to `test/support/preset_reference.jl` (was
+  `tools/validation/`) and runs again; it failed to load. `bit_identity.jl` and
+  `budget.jl` can be `include`d without exiting the session.
 - The dataset tools read the field metadata from `tools/dataset/fields.toml`.
   `convert_greb_to_jld2.jl` stops when a field fails, prints a summary per
   section and no longer reads `--all` as the input directory;

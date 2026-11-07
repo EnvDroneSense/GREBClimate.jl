@@ -23,8 +23,9 @@ const ROOT = normpath(joinpath(@__DIR__, "..", "..", ".."))
 const DOC_FILES = ["README.md", "DATA_README.md", "CHANGELOG.md",
                    "docs/src/index.md", "docs/src/tutorial.md",
                    "docs/src/configuration.md", "docs/src/api.md",
-                   "docs/src/data.md", "docs/src/model.md", "docs/src/viz.md",
-                   "CONTRIBUTING.md"]
+                   "docs/src/data.md", "docs/src/model.md", "docs/src/viz/index.md",
+                   "docs/src/viz/plots.md", "docs/src/viz/tools.md",
+                   "docs/src/viz/interpreting.md", "CONTRIBUTING.md"]
 
 failures = String[]
 fail(msg) = (push!(failures, msg); println("  FAIL  ", msg))

@@ -33,6 +33,6 @@ downloads and caches on first use; see [Input data](@ref).
 | [Input data](@ref) | Where the dataset comes from, how it is found, and its layout |
 | [Model overview](@ref) | What the model computes and how a run is structured |
 | [Time and calendar](@ref) | The model calendar, the time value of a run, and what the time system does not do yet |
-| [Plots and notebook](@ref) | The `viz/` plotting toolbox and the Pluto explorer |
+| [Plots and notebook](@ref) | The `viz/` plotting toolbox, how to read the plots, and the Pluto explorer |
 | [Configuration](@ref) | The parts of a configuration, their options, and the experiment presets |
 | [API Reference](@ref) | Every exported function and type |

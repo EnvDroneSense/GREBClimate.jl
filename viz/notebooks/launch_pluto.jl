@@ -4,7 +4,7 @@
 
 using Pkg
 viz = joinpath(@__DIR__, "..")
-isfile(joinpath(viz, "Manifest.toml")) || include(joinpath(viz, "setup.jl"))   # first launch only
+include(joinpath(viz, "setup.jl"))   # seconds when the environment is current
 Pkg.activate(viz)
 
 using Pluto

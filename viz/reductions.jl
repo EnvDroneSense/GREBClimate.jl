@@ -31,11 +31,39 @@ function yearblocks(times::AbstractVector)
     filter(b -> length(b) == 12, blocks)
 end
 
-"Area-weighted global mean of `var`, one value per month."
-function series(records::AbstractVector, var::Symbol)
+"""
+    series(records, var; mask=nothing)
+
+Area-weighted mean of `var`, one value per record: the global mean, or the mean
+over the cells where `mask` (a lon x lat `Bool` matrix, see
+[`band_mask`](@ref) and [`land_mask`](@ref)) is true.
+"""
+function series(records::AbstractVector, var::Symbol; mask::Union{Nothing,AbstractMatrix{Bool}}=nothing)
     w = area_weights(size(getfield(first(records), var))...)
+    mask === nothing || (w = w .* mask)
+    sum(w) > 0 || error("the mask selects no cells")
     [sum(getfield(r, var) .* w) / sum(w) for r in records]
 end
+
+"""
+    to_absolute(anomaly, control)
+
+A scenario that is an anomaly, made absolute again: the control's last 12 months
+are added back by calendar month. Needed to difference a scenario against its
+control with [`plot_difference`](@ref).
+"""
+function to_absolute(anomaly::AbstractVector, control::AbstractVector)
+    length(control) >= 12 || error("the control needs at least 12 months, it has $(length(control))")
+    clim = control[end-11:end]
+    return [map(.+, r, clim[mod1(i, 12)]) for (i, r) in enumerate(anomaly)]
+end
+
+"""
+    zonal_mean(records, var; month=:mean)
+
+The mean over longitude of one grid ([`field`](@ref)), one value per latitude.
+"""
+zonal_mean(records::AbstractVector, var::Symbol; month=:mean) = vec(mean(field(records, var; month=month); dims=1))
 
 """
     annual(s, times=by_position(length(s)))

@@ -18,13 +18,17 @@ module GREBViz
 import Plots
 using Statistics: mean, quantile
 
-export plot_map, plot_timeseries, plot_seasonal, plot_hovmoller, coastlines!,
+export plot_map, plot_timeseries, plot_seasonal, plot_hovmoller, plot_zonal,
+       plot_difference, plot_compare, plot_members,
        evolution, evolution_frame, evolution_gif, frame_count,
-       series, annual, seasonal_cycle, field, hovmoller, map_frames,
+       series, annual, seasonal_cycle, field, hovmoller, map_frames, zonal_mean, to_absolute,
+       land_mask, band_mask, mask_outline, outline!, coastlines!,
        lats, lons, area_weights, fieldinfo
 
 include("reductions.jl")
+include("regions.jl")
 include("plots.jl")
+include("compare.jl")
 include("animation.jl")
 
 end # module

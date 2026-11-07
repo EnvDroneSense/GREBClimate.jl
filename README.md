@@ -37,7 +37,7 @@ GREB is a conceptual climate model that simulates the global energy balance on a
 - **Ensembles**: run many configurations side by side with `run_ensemble`, each member identical to its own single run
 - **Fast**: SIMD-vectorised physics, and the temperature and humidity transport run concurrently with `julia -t 2,0`
 - **Enzyme support (optional)**: the radiation, hydrology and sea-ice kernels use plain loops so that [Enzyme](https://github.com/EnzymeAD/Enzyme.jl) can differentiate them; the derivative rules for the fast `log`/`exp` load only when Enzyme is loaded
-- **Plots and notebook**: maps, time series, seasonal cycles, Hovmöller diagrams and animations ([guide](https://EnvDroneSense.github.io/GREBClimate.jl/stable/viz/))
+- **Plots and notebook**: maps, time series, seasonal cycles, zonal means, Hovmöller diagrams, run comparisons, animations and building blocks for your own plots ([guide](https://EnvDroneSense.github.io/GREBClimate.jl/stable/viz/))
 
 ## 🚀 Quick Start
 

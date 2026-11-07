@@ -12,9 +12,10 @@ dir = greb_data_dir(allow_download=false)
 fields = load_climatology(dir; dataset=:ncep)
 
 @info "running GREB (3 yr flux spin-up, 5 yr control, 15 yr 2xCO2 scenario)"
+# Base.CoreLogging: the viz environment does not list the Logging stdlib.
 res = Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
     greb_model!(RunSpec(ctrl=5, scnr=15), preset(:co2_double);
-                jld2_dir=dir, fields=deepcopy(fields))
+                jld2_dir=dir, fields=fields)
 end
 
 save(p, name) = (savefig(p, joinpath(outdir, "greb_$name.png")); println("  -> greb_$name.png"))
@@ -23,6 +24,9 @@ save(plot_timeseries(res), "timeseries")
 save(plot_timeseries(res; annual=true), "timeseries_annual")
 save(plot_seasonal(res), "seasonal")
 save(plot_hovmoller(res), "hovmoller")
+save(plot_zonal(res), "zonal")
+save(plot_difference(to_absolute(res.scnr, res.ctrl), res.ctrl; fields=fields), "difference")
+save(plot_timeseries(res; annual=true, mask=band_mask(fields.z_topo; south=66.5)), "timeseries_arctic")
 evolution_gif(joinpath(outdir, "greb_evolution.gif"), evolution(res; step=:year); fields=fields)
 println("  -> greb_evolution.gif")
 

@@ -27,7 +27,12 @@ makedocs(
         "Input data" => "data.md",
         "Model overview" => "model.md",
         "Time and calendar" => "time.md",
-        "Plots and notebook" => "viz.md",
+        "Plots and notebook" => [
+            "Overview" => "viz/index.md",
+            "The plots" => "viz/plots.md",
+            "Building blocks" => "viz/tools.md",
+            "Reading the plots" => "viz/interpreting.md",
+        ],
         "Configuration" => "configuration.md",
         "Developer tools" => [
             "Overview" => "dev/index.md",
