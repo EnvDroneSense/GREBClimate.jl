@@ -1,7 +1,7 @@
 # Run the test files in several Julia processes at once, so the full suite takes
 # the time of its slowest group instead of the sum of all files.
 #
-#   julia --project=. test/parallel.jl [--jobs=4] [--tier=full] [--shard=light|heavy]
+#   julia --project=. test/support/parallel.jl [--jobs=4] [--tier=full] [--shard=light|heavy]
 #
 # Each group is one `Pkg.test(test_args = files)`, so it runs with
 # --check-bounds=yes like the serial gate. Groups are balanced by the `cost`
@@ -13,9 +13,9 @@
 # the cores are shared, so do not set --jobs above the core count divided by
 # three.
 
-include(joinpath(@__DIR__, "support", "selection.jl"))
+include(joinpath(@__DIR__, "selection.jl"))
 
-const ROOT = normpath(joinpath(@__DIR__, ".."))
+const ROOT = normpath(joinpath(@__DIR__, "..", ".."))
 const SERIAL = ("test_threading.jl",)
 
 function parse_options(args)

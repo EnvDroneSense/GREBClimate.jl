@@ -10,15 +10,10 @@ resolved(c; table=Dict(1950 => 400.0f0)) = ResolvedConfig(c, resolve(c.hydrology
     @test_throws ArgumentError preset(:not_a_preset)
 end
 
-@testset "orbital presets default to the near-modern table row" begin
-    @test preset(:eccentricity).scenario.solar == SolarTable(:eccentricity, 32)
-    @test preset(:obliquity).scenario.solar == SolarTable(:obliquity, 95)
-    @test SolarTable(:obliquity) == SolarTable(:obliquity, 95)
-    @test SolarTable(:paleo).index == 0
-end
-
 @testset "parameterised presets carry their parameter" begin
-    # not the default rows (32, 95): an ignored `index` must show
+    # The default rows (32, 95) are pinned by the preset reference. Use other
+    # rows here, so an ignored `index` shows
+    @test SolarTable(:paleo).index == 0
     @test preset(:eccentricity; index=5).scenario.solar == SolarTable(:eccentricity, 5)
     @test preset(:obliquity; index=10).scenario.solar == SolarTable(:obliquity, 10)
     @test preset(:earth_sun_distance; percent=2.5).scenario.solar == EarthSunDistance(2.5)

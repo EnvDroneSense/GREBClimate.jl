@@ -129,13 +129,6 @@ end
     end
 end
 
-@testset "hydro! errors on an unknown evaporation scheme" begin
-    Ts = fill(290.0, X, Y)
-    q = fill(0.005, X, Y)
-    h = resolved_hydrology(evaporation=:bogus)
-    @test_throws ErrorException hydro!(ModelWorkspace(), Ts, q, ClimateFields(), 1, Processes(), h)
-end
-
 @testset "hydro! fitted rain: dq_rain and Q_lat_air values, with no limit on rain" begin
     fields = constant_fields(z_topo=1.0)
     init_model!(fields, resolve(preset(:full_model)))

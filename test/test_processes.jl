@@ -8,6 +8,7 @@
     @test_throws ArgumentError Processes(clouds=:off)
     @test_throws ArgumentError Processes(ocean=:slab)
     @test_throws ArgumentError Hydrology(rain=:best)
+    @test_throws ArgumentError Hydrology(evaporation=:bogus)
     @test_throws ArgumentError Hydrology(rain=:original, rain_fit=:ncep)   # a fit only applies to :fitted
     @test mscm_hydrology() == Hydrology(rain=:original, evaporation=:original)
     @test Processes().co2 === true

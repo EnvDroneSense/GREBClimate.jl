@@ -1,10 +1,10 @@
 # Every experiment preset is what the reference recorded: its forcing and its
-# physics (test/data/preset_reference.jl, written by
+# physics (test/support/data/preset_reference.jl, written by
 # tools/validation/preset_reference.jl). A preset changed on purpose means
 # regenerating the reference in the same commit.
 
 include(joinpath("support", "presetcapture.jl"))
-include(joinpath("data", "preset_reference.jl"))
+include(joinpath("support", "data", "preset_reference.jl"))
 
 @testset "preset reference: $p" for p in PRESETS
     got, ref = capture_preset(p), PRESET_REFERENCE[p]

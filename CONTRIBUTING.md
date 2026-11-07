@@ -81,7 +81,7 @@ GREB_TEST_SHARD=light julia --project=. -e 'using Pkg; Pkg.test()'
 GREB_TEST_SHARD=heavy julia --project=. -e 'using Pkg; Pkg.test()'
 ```
 
-To run the whole suite faster on a multi-core machine, `julia --project=. test/parallel.jl`
+To run the whole suite faster on a multi-core machine, `julia --project=. test/support/parallel.jl`
 runs the files in four processes at once (`--jobs=N`, `--tier=NAME`, `--shard=NAME`
 narrow it). Each process runs `Pkg.test`, so bounds checking stays on. It takes about
 100 s instead of about 295 s and needs roughly 1 GB of memory per process.
@@ -94,7 +94,7 @@ julia --project=. -e 'using Pkg; Pkg.test(test_args=["state", "io"])'
 GREB_TEST_TIER=smoke julia --project=. -e 'using Pkg; Pkg.test()'
 ```
 
-For repeated runs, `julia --project=. -i test/live.jl` keeps one session open
+For repeated runs, `julia --project=. -i test/support/live.jl` keeps one session open
 and compiles once: call `t("state")` or `t(:smoke)`. A subset run only proves
 the files it ran; run the full suite before opening a pull request.
 
@@ -126,7 +126,7 @@ Things worth knowing before you add tests:
   tests skip there.** A green CI says nothing about them: with the dataset
   present, run the full suite locally before opening a PR.
 - `test/test_presets.jl` compares every preset (its forcing, masks, physics,
-  hydrology and corrections) with `test/data/preset_reference.jl`. If you
+  hydrology and corrections) with `test/support/data/preset_reference.jl`. If you
   change a preset on purpose, regenerate the file in the same commit with
   `julia --project=. tools/validation/preset_reference.jl` and say so in the
   PR; never edit it by hand.

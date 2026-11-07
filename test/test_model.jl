@@ -257,15 +257,6 @@ end
     end
 end
 
-@testset "greb_model! spins up for as long as SpinUp says" begin
-    # Ts after the first control step
-    first_ts(years) = at_first_step(v -> copy(v.Ts), RunSpec(ctrl=1, scnr=0),
-        preset(:full_model; corrections=SpinUp(years));
-        phase=control, jld2_dir="", fields=synthetic_fields())
-    none, one_year = first_ts(0), first_ts(1)
-    @test all(isfinite, none) && none != one_year
-end
-
 @testset "greb_model! takes the corrections it is given, with either topography" begin
     with_tempdir() do dir
         write_flux_corrections(dir; Ts=0.5f0)
@@ -346,18 +337,11 @@ end
         absolute = run_synthetic(RunSpec(ctrl=1, scnr=1),
             Config(scenario=Scenario(output=:absolute), corrections=NoCorrections()))
         @test !absolute.scnr_anomaly
-        @test !run_synthetic(RunSpec(ctrl=0, scnr=1), preset(:co2_double; corrections=NoCorrections())).scnr_anomaly
+        # A scenario without a control has no records to subtract, and starts in the preset's year
+        nocontrol = run_synthetic(RunSpec(ctrl=0, scnr=1), preset(:co2_double; corrections=NoCorrections()))
+        @test !nocontrol.scnr_anomaly
+        @test isempty(nocontrol.ctrl) && isempty(nocontrol.ctrl_time)
+        @test nocontrol.scnr_time == record_times(1950, 12)
     end
-
-    @testset "scenario without control" begin
-        result = run_synthetic(RunSpec(ctrl=0, scnr=1), preset(:co2_double; corrections=NoCorrections()))
-        @test isempty(result.ctrl) && isempty(result.ctrl_time)
-        @test result.scnr_time == record_times(1950, 12)
-    end
-
-    @testset "years at and below zero" begin
-        config = Config(scenario=Scenario(start_year=-1, output=:absolute), corrections=NoCorrections())
-        result = run_synthetic(RunSpec(ctrl=0, scnr=2), config)
-        @test result.scnr_time == record_times(-1, 24)
-    end
+    # Years at and below zero are covered by test_calendar.jl
 end

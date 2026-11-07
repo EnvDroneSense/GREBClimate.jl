@@ -64,11 +64,9 @@ end
 
     @testset "years at and below zero" begin
         for start in (1970, 1, 0, -231_000)
-            counter = start
-            for s in 1:(3*nstep_yr)
-                @test year(ModelTime(scenario, start, s)) == counter
-                is_year_end(s) && (counter += 1)
-            end
+            # One assertion per start year: the year of every step of three years
+            expected = [start + (s - 1) ÷ nstep_yr for s in 1:(3*nstep_yr)]
+            @test all(year(ModelTime(scenario, start, s)) == expected[s] for s in 1:(3*nstep_yr))
         end
         @test decimal_year(ModelTime(scenario, -5, 366)) == -5 + 365 / 730
     end

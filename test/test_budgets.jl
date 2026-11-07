@@ -21,8 +21,12 @@ end
     calls = Tuple{GREBClimate.Phase,Symbol}[]
     its = Int[]
     times = ModelTime[]
-    observer = (point, view) -> (push!(calls, (view.phase, point)); push!(its, view.step); push!(times, view.time))
+    record = (point, view) -> (push!(calls, (view.phase, point)); push!(its, view.step); push!(times, view.time))
+    # A RangeCheck rides along on the same run: with infinite limits it sees every step
+    seen = RangeCheck(Ts=(-Inf, Inf), Ta=(-Inf, Inf), To=(-Inf, Inf), q=(-Inf, Inf))
+    observer = (point, view) -> (record(point, view); seen(point, view))
     run_synthetic(RunSpec(ctrl=1, scnr=1), preset(:full_model; corrections=NoCorrections()); observer)
+    @test seen.steps == 2N
     step = [:after_tendencies, :after_step]
     @test calls == [(phase, point) for phase in (control, scenario) for _ in 1:N for point in step]
     @test its == [it for _ in 1:2 for it in 1:N for _ in 1:2]
@@ -109,9 +113,5 @@ end
     narrow = RangeCheck(Ts=(285, 300))
     narrow(:after_step, step_view(1))
     @test narrow.first.field === :Ts && narrow.first.value == 280.0f0
-
-    # In a run it sees every step of the control and the scenario
-    seen = RangeCheck(Ts=(-Inf, Inf), Ta=(-Inf, Inf), To=(-Inf, Inf), q=(-Inf, Inf))
-    run_synthetic(RunSpec(ctrl=1, scnr=1), preset(:full_model; corrections=NoCorrections()); observer=seen)
-    @test seen.steps == 2N
+    # Its use in a run, over the control and the scenario, is in the observer testset above
 end

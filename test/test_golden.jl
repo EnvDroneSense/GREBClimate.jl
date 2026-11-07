@@ -1,6 +1,6 @@
 # Golden regression against a saved snapshot of a real-dataset run.
 
-include(joinpath("data", "golden_reference.jl"))
+include(joinpath("support", "data", "golden_reference.jl"))
 
 "The monthly global means of `records` match the snapshot `reference`, record by record."
 function matches_reference(records, reference)

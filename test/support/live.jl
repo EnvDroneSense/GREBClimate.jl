@@ -1,7 +1,7 @@
 # Iterate on tests in one long-lived Julia session, so the package and the test
 # files compile once instead of on every run:
 #
-#   julia --project=. -i test/live.jl
+#   julia --project=. -i test/support/live.jl
 #   julia> t("state")            # one file; name as in SHARD, prefix and .jl optional
 #   julia> t("state", "io")      # several
 #   julia> t(:smoke)             # a tier: :smoke, :standard or :full
@@ -17,9 +17,9 @@ catch
     @info "Revise not available; restart Julia after editing src/"
 end
 
-include(joinpath(@__DIR__, "support", "imports.jl"))
-include(joinpath(@__DIR__, "support", "testutils.jl"))
-include(joinpath(@__DIR__, "support", "selection.jl"))
+include(joinpath(@__DIR__, "imports.jl"))
+include(joinpath(@__DIR__, "testutils.jl"))
+include(joinpath(@__DIR__, "selection.jl"))
 
 """Run the named test files, or a whole tier (`t(:smoke)`), in this session."""
 function t(names::AbstractString...)
@@ -33,7 +33,7 @@ function _run(files)
     elapsed = @elapsed @testset "live" begin
         for file in files
             @testset "$file" begin
-                include(joinpath(@__DIR__, file))
+                include(joinpath(@__DIR__, "..", file))
             end
         end
     end

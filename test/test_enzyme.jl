@@ -1,9 +1,13 @@
 # Enzyme rules for fastlog and fastexp (ext/GREBEnzymeExt.jl). Enzyme is not a
-# test dependency: the check runs in a subprocess when Enzyme can be found in
-# the load path (for example in the default environment) and is skipped otherwise.
+# test dependency: the check runs in a subprocess when Enzyme can be found, in
+# the default environment or in a shared environment named `enzyme`
+# (`julia --project=@enzyme -e 'using Pkg; Pkg.add("Enzyme")'`), and is skipped
+# otherwise. Neither CI nor a fresh checkout has Enzyme, so there it is skipped.
+
+enzyme_env = joinpath(first(DEPOT_PATH), "environments", "enzyme")
 
 @testset "fastlog/fastexp: Enzyme rules match the analytic derivatives" begin
-    if Base.find_package("Enzyme") === nothing
+    if Base.find_package("Enzyme") === nothing && !isdir(enzyme_env)
         @info "Enzyme not installed; skipping test_enzyme.jl"
         @test_skip true
     else
@@ -25,7 +29,9 @@
         """
         exe = first(Base.julia_cmd())
         project = normpath(joinpath(@__DIR__, ".."))
-        out = read(`$exe --startup-file=no --project=$project -e $script`, String)
+        load_path = join(["@", enzyme_env, "@v#.#", "@stdlib"], Sys.iswindows() ? ";" : ":")
+        cmd = addenv(`$exe --startup-file=no --project=$project -e $script`, "JULIA_LOAD_PATH" => load_path)
+        out = read(cmd, String)
         @test split(out) == fill("true", 6)
     end
 end
