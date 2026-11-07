@@ -158,6 +158,11 @@ An entry outside "Changes to model results" leaves results unchanged.
 - CI checks the formatting of `tools`, `ext`, `examples` and `viz` as well as
   `src`, `test` and `benchmark`, runs the `viz` tests, loads the profiler, and
   runs the Fortran harness self-test. Those folders were formatted.
+- The developer docs have pages for the diagnostics, experiments and validation
+  tools, for testing and for the code conventions, and the tutorial has an
+  Examples page with the output of both example scripts. `CONTRIBUTING.md` is
+  shorter and links to them; the dataset size is given as 439 MB unpacked and a
+  321 MB download everywhere.
 - The test that every physics kernel has an allocation budget checked nothing
   since 2.1.0, because it listed only exported names. It now finds unexported
   kernels, fails when it finds none, and covers `to_ghosted!` and

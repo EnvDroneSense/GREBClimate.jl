@@ -38,7 +38,7 @@ The harness prints the machine state itself and marks a run NOISY; a NOISY run i
 
 ## Profiling
 
-`benchmark/profile.jl` shows where the time goes; the harness above shows how much there is. It runs in the package environment (`--project=.`, `-t 1`), not the `benchmark` one. `benchmark/README.md` has the flags and the files of a run; the developer docs page "Profiling" shows the output. Reports land in `benchmark/profiles/<date>-<commit>-<mode>/` (gitignored), or in `--out`.
+`benchmark/profile.jl` shows where the time goes; the harness above shows how much there is. It runs in the package environment (`--project=.`, `-t 1`), not the `benchmark` one. `benchmark/README.md` has the flags and the files of a run (`report.md` first); the developer docs page "Profiling" shows the output. Reports land in `benchmark/profiles/<date>-<commit>-<mode>/` (gitignored), or in `--out`.
 
 | Mode | Answers | Command |
 |---|---|---|
@@ -49,8 +49,6 @@ The harness prints the machine state itself and marks a run NOISY; a NOISY run i
 | `compare` | What changed in the shares between two `step` or `setup` runs | `julia --project=. benchmark/profile.jl compare <before> <after>` |
 
 An unknown mode, a mistyped flag, an extra positional argument or a missing dataset stops the run with an error. In a REPL, `include("benchmark/profile.jl")` then `main(["step"])`; `main` returns the exit code. Do not load `run_benchmarks.jl` in the same session: both define `main`.
-
-A run writes `report.md` (a Markdown table of the run, then the result tables) and prints the top eight rows of the same tables. `step` and `setup` add `counts.tsv`, `tree.txt`, `flat.txt` and `stacks.folded`.
 
 | Rule | Why |
 |---|---|
@@ -63,7 +61,7 @@ A run writes `report.md` (a Markdown table of the run, then the result tables) a
 | Profile a run again if it predates `counts.tsv` | `compare` reads that file and stops without it |
 | A share is a ceiling, not a gain | Prove a gain with the same-process comparison at the end of this file |
 
-Quote shares only from a run of the default size, with its commit and sample count; the old reference shape was dropped because it went stale.
+Quote shares only from a run of the default size, with its commit and sample count.
 
 ## Fortran comparison
 

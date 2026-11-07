@@ -4,15 +4,16 @@ Scripts for maintainers. None of them is needed to use the package. Run them
 from the repository root with `julia --project=. tools/<folder>/<script>.jl`
 (the one Python script with `python`).
 
-| Folder | Purpose | Script | What it does |
-|:-------|:--------|:-------|:-------------|
-| `dataset/` | Build and publish the model's input dataset | `fetch_era5_data.py` | Fetches an ERA5 climatology and writes GREB `.bin` files |
-| | | `convert_greb_to_jld2.jl` | Converts GREB `.bin` files and the CO2 text tables into `greb_input_data/`; every file carries its metadata and `dataset_version` |
-| | | `package_dataset.jl` | Checks the tree, then builds one `tar.xz` per pack (core, era, cmip5, enso, solar) and prints the `DATA_PACKS` block with the SHA256 of each |
-| | | `fields.toml`, `fields.jl` | Not run: `fields.toml` holds the file list, the pack and the metadata text of each field; `fields.jl` reads it. Used by the two scripts |
-| `diagnostics/` | Measure a property of the model | `budget.jl` | Runs a preset with a per-step observer and prints whether each store changes by the sum of its flows, how often a limiter held a cell, and the global-mean flows |
-| `experiments/` | Run the model to answer a question | `helpers.jl`, `sensitivity.jl`, `co2_sweep.jl` | `helpers.jl` is the module `ExperimentTools`: annual global means of a result, a range test of both phases, the Gregory sensitivity estimate and map diagnostics (zonal mean, polar amplification, land against ocean, pattern correlation, sine fit). `sensitivity.jl` runs an abrupt-CO2 preset and prints the forcing, feedback, effective sensitivity and the warming reached. `co2_sweep.jl` holds CO2 at several levels side by side and writes the last-year anomalies to `out/co2_sweep.csv` |
-| `validation/` | Check the model against a reference | `bit_identity.jl` | `bit_identity.jl` saves every record field of every experiment preset, then compares a later build with exact equality; for refactors that must not change results |
+| Folder | Purpose | Script | What it does | Page |
+|:-------|:--------|:-------|:-------------|:-----|
+| `dataset/` | Build and publish the model's input dataset | `fetch_era5_data.py` | Fetches an ERA5 climatology and writes GREB `.bin` files | [Dataset tools](../docs/src/dev/dataset_tools.md) |
+| | | `convert_greb_to_jld2.jl` | Converts GREB `.bin` files and the CO2 text tables into `greb_input_data/` | |
+| | | `package_dataset.jl` | Builds one `tar.xz` per pack and prints the `DATA_PACKS` block | |
+| | | `fields.toml`, `fields.jl` | Not run: the file list, pack and metadata of each field, and the reader of that list | |
+| `diagnostics/` | Measure a property of the model | `budget.jl` | Reports whether each store closes, how often a limiter held a cell, and the global-mean flows | [Diagnostics](../docs/src/dev/diagnostics.md) |
+| `experiments/` | Run the model to answer a question | `sensitivity.jl`, `co2_sweep.jl` | The effective climate sensitivity of an abrupt-CO2 run, and the last-year climate over a range of CO2 levels | [Experiments](../docs/src/dev/experiments.md) |
+| | | `helpers.jl` | The module `ExperimentTools`: annual means, the Gregory estimate and map diagnostics | |
+| `validation/` | Check the model against a reference | `bit_identity.jl` | Saves every record field of every preset, then compares a later build with exact equality | [Validation](../docs/src/dev/validation.md) |
 
 Building and publishing the dataset (details in the `publish-dataset` skill):
 

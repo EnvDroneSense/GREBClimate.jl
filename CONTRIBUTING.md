@@ -50,7 +50,7 @@ at runtime or by maintainers but gitignored.
 
 ## Input data
 
-The package needs the GREB input climatology (about 353 MB) to run the model.
+The package needs the GREB input dataset (439 MB unpacked, a 321 MB download) to run the model.
 `greb_data_dir()` resolves it in this order:
 
 1. an explicit path you pass
@@ -66,151 +66,23 @@ You do **not** need the dataset to contribute. Tests that require it resolve
 with `allow_download=false` and skip when it is absent, which is exactly how
 CI runs.
 
-## Running the tests
+## Tests
 
 ```bash
 julia --project=. -e 'using Pkg; Pkg.test()'
 ```
 
-The suite is split into two shards, grouped by measured runtime rather than
-file count and only roughly balanced. CI runs them as separate jobs; locally
-you can run one:
+While developing, run only what a change needs: `julia --project=. test/support/changed.jl --run`. The whole suite is the gate before you open a pull request.
 
-```bash
-GREB_TEST_SHARD=light julia --project=. -e 'using Pkg; Pkg.test()'
-GREB_TEST_SHARD=heavy julia --project=. -e 'using Pkg; Pkg.test()'
-```
+- A new test file needs a row in the `SHARD` table in [test/support/selection.jl](test/support/selection.jl), or it will not run.
+- A test that calls `greb_data_dir` must pass `allow_download=false`.
+- CI has no dataset, so the golden, MSCM, deconstruction and orbital-table tests skip there. Run the whole suite locally with the dataset.
 
-To run the whole suite faster on a multi-core machine, `julia --project=. test/support/parallel.jl`
-runs the files in four processes at once (`--jobs=N`, `--tier=NAME`, `--shard=NAME`
-narrow it). Each process runs `Pkg.test`, so bounds checking stays on. It takes about
-100 s instead of about 295 s and needs roughly 1 GB of memory per process.
+The developer docs page [Testing](docs/src/dev/testing.md) has every command and the rules for new tests; [test/README.md](test/README.md) maps the files.
 
-While developing you rarely need the whole suite. Run named files, or a tier
-(`smoke`, `standard`, `full`; each includes the ones before it):
+## Conventions
 
-```bash
-julia --project=. -e 'using Pkg; Pkg.test(test_args=["state", "io"])'
-GREB_TEST_TIER=smoke julia --project=. -e 'using Pkg; Pkg.test()'
-```
-
-For repeated runs, `julia --project=. -i test/support/live.jl` keeps one session open
-and compiles once: call `t("state")` or `t(:smoke)`. A subset run only proves
-the files it ran; run the full suite before opening a pull request.
-
-Things worth knowing before you add tests:
-
-- **A new test file must be added to the `SHARD` table in
-  [test/support/selection.jl](test/support/selection.jl), or it will not run.** Nothing globs
-  the directory.
-- Shared fixtures live in `test/support/testutils.jl`: `quiet()`, `with_tempdir()`,
-  `synthetic_fields()`, `constant_fields()`, `uniform_record()`,
-  `at_first_step()`, `DATA_DIR`, and the grid constants.
-- Any test that calls `greb_data_dir` must pass `allow_download=false`.
-  Without it the test passes locally (where a dataset usually exists) and
-  fails in CI.
-- **Don't run the model to test something the model doesn't do.** Most of the
-  suite's cost is simulated years. If the behaviour under test lives in
-  `init_model!`, a loader, or a single physics kernel, call that directly.
-  If it is decided at the start of a run (the CO2 or solar table a preset
-  uses, the climatology in use), `at_first_step()` runs `greb_model!` to the
-  first step through the observer, returns what it saw and stops. Pass
-  `NoCorrections()` there: the observer is not called during the spin-up.
-- A test should fail when the behaviour breaks. Before deleting or adding a
-  test, break the line it claims to pin and check that it fails (and that, for
-  a deletion, another test does too).
-- `test/test_golden.jl` is a regression lock on model output. If your change
-  moves those numbers, that is either a bug or a deliberate physics change
-  that needs saying out loud in the PR.
-- **CI has no dataset, so the golden, MSCM, deconstruction and orbital-table
-  tests skip there.** A green CI says nothing about them: with the dataset
-  present, run the full suite locally before opening a PR.
-- `test/test_presets.jl` compares every preset (its forcing, masks, physics,
-  hydrology and corrections) with `test/support/data/preset_reference.jl`. If you
-  change a preset on purpose, regenerate the file in the same commit with
-  `julia --project=. test/support/preset_reference.jl` and say so in the
-  PR; never edit it by hand.
-
-## Performance conventions
-
-The model is written to run many simulated years, and the kernels are built
-around that:
-
-- Fields are `Float32` throughout, on a fixed `xdim x ydim` grid.
-- Physics kernels write into pre-allocated `ModelWorkspace` buffers
-  instead of allocating. `test/test_invariants.jl` enforces a small byte
-  budget per physics kernel and checks its return type is concrete - a change
-  that allocates per grid cell will fail it immediately. A new kernel must be
-  added to both tables in that file. Only the allocation table is checked
-  for completeness (an assertion fails if a `!` kernel, exported or not, is
-  missing); the return-type table is not, so add the kernel there yourself.
-- `LWradiation!`, `hydro!`, `SWradiation!` and `seaice!` use plain loops, not
-  `@turbo`, so Enzyme can differentiate them; their `log` and `exp` go through
-  `fastlog` and `fastexp`, whose derivative rules are in `ext/GREBEnzymeExt.jl`.
-  Keep `@turbo` out of these four. `circulation!` and the other kernels still
-  use it.
-- Configuration is passed explicitly. Nothing is held as module-global
-  mutable state.
-
-**A change that must not alter results** (a refactor, an optimisation) is
-checked with exact equality, not tolerances. With the dataset present, save a
-snapshot on the commit before and compare after, at one and at two threads:
-
-```bash
-julia --project=. -t 1 tools/validation/bit_identity.jl save snap_t1.jld2
-julia --project=. -t 1 tools/validation/bit_identity.jl compare snap_t1.jld2
-```
-
-Repeat both with `-t 2,0` and a second snapshot.
-
-Snapshots depend on the CPU and the Julia version and are not committed. For
-a change to the flux sums or the humidity limiters,
-`tools/diagnostics/budget.jl <preset>` prints how well each store closes.
-
-**Benchmarks:**
-
-```bash
-julia --project=benchmark -e 'using Pkg; Pkg.develop(path="."); Pkg.instantiate()'
-julia --project=benchmark -t 2,0 benchmark/run_benchmarks.jl year
-```
-
-The first line is needed once: the benchmark environment holds Chairmarks.
-`benchmark/run_benchmarks.jl compare` times variants in a shuffled order each
-round and checks itself against a second copy of the baseline;
-[benchmark/README.md](benchmark/README.md) lists every mode. Run the first
-line again after updating the repository. `benchmark/fortran/` checks the model
-against the original Fortran (needs gfortran and the Fortran source; its
-`selftest` mode needs neither).
-
-Two threads is the current recommendation: the temperature and humidity
-transport run in parallel, and a third thread has measured no consistent gain.
-It has not been re-measured since the circulation was last optimised.
-
-## Formatting
-
-`src/`, `test/`, `benchmark/`, `tools/`, `ext/`, `examples/` and `viz/` follow
-`.JuliaFormatter.toml`, and a CI job fails when a file is not formatted. With JuliaFormatter 2 in your global
-environment, format before you push:
-
-```bash
-julia -e 'using JuliaFormatter; foreach(format, ("src", "test", "benchmark", "tools", "ext", "examples", "viz"))'
-```
-
-## Documentation
-
-```bash
-julia --project=docs -e 'using Pkg; Pkg.develop(path="."); Pkg.instantiate()'
-julia --project=docs docs/make.jl
-```
-
-Docstring examples in ```` ```jldoctest ```` blocks are executed during the
-docs build, and a mismatch fails the build. If you change an exported
-function's behaviour or signature, check whether an example needs updating.
-
-The site has two live versions: [stable](https://EnvDroneSense.github.io/GREBClimate.jl/stable/)
-is the latest release (built when the release tag is created), and
-[dev](https://EnvDroneSense.github.io/GREBClimate.jl/dev/) follows the `dev`
-branch. Pull requests build the docs and run the doctests but deploy nothing.
+Fields are `Float32`, kernels do not allocate, and four kernels stay free of `@turbo`. A change that must not alter results is checked with `tools/validation/bit_identity.jl`. Source folders follow `.JuliaFormatter.toml`, and a CI job fails on unformatted files. See [Code conventions](docs/src/dev/conventions.md) for the details, the formatting command and the docs build.
 
 ## Branches
 

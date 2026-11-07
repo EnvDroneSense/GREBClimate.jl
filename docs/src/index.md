@@ -22,7 +22,7 @@ Or, working from a clone:
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
 
-The model needs a ~439 MB input dataset, which [`greb_data_dir`](@ref)
+The model needs a 439 MB input dataset (a 321 MB download), which [`greb_data_dir`](@ref)
 downloads and caches on first use; see [Input data](@ref).
 
 ## Where to go next

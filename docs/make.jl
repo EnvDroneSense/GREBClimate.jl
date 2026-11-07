@@ -23,7 +23,10 @@ makedocs(
     checkdocs = :exports,
     pages = [
         "Home" => "index.md",
-        "Tutorial" => "tutorial.md",
+        "Tutorial" => [
+            "Steps of a run" => "tutorial.md",
+            "Examples" => "examples.md",
+        ],
         "Input data" => "data.md",
         "Model overview" => "model.md",
         "Time and calendar" => "time.md",
@@ -40,6 +43,11 @@ makedocs(
             "Benchmarks" => "dev/benchmarks.md",
             "Profiling" => "dev/profiling.md",
             "Fortran comparison" => "dev/fortran.md",
+            "Diagnostics" => "dev/diagnostics.md",
+            "Experiments" => "dev/experiments.md",
+            "Validation" => "dev/validation.md",
+            "Testing" => "dev/testing.md",
+            "Code conventions" => "dev/conventions.md",
         ],
         "API Reference" => "api.md",
     ],
