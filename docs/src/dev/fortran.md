@@ -1,6 +1,6 @@
 # Fortran comparison
 
-`benchmark/fortran/run_fortran_comparison.jl` checks GREBClimate.jl against the original Fortran GREB and times both on the same workload (3 flux-correction, 3 control and 50 scenario years, `co2_double`). It builds three gfortran executables, runs them, and runs Julia in a child process. It asserts nothing in the test suite: the Fortran comparison stays in `benchmark/`. The flags of the other harnesses are in [Benchmarks](benchmarks.md).
+`benchmark/fortran/run_fortran_comparison.jl` checks GREBClimate.jl against the original Fortran GREB and times both on the same workload (3 flux-correction, 3 control and 50 scenario years, `co2_double`). It builds three gfortran executables, runs them, and runs Julia in a child process. It is not part of the test suite, so it stays in `benchmark/`. The flags of the other harnesses are in [Benchmarks](benchmarks.md).
 
 | Mode | Does |
 |:-----|:-----|

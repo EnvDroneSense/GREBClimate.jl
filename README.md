@@ -76,7 +76,11 @@ The first launch sets up its `viz/` environment. See [Plots and notebook](https:
 
 ## 📂 Input Data
 
-The model reads a JLD2 dataset of climatologies, flux corrections and forcing tables (439 MB unpacked, a 321 MB download in five packs). It is not in the repository: `greb_data_dir()` finds a local copy (an explicit path, `$GREB_DATA`, or `greb_input_data/` in the package's top folder) and otherwise asks once whether to download the whole dataset; answering no fetches the 103 MB core pack, and `download_greb_pack` adds an optional pack (ERA-Interim, the `:rcp85`, `:elnino`, `:lanina` and orbital solar experiments) later. The download is cached once. Set `DATADEPS_ALWAYS_ACCEPT=true` in non-interactive sessions. In Pluto there is no terminal to answer the question: run `using GREBClimate; greb_data_dir()` once in a REPL first. The layout, the loading rules and how to regenerate the data are in [Input data](https://EnvDroneSense.github.io/GREBClimate.jl/stable/data/).
+The model reads a JLD2 dataset of climatologies, flux corrections and forcing tables (439 MB unpacked, a 321 MB download in five packs). It is not in the repository. `greb_data_dir()` finds a local copy (an explicit path, `$GREB_DATA`, or `greb_input_data/` in the package's top folder). If there is none, it asks once whether to download the whole dataset and caches the result.
+
+Answering no fetches only the 103 MB core pack. `download_greb_pack` adds an optional pack later: ERA-Interim, or the data for the `:rcp85`, `:elnino`, `:lanina` and orbital solar experiments. Set `DATADEPS_ALWAYS_ACCEPT=true` in non-interactive sessions. Pluto has no terminal to answer the question, so run `using GREBClimate; greb_data_dir()` once in a REPL first.
+
+The layout, the loading rules and how to regenerate the data are in [Input data](https://EnvDroneSense.github.io/GREBClimate.jl/stable/data/).
 
 ## 🎮 Running the Model
 
@@ -97,7 +101,9 @@ A run has three phases, in years:
 | `ctrl` (`RunSpec`) | Control run at 340 ppm CO₂; 280 ppm for the CO₂-table presets (`:rcp*`, `:ssp*`, `:historical_co2`, `:a1b`, `:custom_co2`) |
 | `scnr` (`RunSpec`) | Scenario run under the experiment's forcing |
 
-`result.ctrl` and `result.scnr` are vectors of monthly means, each a `NamedTuple` of 96×48 fields (`Ts, Ta, To, q, albedo, ice, precip, evap, qcrcl, sw, lw, qlat, qsens, olr, lwdown`). `result.scnr` is an **anomaly** against the control's final year, except for the orbital experiments and runs with `ctrl=0`. `global_mean(rec.Ts)` gives an area-weighted global mean, and `run_ensemble` runs a list of configurations side by side. The [Tutorial](https://EnvDroneSense.github.io/GREBClimate.jl/stable/tutorial/) covers configuration switches, experiment keywords, reading the results, ensembles and run checks; [`examples/quickstart.jl`](examples/quickstart.jl) runs the steps and [`examples/feedback_deconstruction.jl`](examples/feedback_deconstruction.jl) asks which processes carry the warming of a doubled CO2; the [Examples](https://EnvDroneSense.github.io/GREBClimate.jl/stable/examples/) page shows their output.
+`result.ctrl` and `result.scnr` are vectors of monthly means, each a `NamedTuple` of 96×48 fields (`Ts, Ta, To, q, albedo, ice, precip, evap, qcrcl, sw, lw, qlat, qsens, olr, lwdown`). `result.scnr` is an **anomaly** against the control's final year, except for the orbital experiments and runs with `ctrl=0`. `global_mean(rec.Ts)` gives an area-weighted global mean, and `run_ensemble` runs a list of configurations side by side.
+
+The [Tutorial](https://EnvDroneSense.github.io/GREBClimate.jl/stable/tutorial/) covers configuration switches, experiment keywords, reading the results, ensembles and run checks. Two scripts run the steps: [`examples/quickstart.jl`](examples/quickstart.jl), and [`examples/feedback_deconstruction.jl`](examples/feedback_deconstruction.jl), which asks which processes carry the warming of a doubled CO2. The [Examples](https://EnvDroneSense.github.io/GREBClimate.jl/stable/examples/) page shows their output.
 
 ## 🔬 Model Components
 

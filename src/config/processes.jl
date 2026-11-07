@@ -97,7 +97,7 @@ mscm_hydrology() = Hydrology(rain=:original, evaporation=:original)
 
 How the flux corrections that hold the control climate at the observed one
 are obtained: [`SpinUp`](@ref)`(years)` computes them, [`Stored`](@ref)`()`
-reads the dataset's file, [`NoCorrections`](@ref)`()` runs without.
+reads the dataset's file, and [`NoCorrections`](@ref)`()` runs without any.
 
 The corrections belong to the configuration they were computed for. The
 default hydrology (fitted rain, moisture convergence) is only stable on

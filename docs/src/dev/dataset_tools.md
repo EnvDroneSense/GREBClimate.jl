@@ -39,7 +39,7 @@ The archives are reproducible. Entries are sorted, owner and group are zeroed, t
 
 ## Publish
 
-Three values must agree. Otherwise users get a 404 or a checksum failure that appears only on a machine without a local copy.
+Three values must agree, or users get a 404 or a checksum failure. Both appear only on a machine without a local copy.
 
 | Value | Where | Must match |
 |:------|:------|:-----------|

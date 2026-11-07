@@ -2,7 +2,7 @@
 
 The repository ships a plotting toolbox (`viz/`, module `GREBViz`) and a Pluto notebook
 (`viz/notebooks/GREB_explorer.jl`) built on it. Neither is part of the package:
-they share their own environment, `viz/Project.toml` (Plots, Pluto, PlutoUI).
+they use their own environment, `viz/Project.toml` (Plots, Pluto, PlutoUI).
 Both need the dataset on disk (see [Input data](@ref)); they never download it.
 
 | Page | Holds |
@@ -29,8 +29,8 @@ frame-by-frame view of the run that can be played or exported as a GIF.
 
 ## From a script
 
-Set up the environment (the notebook launcher does this on every start). Run it
-again after updating the repository:
+Set up the environment with the command below. The notebook launcher does this on
+every start, and you should run it again after updating the repository:
 
 ```bash
 julia viz/setup.jl

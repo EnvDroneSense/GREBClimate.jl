@@ -55,6 +55,8 @@ jobs:
           julia --project=. -e 'import Pkg; Pkg.instantiate()'
           julia --project=. -e 'include("benchmark/profile.jl")'
           julia --project=. benchmark/fortran/run_fortran_comparison.jl selftest
+      - name: Run the quickstart example without the dataset
+        run: julia --project=. examples/quickstart.jl --data-free
 
   viz:
     runs-on: ubuntu-latest

@@ -213,8 +213,8 @@ struct NoSurfaceForcing <: SurfaceForcing end
     BoundaryAnomaly(source)
 
 Anomalies of surface temperature, winds and vertical velocity added to the
-climatology for the scenario, with surface temperature held at it: `source`
-is `:cmip5_rcp85`, `:elnino` or `:lanina`.
+climatology for the scenario, and the surface temperature is held at the
+result. `source` is `:cmip5_rcp85`, `:elnino` or `:lanina`.
 """
 struct BoundaryAnomaly <: SurfaceForcing
     source::Symbol
