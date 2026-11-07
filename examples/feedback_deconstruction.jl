@@ -21,7 +21,7 @@ const MEMBERS = [
     "no moisture convergence" => (moisture_convergence=false,),
     "no deep ocean" => (ocean=:mixed_layer,),
     "no transport" => (transport=false,),
-    "no water cycle" => (hydrology=:none,),
+    "no water cycle" => (hydrology=:none,)
 ]
 
 function main(args)
@@ -31,9 +31,9 @@ function main(args)
 
     # The reducer runs inside each task: only the warming and a finite check are kept
     warming = run_ensemble(RunSpec(ctrl=CTRL, scnr=SCNR), configs; fields, jld2_dir=dir) do result
-        last_year = result.scnr[(end - 11):end]
+        last_year = result.scnr[(end-11):end]
         (K=sum(global_mean(r.Ts) for r in last_year) / 12,
-         finite=all(r -> all(isfinite, r.Ts), result.scnr))
+            finite=all(r -> all(isfinite, r.Ts), result.scnr))
     end
 
     base = warming[1].K

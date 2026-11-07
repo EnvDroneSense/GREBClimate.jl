@@ -21,8 +21,8 @@ jobs:
         run: |
           import Pkg; Pkg.add(name="JuliaFormatter", version="2")
           using JuliaFormatter
-          ok = all(format(d; overwrite=false) for d in ("src", "test", "benchmark"))
-          ok || error("Not formatted: run JuliaFormatter.format on src, test and benchmark")
+          ok = all(format(d; overwrite=false) for d in ("src", "test", "benchmark", "tools", "ext", "examples", "viz"))
+          ok || error("Not formatted: run JuliaFormatter.format on src, test, benchmark, tools, ext, examples and viz")
         shell: julia --color=yes {0}
 
   benchmark-smoke:
@@ -48,6 +48,28 @@ jobs:
           println("self-check passed: ", ok)
           # Loads the harness without running a mode, so a renamed internal name breaks here.
           include(joinpath(pwd(), "benchmark", "run_benchmarks.jl"))
+        shell: julia --color=yes {0}
+      # Separate process: profile.jl and run_benchmarks.jl both define main.
+      - name: Load the profiler and run the Fortran harness self-test
+        run: |
+          julia --project=. -e 'include("benchmark/profile.jl")'
+          julia --project=. benchmark/fortran/run_fortran_comparison.jl selftest
+
+  viz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v2
+      - name: Run the viz tests
+        run: |
+          import Pkg
+          Pkg.activate("viz")
+          Pkg.develop(path=".")
+          Pkg.instantiate()
+          include(joinpath(pwd(), "viz", "test.jl"))
         shell: julia --color=yes {0}
 
   test:

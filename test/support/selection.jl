@@ -92,7 +92,7 @@ const SOURCE_MAP = [
     ("ext/", ["enzyme"]),
     ("tools/dataset/", ["dataset_tools", "io"]),
     ("tools/experiments/", ["experiment_tools"]),
-    ("tools/", ["experiment_tools", "dataset_tools"]),
+    ("tools/", ["experiment_tools", "dataset_tools"])
 ]
 
 # Paths that run the full suite although they are named: the package module,

@@ -155,6 +155,9 @@ An entry outside "Changes to model results" leaves results unchanged.
   harnesses and appends its rows to `benchmark/results/` (`record_result` takes
   a `threads` keyword for this). The script uses the helpers in `common.jl`, and
   the developer docs have a page "Fortran comparison".
+- CI checks the formatting of `tools`, `ext`, `examples` and `viz` as well as
+  `src`, `test` and `benchmark`, runs the `viz` tests, loads the profiler, and
+  runs the Fortran harness self-test. Those folders were formatted.
 - The test that every physics kernel has an allocation budget checked nothing
   since 2.1.0, because it listed only exported names. It now finds unexported
   kernels, fails when it finds none, and covers `to_ghosted!` and

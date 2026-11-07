@@ -177,7 +177,10 @@ julia --project=benchmark -t 2,0 benchmark/run_benchmarks.jl year
 The first line is needed once: the benchmark environment holds Chairmarks.
 `benchmark/run_benchmarks.jl compare` times variants in a shuffled order each
 round and checks itself against a second copy of the baseline;
-[benchmark/README.md](benchmark/README.md) lists every mode.
+[benchmark/README.md](benchmark/README.md) lists every mode. Run the first
+line again after updating the repository. `benchmark/fortran/` checks the model
+against the original Fortran (needs gfortran and the Fortran source; its
+`selftest` mode needs neither).
 
 Two threads is the current recommendation: the temperature and humidity
 transport run in parallel, and a third thread has measured no consistent gain.
@@ -185,12 +188,12 @@ It has not been re-measured since the circulation was last optimised.
 
 ## Formatting
 
-`src/`, `test/` and `benchmark/` follow `.JuliaFormatter.toml`, and a CI job
-fails when a file is not formatted. With JuliaFormatter 2 in your global
+`src/`, `test/`, `benchmark/`, `tools/`, `ext/`, `examples/` and `viz/` follow
+`.JuliaFormatter.toml`, and a CI job fails when a file is not formatted. With JuliaFormatter 2 in your global
 environment, format before you push:
 
 ```bash
-julia -e 'using JuliaFormatter; foreach(format, ("src", "test", "benchmark"))'
+julia -e 'using JuliaFormatter; foreach(format, ("src", "test", "benchmark", "tools", "ext", "examples", "viz"))'
 ```
 
 ## Documentation

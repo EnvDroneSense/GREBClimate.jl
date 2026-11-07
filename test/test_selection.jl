@@ -8,6 +8,7 @@
     named(path) = any(startswith(path, p) for p in FULL_PATHS) || any(r -> startswith(path, r[1]), SOURCE_MAP)
     @test filter(!named, sources) == String[]
     for (_, names) in SOURCE_MAP, name in names
+
         name == "@standard" || @test resolve_test_file(name) in vcat(first.(SHARD), OPT_IN)
     end
     # Every path prefix names something that exists

@@ -13,7 +13,7 @@ scenarios of the same preset: `plot_difference(r1.scnr, r2.scnr)`.
 function plot_difference(a::AbstractVector, b::AbstractVector; var::Symbol=:Ts, month=:mean, fields=nothing)
     d = field(a, var; month=month) .- field(b, var; month=month)
     geomap(d; fields=fields, title="Difference - $(fieldinfo(var).label)",
-           colorbar_title=fieldinfo(var).unit, colours(d, true)...)
+        colorbar_title=fieldinfo(var).unit, colours(d, true)...)
 end
 
 """
@@ -60,6 +60,6 @@ function plot_members(members::AbstractVector{<:Pair}; xlabel::AbstractString=""
     lo, hi = min(0.0, minimum(values)), max(0.0, maximum(values))
     pad = (hi - lo == 0 ? 1.0 : hi - lo) * 0.08
     Plots.bar(1:n, values; orientation=:h, legend=false, xlabel=xlabel, yticks=(1:n, labels),
-              yflip=true, ylims=(0.4, n + 0.6), xlims=(lo - pad, hi + pad),
-              size=(760, 110 + 36 * n), left_margin=8Plots.mm, bottom_margin=5Plots.mm)
+        yflip=true, ylims=(0.4, n + 0.6), xlims=(lo - pad, hi + pad),
+        size=(760, 110 + 36 * n), left_margin=8Plots.mm, bottom_margin=5Plots.mm)
 end

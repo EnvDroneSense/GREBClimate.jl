@@ -72,7 +72,7 @@ amplitude is `hypot(a, b)` and the lag is in samples, positive when the series
 peaks later than `sin`.
 """
 function sine_fit(series::AbstractVector{<:Real}, period::Real)
-    t = 0:(length(series) - 1)
+    t = 0:(length(series)-1)
     ω = 2π / period
     design = hcat(ones(length(t)), sin.(ω .* t), cos.(ω .* t))
     c, a, b = design \ Float64.(series)
@@ -114,6 +114,7 @@ range.
 function in_range_report(records, times, anomaly::Bool)
     limits = G.RangeCheck().limits
     for (rec, t) in zip(records, times), field in keys(limits)
+
         lower, upper = limits[field]
         for x in getproperty(rec, field)
             ok = anomaly ? isfinite(x) && abs(x) <= upper - lower : lower <= x <= upper
@@ -137,16 +138,16 @@ function summarize(result)
     series(records, times) = begin
         years, Ts = annual_means(records, times, :Ts)
         (; years, Ts,
-           precip=annual_means(records, times, :precip)[2],
-           ice=annual_means(records, times, :ice)[2],
-           net=annual_means(records, times, rec -> global_mean(rec.sw) - global_mean(rec.olr))[2])
+            precip=annual_means(records, times, :precip)[2],
+            ice=annual_means(records, times, :ice)[2],
+            net=annual_means(records, times, rec -> global_mean(rec.sw) - global_mean(rec.olr))[2])
     end
     anomaly = get(result, :scnr_anomaly, false)
     return (ctrl=series(result.ctrl, result.ctrl_time),
-            scnr=series(result.scnr, result.scnr_time),
-            scnr_anomaly=anomaly,
-            out_of_range=(ctrl=in_range_report(result.ctrl, result.ctrl_time, false),
-                          scnr=in_range_report(result.scnr, result.scnr_time, anomaly)))
+        scnr=series(result.scnr, result.scnr_time),
+        scnr_anomaly=anomaly,
+        out_of_range=(ctrl=in_range_report(result.ctrl, result.ctrl_time, false),
+            scnr=in_range_report(result.scnr, result.scnr_time, anomaly)))
 end
 
 """
@@ -170,8 +171,8 @@ function gregory(dTs::AbstractVector{<:Real}, dnet::AbstractVector{<:Real})
     forcing = my - feedback * mx
     residual = y .- (forcing .+ feedback .* x)
     r2 = 1 - sum(abs2, residual) / sum(abs2, y .- my)
-    return (forcing=forcing, feedback=feedback, sensitivity=-forcing / feedback, r2=r2,
-            reached=x[end], remaining=y[end])
+    return (forcing=forcing, feedback=feedback, sensitivity=(-forcing / feedback), r2=r2,
+        reached=x[end], remaining=y[end])
 end
 
 end # module

@@ -110,8 +110,8 @@ end
 
 "`lidict` with the inlined frames outside the outermost package frame cut, as `trim_to_package` does for the samples."
 function trim_lidict(lidict::AbstractDict, frames_at::AbstractDict)
-    return Dict(ip => (i = findlast(fr -> fr.owned, frames_at[ip]); i === nothing ? frames : frames[1:i])
-                for (ip, frames) in lidict)
+    return Dict(ip => (i=findlast(fr -> fr.owned, frames_at[ip]); i === nothing ? frames : frames[1:i])
+    for (ip, frames) in lidict)
 end
 
 "The distinct stacks as `frames => samples` pairs, innermost first, inlined frames included, cut at the outermost package frame."
@@ -170,7 +170,7 @@ function md_table(io::IO, header::Vector{String}, rows; left=(1,))
     line(r) = string("| ", join((j in left ? rpad(r[j], widths[j]) : lpad(r[j], widths[j]) for j in eachindex(r)), " | "), " |")
     println(io, line(all_rows[1]))
     println(io, "|", join((j in left ? string(":", "-"^(widths[j] + 1)) : string("-"^(widths[j] + 1), ":")
-                           for j in eachindex(header)), "|"), "|")
+            for j in eachindex(header)), "|"), "|")
     for r in Iterators.drop(all_rows, 1)
         println(io, line(r))
     end
@@ -227,6 +227,7 @@ function write_counts(path::AbstractString, t, commit::AbstractString)
         println(io, "run\tcommit\t", commit)
         println(io, "run\tsamples\t", t.samples)
         for (name, table) in (("class", t.classes), ("function", t.self), ("line", t.lines)), (row, count) in ranked(table)
+
             println(io, name, "\t", row, "\t", count)
         end
     end
@@ -255,8 +256,8 @@ function write_sampled(io::IO, t; mincount::Int, ms_per_run::Float64, top=nothin
     filter!(k -> max(get(t.self, k, 0), get(t.onstack, k, 0)) >= mincount, names)
     md_table(io, ["Function", "Self", "Share %", "+/-", "On stack", "Share %", "ms"],
         ([code(k), string(get(t.self, k, 0)), share(get(t.self, k, 0), n)...,
-          string(get(t.onstack, k, 0)), share(get(t.onstack, k, 0), n)[1],
-          @sprintf("%.2f", ms_per_run * get(t.onstack, k, 0) / n)] for k in rows_of(names));
+             string(get(t.onstack, k, 0)), share(get(t.onstack, k, 0), n)[1],
+             @sprintf("%.2f", ms_per_run * get(t.onstack, k, 0) / n)] for k in rows_of(names));
         left=(1,))
 
     println(io, "## By line\n")
@@ -311,9 +312,9 @@ function open_report(mode::AbstractString, description::AbstractString, out_dir)
     end
     mkpath(dir)
     info = ["mode" => "$mode ($description)",
-            "commit" => commit * (dirty ? " (tracked files modified)" : ""),
-            "date" => Dates.format(Dates.now(), "yyyy-mm-dd HH:MM"),
-            "julia" => string(VERSION)]
+        "commit" => commit * (dirty ? " (tracked files modified)" : ""),
+        "date" => Dates.format(Dates.now(), "yyyy-mm-dd HH:MM"),
+        "julia" => string(VERSION)]
     return dir, info
 end
 
@@ -375,9 +376,9 @@ function profile_cpu(jld2_dir::AbstractString, mode::Symbol; years::Int=CPU_MODE
 
     dir, info = open_report(string(mode), WORKLOAD, out_dir)
     push!(info, "threads" => "$(Threads.nthreads()) (sampled: $(join(threads_seen, ", ")))",
-                "runs" => "$runs of $years simulated year(s)",
-                "elapsed" => "$(round(elapsed, digits=2)) s ($(round(ms_per_run, digits=1)) ms per run)",
-                "samples" => "$n ($(round(1000 * elapsed / n, digits=2)) ms per sample)")
+        "runs" => "$runs of $years simulated year(s)",
+        "elapsed" => "$(round(elapsed, digits=2)) s ($(round(ms_per_run, digits=1)) ms per run)",
+        "samples" => "$n ($(round(1000 * elapsed / n, digits=2)) ms per sample)")
 
     frames_at = Dict(ip => Frame.(frames) for (ip, frames) in lidict)
     trimmed = trim_to_package(data, samples, frames_at)
@@ -450,8 +451,8 @@ function profile_allocs(jld2_dir::AbstractString; years::Int=1, out_dir=nothing)
 
     dir, info = open_report("allocs", WORKLOAD, out_dir)
     push!(info, "runs" => "1 of $years simulated year(s)",
-                "allocations" => amount(total),
-                "in loop" => amount(in_loop) * " (with `time_loop!` on the stack)")
+        "allocations" => amount(total),
+        "in loop" => amount(in_loop) * " (with `time_loop!` on the stack)")
 
     close_report(dir, "Allocations", info) do io, top
         rows_of(items) = top === nothing ? items : first(items, top)
@@ -463,7 +464,7 @@ function profile_allocs(jld2_dir::AbstractString; years::Int=1, out_dir=nothing)
         println(io, "The ", top === nothing ? 40 : top, " largest, with the type holding the most bytes there.\n")
         md_table(io, ["Line", "Bytes", "Share %", "Count", "Largest type"],
             ([code(line), format_bytes(row.bytes), pct(row), string(row.count), first(largest(row.types, 1), 80)]
-             for (line, row) in first(largest_first(by_line), top === nothing ? 40 : top)); left=(1, 5))
+            for (line, row) in first(largest_first(by_line), top === nothing ? 40 : top)); left=(1, 5))
     end
     return dir
 end
@@ -532,7 +533,7 @@ function write_changes(io::IO, title::AbstractString, a::Dict{String,Int}, na::I
     println(io, "## ", title, "\n")
     md_table(io, ["Row", "A %", "B %", "Diff", "+/-", "3 SE"],
         ([code(r.name), @sprintf("%.2f", 100r.pa), @sprintf("%.2f", 100r.pb), @sprintf("%+.2f", 100r.diff),
-          @sprintf("%.2f", 100r.se), abs(r.diff) >= 3 * r.se ? "*" : ""] for r in first(rows, top)))
+             @sprintf("%.2f", 100r.se), abs(r.diff) >= 3 * r.se ? "*" : ""] for r in first(rows, top)))
 end
 
 "Compare the shares of two runs, largest change first."

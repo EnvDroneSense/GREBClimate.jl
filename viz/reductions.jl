@@ -54,7 +54,7 @@ control with [`plot_difference`](@ref).
 """
 function to_absolute(anomaly::AbstractVector, control::AbstractVector)
     length(control) >= 12 || error("the control needs at least 12 months, it has $(length(control))")
-    clim = control[end-11:end]
+    clim = control[(end-11):end]
     return [map(.+, r, clim[mod1(i, 12)]) for (i, r) in enumerate(anomaly)]
 end
 
@@ -111,7 +111,7 @@ end
 One grid per month, or per whole calendar year with `step=:year`.
 """
 function map_frames(records::AbstractVector, var::Symbol; step::Symbol=:month,
-                    times::AbstractVector=by_position(length(records)))
+        times::AbstractVector=by_position(length(records)))
     frames = [Float64.(getfield(r, var)) for r in records]
     step === :month && return frames
     step === :year && return [mean(frames[b]) for b in yearblocks(times)]

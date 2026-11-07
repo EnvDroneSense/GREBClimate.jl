@@ -27,9 +27,10 @@ function mask_outline(mask::AbstractMatrix{Bool})
     xs, ys = Float64[], Float64[]
     seg!(x1, y1, x2, y2) = (append!(xs, (x1, x2, NaN)); append!(ys, (y1, y2, NaN)))
     for j in 1:ny, i in 1:nx
+
         y0, y1 = -90 + (j - 1) * dy, -90 + j * dy
         mask[i, j] != mask[mod1(i + 1, nx), j] && seg!(i * dx, y0, i * dx, y1)       # east edge, wraps
-        j < ny && mask[i, j] != mask[i, j + 1] && seg!((i - 1) * dx, y1, i * dx, y1) # north edge
+        j < ny && mask[i, j] != mask[i, j+1] && seg!((i - 1) * dx, y1, i * dx, y1) # north edge
     end
     return xs, ys
 end

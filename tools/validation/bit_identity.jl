@@ -61,6 +61,7 @@ function run_cases()
             greb_model!(RUN, mkcfg(); jld2_dir=dir, fields=fields)
         end
         for phase in (:ctrl, :scnr), var in fieldnames(MonthlyRecord)
+
             recs = getfield(result, phase)
             snap["$name/$phase/$var"] = cat((getfield(r, var) for r in recs)...; dims=3)
         end
@@ -110,7 +111,7 @@ function main(args)
         end
     end
     println(total == 0 ? "IDENTICAL: 0 differing values in $(length(old)) arrays" :
-                         "DIFFERENT: $total differing values")
+            "DIFFERENT: $total differing values")
     return total == 0 ? 0 : 1
 end
 

@@ -45,7 +45,7 @@ function main(args)
     println(lpad("CO2 [ppm]", 10), lpad("Ts [K]", 10), lpad("ice", 10), lpad("precip", 10))
     for (c, a) in zip(co2, anomalies)
         println(lpad(round(c, digits=0), 10), lpad(round(a.Ts, digits=2), 10),
-                lpad(round(a.ice, digits=4), 10), lpad(round(a.precip, digits=3), 10))
+            lpad(round(a.ice, digits=4), 10), lpad(round(a.precip, digits=3), 10))
     end
     println("\nwrote ", csv)
     return anomalies

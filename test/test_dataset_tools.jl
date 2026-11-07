@@ -135,6 +135,7 @@ end
     @test Tuple(tools.PACK_NAMES) == keys(GREBClimate.DATA_PACKS)
     optional = GREBClimate._OPTIONAL_PACK_FILES
     for pack in GREBClimate._OPTIONAL_PACKS, file in getfield(optional, pack)
+
         @test tools.pack_of(file) === pack
     end
     in_core = [f for f in ("static/global.topography.jld2", "solar/solar_radiation.clim.jld2",

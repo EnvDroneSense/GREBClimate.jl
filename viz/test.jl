@@ -7,7 +7,7 @@ include(joinpath(@__DIR__, "GREBViz.jl"))
 using .GREBViz
 
 const NX, NY = 96, 48
-rec(f) = (Ts=Float32[f(i, j) for i in 1:NX, j in 1:NY], q=fill(1f-3, NX, NY))
+rec(f) = (Ts=Float32[f(i, j) for i in 1:NX, j in 1:NY], q=fill(1.0f-3, NX, NY))
 fields = (z_topo=Float32[i <= NX ÷ 2 ? 100 : -100 for i in 1:NX, j in 1:NY],)
 
 @testset "GREBViz" begin
@@ -38,8 +38,8 @@ fields = (z_topo=Float32[i <= NX ÷ 2 ? 100 : -100 for i in 1:NX, j in 1:NY],)
 
         recs = [rec((i, j) -> t) for t in 1:4]
         @test all(==(2.5f0), field(recs, :Ts))
-        @test all(==(4f0), field(recs, :Ts; month=:last))
-        @test all(==(2f0), field(recs, :Ts; month=2))
+        @test all(==(4.0f0), field(recs, :Ts; month=:last))
+        @test all(==(2.0f0), field(recs, :Ts; month=2))
         @test_throws BoundsError field(recs, :Ts; month=9)
         months, φ, m = hovmoller(recs, :Ts)
         @test size(m) == (4, NY) && m[:, 1] ≈ 1:4 && φ == lats(NY)
@@ -64,14 +64,14 @@ fields = (z_topo=Float32[i <= NX ÷ 2 ? 100 : -100 for i in 1:NX, j in 1:NY],)
         @test isempty(first(mask_outline(trues(NX, NY))))
         # absolute again, and the zonal mean
         c = [rec((i, j) -> 280 + m % 12) for m in 0:23]
-        a = [rec((i, j) -> 1f0) for _ in 1:24]
-        @test to_absolute(a, c)[13].Ts[1] ≈ 1f0 + c[13].Ts[1]
+        a = [rec((i, j) -> 1.0f0) for _ in 1:24]
+        @test to_absolute(a, c)[13].Ts[1] ≈ 1.0f0 + c[13].Ts[1]
         @test_throws ErrorException to_absolute(a, c[1:5])
         @test zonal_mean(hot, :Ts) ≈ lats(NY)
     end
 
     ctrl = [rec((i, j) -> 280 + m % 12) for m in 0:23]
-    anom = [rec((i, j) -> 1f0 + m / 10) for m in 0:23]
+    anom = [rec((i, j) -> 1.0f0 + m / 10) for m in 0:23]
     res = (ctrl=ctrl, scnr=anom, scnr_anomaly=true)
 
     @testset "runs" begin

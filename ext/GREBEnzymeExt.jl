@@ -19,31 +19,21 @@ function forward_return(config, primal, shadow)
 end
 
 # d log(x) = dx / x
-EnzymeRules.forward(config::FwdConfig, ::Const{typeof(fastlog)}, ::Type{<:Dup}, x::Duplicated) =
-    forward_return(config, fastlog(x.val), x.dval / x.val)
-EnzymeRules.forward(::FwdConfig, ::Const{typeof(fastlog)}, ::Type{<:Const}, x::Const) =
-    fastlog(x.val)
-EnzymeRules.augmented_primal(config::RevConfigWidth{1}, ::Const{typeof(fastlog)}, ::Type{<:Active}, x::Active) =
-    AugmentedReturn(primal_if_needed(config, fastlog(x.val)), nothing, nothing)
-EnzymeRules.reverse(::RevConfigWidth{1}, ::Const{typeof(fastlog)}, dret::Active, tape, x::Active) =
-    (dret.val / x.val,)
+EnzymeRules.forward(config::FwdConfig, ::Const{typeof(fastlog)}, ::Type{<:Dup}, x::Duplicated) = forward_return(config, fastlog(x.val), x.dval / x.val)
+EnzymeRules.forward(::FwdConfig, ::Const{typeof(fastlog)}, ::Type{<:Const}, x::Const) = fastlog(x.val)
+EnzymeRules.augmented_primal(config::RevConfigWidth{1}, ::Const{typeof(fastlog)}, ::Type{<:Active}, x::Active) = AugmentedReturn(primal_if_needed(config, fastlog(x.val)), nothing, nothing)
+EnzymeRules.reverse(::RevConfigWidth{1}, ::Const{typeof(fastlog)}, dret::Active, tape, x::Active) = (dret.val / x.val,)
 
 # d exp(x) = exp(x) dx; the reverse pass reuses exp(x) stored as the tape
-EnzymeRules.forward(config::FwdConfig, ::Const{typeof(fastexp)}, ::Type{<:Dup}, x::Duplicated) =
-    (e = fastexp(x.val); forward_return(config, e, x.dval * e))
-EnzymeRules.forward(::FwdConfig, ::Const{typeof(fastexp)}, ::Type{<:Const}, x::Const) =
-    fastexp(x.val)
-EnzymeRules.augmented_primal(config::RevConfigWidth{1}, ::Const{typeof(fastexp)}, ::Type{<:Active}, x::Active) =
-    (e = fastexp(x.val); AugmentedReturn(primal_if_needed(config, e), nothing, e))
-EnzymeRules.reverse(::RevConfigWidth{1}, ::Const{typeof(fastexp)}, dret::Active, tape, x::Active) =
-    (dret.val * tape,)
+EnzymeRules.forward(config::FwdConfig, ::Const{typeof(fastexp)}, ::Type{<:Dup}, x::Duplicated) = (e=fastexp(x.val); forward_return(config, e, x.dval * e))
+EnzymeRules.forward(::FwdConfig, ::Const{typeof(fastexp)}, ::Type{<:Const}, x::Const) = fastexp(x.val)
+EnzymeRules.augmented_primal(config::RevConfigWidth{1}, ::Const{typeof(fastexp)}, ::Type{<:Active}, x::Active) = (e=fastexp(x.val); AugmentedReturn(primal_if_needed(config, e), nothing, e))
+EnzymeRules.reverse(::RevConfigWidth{1}, ::Const{typeof(fastexp)}, dret::Active, tape, x::Active) = (dret.val * tape,)
 
 # Constant arguments (for example a temperature that is not differentiated)
 for f in (fastlog, fastexp)
-    @eval EnzymeRules.augmented_primal(config::RevConfigWidth{1}, ::Const{typeof($f)}, ::Type{<:Const}, x::Const) =
-        AugmentedReturn(primal_if_needed(config, $f(x.val)), nothing, nothing)
-    @eval EnzymeRules.reverse(::RevConfigWidth{1}, ::Const{typeof($f)}, ::Type{<:Const}, tape, x::Const) =
-        (nothing,)
+    @eval EnzymeRules.augmented_primal(config::RevConfigWidth{1}, ::Const{typeof($f)}, ::Type{<:Const}, x::Const) = AugmentedReturn(primal_if_needed(config, $f(x.val)), nothing, nothing)
+    @eval EnzymeRules.reverse(::RevConfigWidth{1}, ::Const{typeof($f)}, ::Type{<:Const}, tape, x::Const) = (nothing,)
 end
 
 end

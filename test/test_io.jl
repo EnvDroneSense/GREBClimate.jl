@@ -240,7 +240,11 @@ end
         @test_throws "download_greb_pack(:solar)" load_solar_forcing(dir, :paleo)
         # A core file is missing: no pack to suggest
         core = joinpath(dir, "climatology", "Tocean.clim.jld2")
-        err = try read_field(core) catch e e end
+        err = try
+            read_field(core)
+        catch e
+            e
+        end
         @test err isa ArgumentError && !occursin("download_greb_pack", err.msg)
 
         # An unknown pack, and the core pack (which greb_data_dir downloads), are refused
@@ -273,6 +277,7 @@ end
     with_tempdir() do dir
         # With every file of every optional pack there, nothing is downloaded
         for pack in GREBClimate._OPTIONAL_PACKS, file in getfield(GREBClimate._OPTIONAL_PACK_FILES, pack)
+
             mkpath(dirname(joinpath(dir, file)))
             touch(joinpath(dir, file))
         end

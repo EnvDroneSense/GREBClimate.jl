@@ -22,7 +22,7 @@ const LON, LAT, TIME = 96, 48, 730
 const LAYOUTS = Dict(
     LON * LAT * 4 => ((LON, LAT), ["lon", "lat"]),
     LON * LAT * TIME * 4 => ((LON, LAT, TIME), ["lon", "lat", "time"]),
-    LAT * TIME * 4 => ((LAT, TIME), ["lat", "time"]),
+    LAT * TIME * 4 => ((LAT, TIME), ["lat", "time"])
 )
 
 function read_bin(path::AbstractString, dims::Tuple)
@@ -50,7 +50,7 @@ end
 
 "Write a field file: the array, its axes, the metadata in `info`. `coords` adds or replaces axis values."
 function write_jld2_field(path::AbstractString, data, dim_names::Vector{String}, info;
-                          coords::AbstractDict=Dict{Int,Vector{Float64}}(), ctl::Union{Nothing,String}=nothing)
+        coords::AbstractDict=Dict{Int,Vector{Float64}}(), ctl::Union{Nothing,String}=nothing)
     mkpath(dirname(path))
     jldopen(path, "w") do file
         file["data"] = data
@@ -79,7 +79,7 @@ function convert_fields(input_dir, output_dir; all::Bool)
         dims, dim_names = LAYOUTS[stat(path).size]
         folder = occursin(r"topography|glacier", name) ? "static" : occursin("solar_radiation", name) ? "solar" : "climatology"
         write_jld2_field(joinpath(output_dir, folder, "$name.jld2"), read_bin(path, dims), dim_names, field_info(name);
-                         ctl=read_ctl_text(path))
+            ctl=read_ctl_text(path))
         push!(folders, folder)
     end
     println("  fields: $(length(bins)) raw .bin files -> ", join(("$(count(==(f), folders)) in $f/" for f in unique(folders)), ", "))
@@ -204,7 +204,7 @@ function convert_scenario_texts(input_dir, output_dir)
     emissions = parse_table(hist_path, 3)
     population = parse_table(hist_path, 4)
     data = Dict(year => (co2_emissions_gt_co2_yr=emissions[year], population_billions=population[year])
-                for year in sort(collect(keys(emissions))))
+    for year in sort(collect(keys(emissions))))
     jldopen(joinpath(output_dir, "historical_emissions_population.jld2"), "w") do file
         file["data"] = data
         write_info(file, (description="Historical CO2 emissions and world population per year",

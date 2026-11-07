@@ -8,4 +8,4 @@ include(joinpath(viz, "setup.jl"))   # seconds when the environment is current
 Pkg.activate(viz)
 
 using Pluto
-Pluto.run(notebook = joinpath(@__DIR__, "GREB_explorer.jl"))
+Pluto.run(notebook=joinpath(@__DIR__, "GREB_explorer.jl"))

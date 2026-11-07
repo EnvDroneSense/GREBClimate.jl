@@ -39,7 +39,7 @@ const DATA_PACKS = (
     enso=(archive="greb_input_data-v2-enso.tar.xz", bytes=120905740,
         sha256="e5ff850ed0672de51bbbbafccb62ae0b5fac400a5d1c0fbde9d14665b13f61a4"),
     solar=(archive="greb_input_data-v2-solar.tar.xz", bytes=4440816,
-        sha256="9bf3593a9af0223ee8d73e4f72674b4439243b046d18df741d14e0d7c642253e"),
+        sha256="9bf3593a9af0223ee8d73e4f72674b4439243b046d18df741d14e0d7c642253e")
 )
 
 const _OPTIONAL_PACKS = (:era, :cmip5, :enso, :solar)
@@ -54,7 +54,7 @@ const _PACK_CONTENT = (
     era="the ERA-Interim climatology (dataset = :era)",
     cmip5="the CMIP5 RCP8.5 anomalies (the :rcp85 experiment)",
     enso="the El Nino and La Nina anomalies (the :elnino and :lanina experiments)",
-    solar="the paleo and orbital solar tables (the :paleo_231kyr, :eccentricity and :obliquity experiments)",
+    solar="the paleo and orbital solar tables (the :paleo_231kyr, :eccentricity and :obliquity experiments)"
 )
 
 function _pack_message(pack::Symbol)
@@ -88,7 +88,7 @@ const _OPTIONAL_PACK_FILES = (
     era=["climatology/$name.jld2" for name in values(_CLIMATOLOGY_FILES.era) if !startswith(name, "ncep.")],
     cmip5=["climatology/$name.jld2" for name in values(_boundary_anomaly_files(:cmip5_rcp85))],
     enso=["climatology/$name.jld2" for source in (:elnino, :lanina) for name in values(_boundary_anomaly_files(source))],
-    solar=["solar_scenarios/solar_$kind.jld2" for kind in (:paleo, :eccentricity, :obliquity)],
+    solar=["solar_scenarios/solar_$kind.jld2" for kind in (:paleo, :eccentricity, :obliquity)]
 )
 
 # The optional pack that holds the file `name` (with or without ".jld2"), or `nothing`

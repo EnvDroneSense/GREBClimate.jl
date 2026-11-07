@@ -52,5 +52,5 @@ end
 
 # The same for the three flux corrections, by name
 const FLUX_CORRECTION_INFO = NamedTuple(Symbol(k) => (description=FIELDS["flux_correction"][k]["description"],
-                                                      units=FIELDS["flux_correction"][k]["units"])
-                                        for k in FLUX_CORRECTION_NAMES)
+                                            units=FIELDS["flux_correction"][k]["units"])
+for k in FLUX_CORRECTION_NAMES)

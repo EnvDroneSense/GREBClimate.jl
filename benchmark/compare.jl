@@ -47,6 +47,7 @@ function compare_kernels(pairs::Pair{String}...; seconds::Real=5, rounds::Int=RO
     calibration = machine_header()
     times = [Float64[] for _ in fs]
     for _ in 1:rounds, i in shuffle(eachindex(fs))
+
         push!(times[i], chunk_time(fs[i], seconds / rounds))
     end
     quiet = machine_footer(calibration)

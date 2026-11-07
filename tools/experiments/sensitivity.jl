@@ -29,7 +29,7 @@ function main(args)
     dir === nothing && error("no local dataset found")
     fields = load_climatology(dir; dataset=:ncep)
     result = greb_model!(RunSpec(ctrl=ctrl, scnr=years), preset(name; corrections=SpinUp(spinup));
-                         jld2_dir=dir, fields=fields)
+        jld2_dir=dir, fields=fields)
     result.scnr_anomaly || error("the scenario of `$name` is not an anomaly")
 
     s = summarize(result)

@@ -13,8 +13,8 @@ using GREBClimate
 
 # Annual mean of the global mean of `field`, one value per year of monthly records
 function yearly(records, field)
-    return [sum(global_mean(getproperty(r, field)) for r in records[(12y - 11):(12y)]) / 12
-            for y in 1:(length(records) ÷ 12)]
+    return [sum(global_mean(getproperty(r, field)) for r in records[(12y-11):(12y)]) / 12
+            for y in 1:(length(records)÷12)]
 end
 
 function main(args)
@@ -22,7 +22,7 @@ function main(args)
         cfg = preset(:co2_double; corrections=NoCorrections())
         result = greb_model!(RunSpec(ctrl=1, scnr=1), cfg; jld2_dir="", allow_uninitialized=true)
         println("data-free run: ", length(result.ctrl), " control and ", length(result.scnr),
-                " scenario months, fields of size ", size(result.ctrl[1].Ts))
+            " scenario months, fields of size ", size(result.ctrl[1].Ts))
         return result
     end
 
@@ -43,7 +43,7 @@ function main(args)
 
     # 5. A change to the experiment: the same run with ice albedo switched off
     no_ice = greb_model!(run, preset(:co2_double; processes=(ice_albedo=false,));
-                         jld2_dir=dir, fields=fields)
+        jld2_dir=dir, fields=fields)
 
     warming, warming_no_ice = yearly(result.scnr, :Ts), yearly(no_ice.scnr, :Ts)
     println("\nyear   warming [K]   without ice albedo [K]")

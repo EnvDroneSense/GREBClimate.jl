@@ -83,7 +83,7 @@ function require_tooling()
     missing_parts = String[]
     t.gfortran === nothing && push!(missing_parts, "gfortran not found. Set GREB_GFORTRAN, or `scoop install mingw`.")
     t.fortran_dir === nothing && push!(missing_parts, "Official Fortran GREB tree not found. Set GREB_FORTRAN_DIR " *
-        "to a directory holding greb.model.mscm.f90, greb.shell.mscm.f90 and input/.")
+                                                      "to a directory holding greb.model.mscm.f90, greb.shell.mscm.f90 and input/.")
     isdir(t.jld2_dir) || push!(missing_parts, "JLD2 data directory not found: $(t.jld2_dir). Set GREB_DATA.")
     isempty(missing_parts) || error(join(missing_parts, "\n"))
     t
@@ -176,12 +176,10 @@ function julia_run(jld2_dir::AbstractString, dump_path::AbstractString="")
 end
 
 "Arguments of the Julia process that runs `julia_run` (this script in `driver` mode)."
-julia_args(jld2_dir, dump_path="") =
-    ["--project=$REPO", "-t", string(THREADS), @__FILE__, "driver", jld2_dir, (isempty(dump_path) ? [] : [dump_path])...]
+julia_args(jld2_dir, dump_path="") = ["--project=$REPO", "-t", string(THREADS), @__FILE__, "driver", jld2_dir, (isempty(dump_path) ? [] : [dump_path])...]
 
 "Run `julia_run` in a new process, with its output in `log`; returns wall-clock seconds."
-run_julia(jld2_dir::AbstractString, log::AbstractString; dump_path::AbstractString="") =
-    @elapsed run_logged(`$JULIA_BIN $(julia_args(jld2_dir, dump_path))`, log)
+run_julia(jld2_dir::AbstractString, log::AbstractString; dump_path::AbstractString="") = @elapsed run_logged(`$JULIA_BIN $(julia_args(jld2_dir, dump_path))`, log)
 
 # ── Peak memory ─────────────────────────────────────────────────────────────
 
@@ -221,7 +219,7 @@ function memory(; reps::Int=1)
     root = prepare_tree(t.fortran_dir)
     exes = build_all(t.gfortran, root)
 
-    peaks =Dict{Symbol,Vector{Int}}()
+    peaks = Dict{Symbol,Vector{Int}}()
     for r in 1:reps
         println("--- memory trial $r/$reps ---")
         for v in keys(BUILDS)
@@ -299,9 +297,9 @@ function verify(; exes=nothing)
     meandiff, maxdiff = sum(diff) / length(diff), maximum(diff)
     # (what is checked, value, limit, passed)
     checks = [("Fortran final-year anomaly (K, at least)", abs(fg), GATE_MIN_SIGNAL_K, abs(fg) > GATE_MIN_SIGNAL_K),
-              ("final-year mean, relative difference", rel, GATE_RELATIVE_TOLERANCE, rel <= GATE_RELATIVE_TOLERANCE),
-              ("mean |Fortran - Julia| over all months (K)", meandiff, GATE_MEAN_ABS_K, meandiff <= GATE_MEAN_ABS_K),
-              ("max  |Fortran - Julia| over all months (K)", maxdiff, GATE_MAX_ABS_K, maxdiff <= GATE_MAX_ABS_K)]
+        ("final-year mean, relative difference", rel, GATE_RELATIVE_TOLERANCE, rel <= GATE_RELATIVE_TOLERANCE),
+        ("mean |Fortran - Julia| over all months (K)", meandiff, GATE_MEAN_ABS_K, meandiff <= GATE_MEAN_ABS_K),
+        ("max  |Fortran - Julia| over all months (K)", maxdiff, GATE_MAX_ABS_K, maxdiff <= GATE_MAX_ABS_K)]
     println("
 Correctness gate - did both models run the same experiment?")
     println("  final-year global-mean Ts anomaly: Fortran ", round(fg, digits=4), " K, Julia ", round(jg, digits=4), " K")
@@ -434,7 +432,7 @@ function selftest()
     end
 
     args = julia_args("data", "dump.bin")
-    check("julia_args starts the driver mode", args[end-2:end] == ["driver", "data", "dump.bin"])
+    check("julia_args starts the driver mode", args[(end-2):end] == ["driver", "data", "dump.bin"])
     check("julia_args leaves out an empty dump path", julia_args("data")[end] == "data")
     check("STACK_FLAG is a Windows option", isempty(STACK_FLAG) != Sys.iswindows())
 

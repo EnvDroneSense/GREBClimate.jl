@@ -15,7 +15,7 @@ fields = load_climatology(dir; dataset=:ncep)
 # Base.CoreLogging: the viz environment does not list the Logging stdlib.
 res = Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
     greb_model!(RunSpec(ctrl=5, scnr=15), preset(:co2_double);
-                jld2_dir=dir, fields=fields)
+        jld2_dir=dir, fields=fields)
 end
 
 save(p, name) = (savefig(p, joinpath(outdir, "greb_$name.png")); println("  -> greb_$name.png"))
@@ -31,5 +31,5 @@ evolution_gif(joinpath(outdir, "greb_evolution.gif"), evolution(res; step=:year)
 println("  -> greb_evolution.gif")
 
 s = series(res.scnr, :Ts)
-println("\nfinal-year 2xCO2 global-mean Ts anomaly: ", round(sum(s[end-11:end]) / 12, digits=3), " K")
+println("\nfinal-year 2xCO2 global-mean Ts anomaly: ", round(sum(s[(end-11):end]) / 12, digits=3), " K")
 println("output in ", outdir)
