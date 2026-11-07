@@ -13,6 +13,7 @@ era5_raw/
 # Model data (see DATA_README.md) and dataset release archives
 /Data/
 /greb_input_data/
+/dataset_packs/
 /greb_input_data-*.tar.gz
 
 # Profiler reports (benchmark/profile.jl)

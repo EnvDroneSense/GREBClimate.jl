@@ -31,6 +31,11 @@ const SHARD = [
     ("test_aqua.jl", "heavy", "full", 13)
 ]
 
+# Run only by name (`Pkg.test(test_args = ["dataset_tools"])`), never as part of a
+# tier, a shard or the full suite: the dataset tools change rarely, and their
+# tests are needed only when they or the dataset loaders do.
+const OPT_IN = ["test_dataset_tools.jl"]
+
 const TIERS = ["smoke", "standard", "full"]
 
 """
@@ -41,8 +46,8 @@ function resolve_test_file(name)
     base = replace(strip(name), r"\.jl$" => "")
     startswith(base, "test_") || (base = "test_" * base)
     file = base * ".jl"
-    any(row -> row[1] == file, SHARD) ||
-        error("no test file `$name` in SHARD; known: ", join((r[1] for r in SHARD), ", "))
+    file in OPT_IN || any(row -> row[1] == file, SHARD) ||
+        error("no test file `$name` in SHARD; known: ", join(vcat([r[1] for r in SHARD], OPT_IN), ", "))
     return file
 end
 
@@ -54,7 +59,7 @@ The files to run, in `SHARD` order. `names` (from `GREB_TEST_FILES` or the
 function select_tests(; names=String[], tier="", shard="all")
     if !isempty(names)
         wanted = Set(resolve_test_file.(names))
-        return [row[1] for row in SHARD if row[1] in wanted]
+        return [f for f in vcat([row[1] for row in SHARD], OPT_IN) if f in wanted]
     elseif !isempty(tier)
         rank = findfirst(==(tier), TIERS)
         rank === nothing && error("GREB_TEST_TIER must be one of ", join(TIERS, ", "), ", got `$tier`")

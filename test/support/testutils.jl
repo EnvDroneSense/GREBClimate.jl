@@ -38,6 +38,7 @@ function write_field(path, value, dims=(X, Y, N); dim_names=["lon", "lat", "time
     jldopen(path, "w") do file
         file["data"] = fill(value, dims...)
         file["dim_names"] = dim_names
+        file["dataset_version"] = GREBClimate.DATASET_VERSION
     end
     return path
 end
@@ -52,18 +53,22 @@ function write_flux_corrections(dir; Ts=0.0f0, q=0.0f0, To=0.0f0)
         for (key, value) in (("Tsurf_flux_correction", Ts), ("vapour_flux_correction", q), ("Tocean_flux_correction", To))
             value === nothing || (file[key] = fill(value, X, Y, N))
         end
+        file["dataset_version"] = GREBClimate.DATASET_VERSION
     end
     return dir
 end
 
 """
 Write a minimal `scenario/ipcc_scenarios.jld2` into `dir`. `table` maps the
-on-disk scenario key ("rcp6", not "rcp60") to a year=>ppm Dict.
+scenario key to a year=>ppm Dict; the label of each table is `co2_equivalent`
+for an `rcp` key and `co2` for any other.
 """
 function write_ipcc_scenarios(dir, table)
     mkpath(joinpath(dir, "scenario"))
     jldopen(joinpath(dir, "scenario", "ipcc_scenarios.jld2"), "w") do file
         file["scenarios"] = table
+        file["labels"] = Dict(key => startswith(key, "rcp") ? "co2_equivalent" : "co2" for key in keys(table))
+        file["dataset_version"] = GREBClimate.DATASET_VERSION
     end
     return dir
 end

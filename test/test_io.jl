@@ -70,16 +70,21 @@ end
         :ssp119 => 300.0, :ssp126 => 301.0, :ssp245 => 302.0,
         :ssp460 => 303.0, :ssp585 => 304.0, :historical_co2 => 280.73)
     key(p) = preset(p).scenario.co2.key
-    on_disk(p) = p === :rcp60 ? "rcp6" : string(key(p))   # the dataset's name for RCP6.0
     with_tempdir() do dir
-        write_ipcc_scenarios(dir, Dict(on_disk(p) => Dict(1950 => co2) for (p, co2) in expected))
+        write_ipcc_scenarios(dir, Dict(string(key(p)) => Dict(1950 => co2) for (p, co2) in expected))
         for (p, co2) in expected
             @test isapprox(load_co2_scenario(dir, key(p))[1950], co2; atol=1e-3)
         end
 
-        # The table's name is :rcp60; the dataset's own key is not accepted
+        # The RCP6.0 table is stored as "rcp60"; "rcp6" was the name in dataset version 1
         @test key(:rcp60) === :rcp60
         @test_throws ArgumentError load_co2_scenario(dir, :rcp6)
+
+        # Each table says what it holds
+        @test co2_scenario_label(dir, :rcp60) === :co2_equivalent
+        @test co2_scenario_label(dir, :ssp585) === :co2
+        @test co2_scenario_label(dir, :hist) === :co2
+        @test_throws ArgumentError co2_scenario_label(dir, :rcp6)
     end
 end
 
@@ -184,14 +189,71 @@ end
 end
 
 @testset "published dataset archive constants are coherent" begin
-    @test occursin(r"^[0-9a-f]{64}$", GREBClimate.DATA_SHA256)
+    packs = GREBClimate.DATA_PACKS
+    @test collect(keys(packs)) == [:core, GREBClimate._OPTIONAL_PACKS...]
+    for (pack, p) in pairs(packs)
+        @test occursin(r"^[0-9a-f]{64}$", p.sha256)
+        @test p.bytes > 0
+        # The asset name is the one the packager gives the archive, and the URL ends with it
+        @test p.archive == "greb_input_data-v$(GREBClimate.DATASET_VERSION)-$pack.tar.xz"
+        @test endswith(GREBClimate._pack_url(pack), "/$(GREBClimate.DATA_RELEASE_TAG)/$(p.archive)")
+    end
+    @test allunique(p.sha256 for p in packs)
+    @test GREBClimate.DATA_DEP_NAME == "GREB-input-data-v$(GREBClimate.DATASET_VERSION)"
 
     data_src = read(joinpath(@__DIR__, "..", "src", "data.jl"), String)
     @test match(r"const DATA_RELEASE_TAG = \"([^\"]+)\"", data_src).captures[1] ==
           GREBClimate.DATA_RELEASE_TAG
 end
 
-@testset "dataset file list: 33 single-field files, all of them in the dataset tools' list" begin
+@testset "dataset version: a file of another version is refused; metadata is read back" begin
+    with_tempdir() do dir
+        write_field(joinpath(dir, "static", "global.topography.jld2"), 1.0, (X, Y); dim_names=["lon", "lat"])
+        old = joinpath(dir, "static", "global.topography.jld2")
+
+        # `info` carries what the file says about itself, and nothing of the array
+        info = read_field(old).info
+        @test info == Dict{String,Any}("dataset_version" => GREBClimate.DATASET_VERSION)
+
+        # A file without the entry is from version 1: the loaders refuse it and say so
+        jldopen(old, "w") do file
+            file["data"] = fill(1.0, X, Y)
+            file["dim_names"] = ["lon", "lat"]
+        end
+        @test_throws "dataset version 1" load_climatology(dir)
+        write_ipcc_scenarios(dir, Dict("rcp60" => Dict(1950 => 1.0)))
+        jldopen(joinpath(dir, "scenario", "ipcc_scenarios.jld2"), "w") do file
+            file["scenarios"] = Dict("rcp6" => Dict(1950 => 1.0))
+        end
+        @test_throws "dataset version 1" load_co2_scenario(dir, :rcp60)
+    end
+end
+
+@testset "optional packs: a missing file names its pack; download_greb_pack" begin
+    with_tempdir() do dir
+        # ERA climatology, anomalies and orbital tables are not in the core pack
+        era = joinpath(dir, "climatology", "erainterim.tsurf.1979-2015.clim.jld2")
+        @test_throws ":era" read_field(era)
+        @test_throws "download_greb_pack(:era)" read_field(era)
+        @test_throws "download_greb_pack(:cmip5)" load_boundary_anomaly!(ClimateFields(), dir, :cmip5_rcp85)
+        @test_throws "download_greb_pack(:enso)" load_boundary_anomaly!(ClimateFields(), dir, :elnino)
+        @test_throws "download_greb_pack(:solar)" load_solar_forcing(dir, :paleo)
+        # A core file is missing: no pack to suggest
+        core = joinpath(dir, "climatology", "Tocean.clim.jld2")
+        err = try read_field(core) catch e e end
+        @test err isa ArgumentError && !occursin("download_greb_pack", err.msg)
+
+        # An unknown pack, and the core pack (which greb_data_dir downloads), are refused
+        @test_throws ArgumentError download_greb_pack(:nonsense; dir)
+        @test_throws ArgumentError download_greb_pack(:core; dir)
+
+        # With every file of the pack there, nothing is downloaded
+        write_solar_scenarios(dir)
+        @test download_greb_pack(:solar; dir) == dir
+    end
+end
+
+@testset "dataset file list: 33 single-field files" begin
     names = GREBClimate.dataset_field_files()
     @test length(names) == 33
     # Both ENSO events and both datasets are in it
@@ -204,11 +266,17 @@ end
     # Every source of a boundary anomaly names one file per anomaly array
     @test all(s -> keys(GREBClimate._boundary_anomaly_files(s)) == fieldnames(BoundaryAnomalyFields),
         GREBClimate._BOUNDARY_ANOMALY_SOURCES)
+end
 
-    # The tools keep their own list: it may hold more, never less
-    tools = Module()
-    Base.include(tools, joinpath(@__DIR__, "..", "tools", "dataset", "fields.jl"))
-    @test issubset(names, tools.MODEL_FIELD_NAMES)
-    @test issubset(GREBClimate._COMBINED_FILES, tools.COMBINED_FILE_NAMES)
-    @test Set(tools.FLUX_CORRECTION_NAMES) == Set(values(GREBClimate._FLUX_CORRECTION_KEYS))
+@testset "greb_data_dir packs argument; download_greb_pack(:all)" begin
+    @test_throws ArgumentError greb_data_dir(; packs=:some)
+    with_tempdir() do dir
+        # With every file of every optional pack there, nothing is downloaded
+        for pack in GREBClimate._OPTIONAL_PACKS, file in getfield(GREBClimate._OPTIONAL_PACK_FILES, pack)
+            mkpath(dirname(joinpath(dir, file)))
+            touch(joinpath(dir, file))
+        end
+        @test download_greb_pack(:all; dir) == dir
+        @test greb_data_dir(dir; packs=:core) == dir
+    end
 end

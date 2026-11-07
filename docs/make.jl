@@ -29,11 +29,15 @@ makedocs(
         "Time and calendar" => "time.md",
         "Plots and notebook" => "viz.md",
         "Configuration" => "configuration.md",
+        "Developer tools" => [
+            "Overview" => "dev/index.md",
+            "Dataset tools" => "dev/dataset_tools.md",
+        ],
         "API Reference" => "api.md",
     ],
 )
 
 deploydocs(
     repo = "github.com/EnvDroneSense/GREBClimate.jl.git",
-    devbranch = "dev",
+    devbranch = "main",
 )

@@ -30,9 +30,23 @@ An entry outside "Changes to model results" leaves results unchanged.
   `(Ts, Ta, To, q)`, like the physics kernels.
 - The observer's view field `config` is renamed `resolved`. It holds the run's
   `ResolvedConfig`.
+- The input dataset is version 2 (release `data-v2`, DataDep
+  `GREB-input-data-v2`). The loaders refuse a dataset of another version with an
+  `ArgumentError` that names the file and both versions. A dataset downloaded for
+  2.2.x is not used and not deleted.
+- The CO2 table of RCP 6.0 is `:rcp60` in the archive, and
+  `load_co2_scenario(dir, :rcp6)` is an unknown-table `ArgumentError`.
+- `DATA_ARCHIVE_NAME`, `DATA_SHA256` and `DATA_URL` are replaced by
+  `DATA_PACKS`.
 
 ### Changes to model results
 
+- The `ssp119`, `ssp126`, `ssp245`, `ssp460` and `ssp585` CO2 tables hold the
+  historical CO2 record for 1950-2008 (dataset version 2). Before, those years
+  held the RCP equivalent concentration: 310.75 against 301.92 ppm in 1950, and
+  at most 15.3 ppm apart. From 2009 the tables are unchanged. Runs with an
+  `ssp*` preset differ before 2009; RCP presets, `:hist` and runs without a
+  table are unchanged.
 - `LWradiation!`, `hydro!`, `SWradiation!` and `seaice!` no longer use
   `@turbo` (see Features). Results change at rounding level, about 3e-7
   relative.
@@ -46,11 +60,23 @@ An entry outside "Changes to model results" leaves results unchanged.
   SLEEFPirates is now a direct dependency. A one-year run costs about 3 % more
   cycles.
 - The loaders and `read_field` accept any `AbstractString` path.
+- The dataset comes in five packs (`tar.xz`, 321 MB in all): `core` (103 MB) and
+  the optional `era`, `cmip5`, `enso` and `solar`. The first `greb_data_dir()`
+  asks once whether to download the whole dataset; no fetches the core pack only.
+  `greb_data_dir(packs = :core)` skips the question.
+- `download_greb_pack(pack; dir)` (exported) adds an optional pack, or `:all` for
+  the four, to a dataset directory.
+- `co2_scenario_label(dir, scenario)` (exported) returns `:co2` for the `ssp*` and
+  `hist` tables and `:co2_equivalent` for the `rcp*` tables.
+- Every dataset file carries `description`, `units`, `source`, `period` and
+  `dataset_version`. `read_field` returns them as the new field `info`.
 
 ### Changes
 
 - The loaders raise an `ArgumentError` for a missing file or table, an unknown
   forcing type, or an index that is not in the table.
+- `read_field` raises an `ArgumentError` for a missing file (was a `jldopen`
+  error). For a file of an optional pack the message names the pack.
 
 ### Fixes
 
@@ -62,11 +88,20 @@ An entry outside "Changes to model results" leaves results unchanged.
 
 ### Documentation
 
+- A "Developer tools" section of the docs site, with a page for the dataset tools.
 - The `dev` version of the docs site follows the `dev` branch instead of the
   last release. The README and CONTRIBUTING link to the `stable` version.
 
 ### Tools and tests
 
+- The dataset tools read the field metadata from `tools/dataset/fields.toml`.
+  `convert_greb_to_jld2.jl` stops when a field fails, prints a summary per
+  section and no longer reads `--all` as the input directory;
+  `package_dataset.jl` builds the five packs, requires every combined file and
+  checks the metadata.
+- `test/test_dataset_tools.jl` tests these tools and that their file list matches
+  the loaders. It runs only by name (`Pkg.test(test_args=["dataset_tools"])`),
+  not in the full suite.
 - CI also runs on pushes to `dev`, and a CI job checks the formatting against
   `.JuliaFormatter.toml`.
 - The benchmark harness times with Chairmarks. Its new `compare` mode runs the

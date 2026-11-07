@@ -76,7 +76,7 @@ The first launch sets up its `viz/` environment. See [Plots and notebook](https:
 
 ## 📂 Input Data
 
-The model reads a JLD2 dataset of climatologies, flux corrections and forcing tables (439 MB unpacked, a 353 MB download). It is not in the repository: `greb_data_dir()` finds a local copy (an explicit path, `$GREB_DATA`, or `greb_input_data/` in the package's top folder) and otherwise downloads and caches it once. Set `DATADEPS_ALWAYS_ACCEPT=true` in non-interactive sessions. The layout, the loading rules and how to regenerate the data are in [Input data](https://EnvDroneSense.github.io/GREBClimate.jl/stable/data/).
+The model reads a JLD2 dataset of climatologies, flux corrections and forcing tables (439 MB unpacked, a 321 MB download in five packs). It is not in the repository: `greb_data_dir()` finds a local copy (an explicit path, `$GREB_DATA`, or `greb_input_data/` in the package's top folder) and otherwise asks once whether to download the whole dataset; answering no fetches the 103 MB core pack, and `download_greb_pack` adds an optional pack (ERA-Interim, the `:rcp85`, `:elnino`, `:lanina` and orbital solar experiments) later. The download is cached once. Set `DATADEPS_ALWAYS_ACCEPT=true` in non-interactive sessions. In Pluto there is no terminal to answer the question: run `using GREBClimate; greb_data_dir()` once in a REPL first. The layout, the loading rules and how to regenerate the data are in [Input data](https://EnvDroneSense.github.io/GREBClimate.jl/stable/data/).
 
 ## 🎮 Running the Model
 

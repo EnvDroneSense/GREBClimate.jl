@@ -31,5 +31,5 @@ be added — or removed — casually.
 **Constant names.** Physical scalars and grid sizes are lower case and keep
 their Fortran names (`grav`, `cp_air`, `xdim`, `nstep_yr`); exported ones
 stay lower case. Tables, file lists, switches and data-release values are
-upper case (`_OVERRIDES`, `_STATIC_FILES`, `DATA_URL`). Do not rename either
+upper case (`_OVERRIDES`, `_STATIC_FILES`, `DATA_PACKS`). Do not rename either
 group to match the other.

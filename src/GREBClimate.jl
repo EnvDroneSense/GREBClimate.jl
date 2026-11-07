@@ -27,9 +27,9 @@ export Solar, ModernSolar, SolarConstant, SolarCycle, SolarTable, EarthSunDistan
 export SurfaceForcing, NoSurfaceForcing, BoundaryAnomaly, SSTOffset
 export RunSpec, ModelWorkspace, MonthlyAccumulator, MonthlyRecord
 export ClimateFields, ModelState, SurfaceState
-export greb_data_dir
+export greb_data_dir, download_greb_pack
 export load_climatology, load_flux_corrections!, load_boundary_anomaly!, read_field
-export load_co2_scenario, load_co2_custom, load_solar_forcing
+export load_co2_scenario, co2_scenario_label, load_co2_custom, load_solar_forcing
 export apply_co2_mask!, apply_surface_mask!, forcing
 export monthly_climatology, scenario_anomalies, ice_climatology, global_mean
 export greb_model!, run_ensemble
@@ -41,9 +41,9 @@ include("core/calendar.jl")
 include("config/processes.jl")
 include("config/scenario.jl")
 include("config/presets.jl")
-include("data.jl")
 include("core/state.jl")
 include("io.jl")
+include("data.jl")
 include("config/resolve.jl")
 # The fast scalar log/exp that @turbo uses internally, callable from plain loops
 # (autodiff rules for them live in ext/GREBEnzymeExt.jl).
