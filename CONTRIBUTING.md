@@ -38,7 +38,7 @@ GREBClimate.jl/
 │   └── data/                   # golden and preset references (see below)
 ├── benchmark/                  # timing/allocation suite (run_benchmarks.jl, README.md)
 ├── docs/                       # Documenter site
-├── examples/                   # plain-Julia drivers: run_greb.jl, parameter_sweep.jl
+├── examples/                   # user examples: quickstart.jl, feedback_deconstruction.jl
 ├── viz/                        # plotting toolbox + Pluto notebook (notebooks/), own Project.toml
 ├── tools/                      # maintainer scripts: dataset/, diagnostics/, experiments/, validation/ (see tools/README.md)
 ├── DATA_README.md              # raw .bin input inventory (maintainers)

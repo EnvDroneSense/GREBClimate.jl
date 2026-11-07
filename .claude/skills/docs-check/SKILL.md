@@ -29,14 +29,14 @@ Reading a snippet is not checking it. **Run it.**
 Every runnable Julia block in `README.md` and `docs/src/*.md` must execute
 against the real package. There are four places that document the same flow —
 `README.md`'s quick-start, `README.md` §Running the Model, `docs/src/tutorial.md`,
-and `examples/run_greb.jl` — and they drift independently.
+and `examples/quickstart.jl` — and they drift independently.
 
 ```bash
-julia --project=. examples/run_greb.jl greb_input_data
+julia --project=. examples/quickstart.jl greb_input_data
 ```
 
 That covers the canonical path. For a documented snippet that
-`examples/run_greb.jl` does not cover, paste it verbatim into a scratch file
+`examples/quickstart.jl` does not cover, paste it verbatim into a scratch file
 and run it. Verbatim matters: the bug above only reproduces if you keep the
 missing `fields=`.
 

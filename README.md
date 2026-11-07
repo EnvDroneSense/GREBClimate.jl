@@ -97,7 +97,7 @@ A run has three phases, in years:
 | `ctrl` (`RunSpec`) | Control run at 340 ppm CO₂; 280 ppm for the CO₂-table presets (`:rcp*`, `:ssp*`, `:historical_co2`, `:a1b`, `:custom_co2`) |
 | `scnr` (`RunSpec`) | Scenario run under the experiment's forcing |
 
-`result.ctrl` and `result.scnr` are vectors of monthly means, each a `NamedTuple` of 96×48 fields (`Ts, Ta, To, q, albedo, ice, precip, evap, qcrcl, sw, lw, qlat, qsens, olr, lwdown`). `result.scnr` is an **anomaly** against the control's final year, except for the orbital experiments and runs with `ctrl=0`. `global_mean(rec.Ts)` gives an area-weighted global mean, and `run_ensemble` runs a list of configurations side by side. The [Tutorial](https://EnvDroneSense.github.io/GREBClimate.jl/stable/tutorial/) covers configuration switches, experiment keywords, reading the results, ensembles and run checks; [`examples/run_greb.jl`](examples/run_greb.jl) is a runnable script.
+`result.ctrl` and `result.scnr` are vectors of monthly means, each a `NamedTuple` of 96×48 fields (`Ts, Ta, To, q, albedo, ice, precip, evap, qcrcl, sw, lw, qlat, qsens, olr, lwdown`). `result.scnr` is an **anomaly** against the control's final year, except for the orbital experiments and runs with `ctrl=0`. `global_mean(rec.Ts)` gives an area-weighted global mean, and `run_ensemble` runs a list of configurations side by side. The [Tutorial](https://EnvDroneSense.github.io/GREBClimate.jl/stable/tutorial/) covers configuration switches, experiment keywords, reading the results, ensembles and run checks; [`examples/quickstart.jl`](examples/quickstart.jl) runs the steps and [`examples/feedback_deconstruction.jl`](examples/feedback_deconstruction.jl) asks which processes carry the warming of a doubled CO2.
 
 ## 🔬 Model Components
 

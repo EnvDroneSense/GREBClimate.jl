@@ -1,8 +1,10 @@
 # Tutorial
 
-This walks through the same flow as [`examples/run_greb.jl`](https://github.com/EnvDroneSense/GREBClimate.jl/blob/main/examples/run_greb.jl):
-load input data, configure an experiment, run the model, and inspect the
-result.
+This explains the steps of a run: load input data, configure an experiment, run
+the model, and inspect the result. The script
+[`examples/quickstart.jl`](https://github.com/EnvDroneSense/GREBClimate.jl/blob/main/examples/quickstart.jl)
+runs them; [`examples/feedback_deconstruction.jl`](https://github.com/EnvDroneSense/GREBClimate.jl/blob/main/examples/feedback_deconstruction.jl)
+uses an ensemble to ask which processes carry the warming.
 
 ## 1. Load input data
 

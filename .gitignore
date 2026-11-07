@@ -23,7 +23,6 @@ era5_raw/
 /benchmark/results/
 
 # Generated plots
-/examples/*.png
 /demo_out/
 
 # Claude Code: only local settings; the rules and skills are tracked
