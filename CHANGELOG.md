@@ -50,8 +50,10 @@ An entry outside "Changes to model results" leaves results unchanged.
   `ssp*` preset differ before 2009; RCP presets, `:hist` and runs without a
   table are unchanged.
 - `LWradiation!`, `hydro!`, `SWradiation!` and `seaice!` no longer use
-  `@turbo` (see Features). Results change at rounding level, about 3e-7
-  relative.
+  `@turbo` (see Features). Results change at rounding level. Measured against
+  2.2.0 on the same code path: control-year `Ts`, `Ta` and `To` differ by about
+  1e-6 relative (at most 2.2e-6), and scenario-year temperatures by at most
+  1.4e-3 K, apart from the `ssp*` presets above.
 
 ### Features
 
@@ -59,8 +61,9 @@ An entry outside "Changes to model results" leaves results unchanged.
   `seaice!` use plain loops, so Enzyme can differentiate them. Their `log` and
   `exp` go through `fastlog` and `fastexp` (the same SLEEFPirates routines),
   whose derivative rules are in a package extension that loads with Enzyme.
-  SLEEFPirates is now a direct dependency. A one-year run costs about 3 % more
-  cycles.
+  SLEEFPirates is now a direct dependency. A one-year run takes about 2 % longer
+  than in 2.2.0 (measured 1.8 % with two threads and 2.1 % with one; the
+  one-thread figure is at the noise floor).
 - The loaders and `read_field` accept any `AbstractString` path.
 - The dataset comes in five packs (`tar.xz`, 321 MB in all): `core` (103 MB) and
   the optional `era`, `cmip5`, `enso` and `solar`. The first `greb_data_dir()`
