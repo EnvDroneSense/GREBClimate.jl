@@ -1,0 +1,11 @@
+# Layout only. Tuned to the hand-written style: no spaces around `=` in
+# keyword arguments, `Dict{Symbol,Scenario}` without a space, and no wrapping
+# at a margin (a few long lines carry aligned tables).
+style = "sciml"
+indent = 4
+margin = 10000
+remove_extra_newlines = false
+whitespace_in_kwargs = false
+whitespace_typedefs = false
+whitespace_ops_in_indices = false
+format_docstrings = false

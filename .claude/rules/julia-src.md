@@ -27,3 +27,9 @@ Optimization wins do not add up — measure the combination, not each piece in
 isolation. Use generic indexing (`axes`, `eachindex`) rather than
 assuming `1:n`; `@inbounds` is deliberate throughout this file and is not to
 be added — or removed — casually.
+
+**Constant names.** Physical scalars and grid sizes are lower case and keep
+their Fortran names (`grav`, `cp_air`, `xdim`, `nstep_yr`); exported ones
+stay lower case. Tables, file lists, switches and data-release values are
+upper case (`_OVERRIDES`, `_STATIC_FILES`, `DATA_PACKS`). Do not rename either
+group to match the other.

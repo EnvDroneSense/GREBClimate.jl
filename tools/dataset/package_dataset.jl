@@ -1,118 +1,118 @@
-# =============================================================================
-# package_dataset.jl - build the distributable dataset archive and its SHA256.
+# Build the distributable dataset packs and their SHA256. MAINTAINER TOOL.
 #
-# MAINTAINER TOOL. Produces the `.tar.gz` that `src/data.jl`'s DataDep points
-# at, and prints the hash to paste into `DATA_SHA256`.
+# Writes one `greb_input_data-v<DATASET_VERSION>-<pack>.tar.xz` per pack (core,
+# era, cmip5, enso, solar) and prints the `DATA_PACKS` block to paste into
+# `src/data.jl`. Needs GNU `tar` and `xz`.
 #
-#   julia --project=. tools/dataset/package_dataset.jl [dataset_dir] [output_path]
-#   # defaults: dataset_dir = greb_input_data
-#   #           output_path = greb_input_data-v1.tar.gz (in the current dir)
+#   julia --project=. tools/dataset/package_dataset.jl [dataset_dir] [output_dir]
+#   # defaults: greb_input_data, the current directory
 #
-# The build is reproducible: entries are sorted, owner/group are zeroed, and
-# gzip runs with -n so no timestamp is embedded. Rebuilding from an identical
-# tree gives a byte-identical archive, so the recorded SHA256 stays valid.
-#
-# Requires GNU `tar` and `gzip`.
-# =============================================================================
+# The archive depends only on the contents: entries are sorted, owner and group
+# are zeroed, the timestamp is pinned and xz runs on one thread. Another xz
+# version can still compress differently, so the checksum that counts is the one
+# of the file you upload; never rebuild an archive after publishing its checksum.
 
+using JLD2
 using SHA
 
-const REPO = normpath(joinpath(@__DIR__, "..", ".."))
 include(joinpath(@__DIR__, "fields.jl"))
 
-"""
-Fixed timestamp stamped on every archive entry, so the archive depends only on
-the dataset's *contents*. Any constant works; it must simply never change, or
-previously recorded checksums stop reproducing.
-"""
+# Stamped on every archive entry. Any constant works, but it must never change,
+# or the recorded checksums stop reproducing.
 const ARCHIVE_MTIME = "2020-01-01 00:00:00 UTC"
 
-# ── validate the tree before packaging ───────────────────────────────────────
+archive_name(pack::Symbol) = "greb_input_data-v$DATASET_VERSION-$pack.tar.xz"
+
+"All `.jld2` files under `dir` as sorted paths relative to `dir`, with `/` as separator."
+dataset_files(dir::AbstractString) = sort!([replace(relpath(joinpath(root, f), dir), '\\' => '/')
+                                            for (root, _, names) in walkdir(dir) for f in names if endswith(f, ".jld2")])
+
+# Keys every file carries, and the extra keys of a single-field file
+const COMMON_KEYS = ("dataset_version", "description", "units", "source")
+const FIELD_KEYS = ("data", "dim_names", "coords", "period")
+
 """
-Check `dir` against the converter's allowlist: every field the model reads must
-be present, and nothing else may be. Returns the file count and total bytes.
+Problems with the metadata of the file at `path` (`name` is its name without ending):
+missing keys, a wrong `dataset_version`, axis values that do not match the array.
+"""
+function metadata_problems(path::AbstractString, name::AbstractString)
+    problems = String[]
+    jldopen(path, "r") do file
+        for key in (name in COMBINED_FILE_NAMES ? COMMON_KEYS : (COMMON_KEYS..., FIELD_KEYS...))
+            haskey(file, key) || push!(problems, "lacks \"$key\"")
+        end
+        haskey(file, "dataset_version") && file["dataset_version"] != DATASET_VERSION &&
+            push!(problems, "has dataset_version $(file["dataset_version"]), expected $DATASET_VERSION")
+        if haskey(file, "data") && haskey(file, "coords") && file["data"] isa AbstractArray
+            for (axis, values) in file["coords"]
+                size(file["data"], axis) == length(values) ||
+                    push!(problems, "axis $axis has $(length(values)) values for $(size(file["data"], axis)) points")
+            end
+        end
+    end
+    return problems
+end
+
+"""
+Check `dir` against the file list: every field the model reads and every combined
+file must be there, nothing else, and each file must carry its metadata.
+Returns the file count and the total bytes.
 """
 function validate_dataset(dir::AbstractString)
     isdir(dir) || error("dataset directory not found: $dir")
+    files = dataset_files(dir)
+    names = Dict(first(splitext(basename(f))) => f for f in files)
+    expected = union(MODEL_FIELD_NAMES, COMBINED_FILE_NAMES)
 
-    expected = MODEL_FIELD_NAMES
-    combined = Set(COMBINED_FILE_NAMES)
+    absent = setdiff(expected, keys(names))
+    isempty(absent) || error("dataset is missing $(length(absent)) file(s):\n  ", join(sort(collect(absent)), "\n  "))
+    extra = setdiff(keys(names), expected)
+    isempty(extra) || error("dataset holds $(length(extra)) file(s) the model never reads:\n  ",
+        join(sort(collect(extra)), "\n  "),
+        "\nRegenerate without --all, or add them to MODEL_FIELD_NAMES if they are now used.")
 
-    present, nbytes, nfiles = Set{String}(), 0, 0
-    for (root, _, files) in walkdir(dir), f in files
-        endswith(f, ".jld2") || continue
-        push!(present, first(splitext(f)))
-        nbytes += stat(joinpath(root, f)).size
-        nfiles += 1
-    end
-
-    extra = setdiff(present, union(expected, combined))
-    absent = setdiff(expected, present)
-    isempty(absent) || error("dataset is missing $(length(absent)) field(s) the model reads:\n  " *
-                             join(sort(collect(absent)), "\n  "))
-    if !isempty(extra)
-        error("""
-              dataset contains $(length(extra)) file(s) the model never reads:
-                $(join(sort(collect(extra)), "\n  "))
-              Regenerate without --all, or add them to MODEL_FIELD_NAMES if they
-              are now genuinely used.
-              """)
-    end
-    return nfiles, nbytes
+    bad = ["$f: $p" for (name, f) in names for p in metadata_problems(joinpath(dir, f), name)]
+    isempty(bad) || error("metadata problems:\n  ", join(sort(bad), "\n  "))
+    return length(files), sum(f -> stat(joinpath(dir, f)).size, files)
 end
 
-function build_archive(dir::AbstractString, out::AbstractString)
-    # Reproducible tar. All four flags matter:
-    #   --sort=name        stable entry order
-    #   --owner/--group    no uid/gid from the building machine
-    #   --mtime            pinned; tar stores each file's mtime, so without this
-    #                      a regenerated dataset produces a different archive
-    #                      even when every file is byte-identical
-    #   gzip -n            no timestamp or filename in the gzip header
-    cmd = pipeline(`tar --sort=name --owner=0 --group=0 --numeric-owner
-                        --mtime=$ARCHIVE_MTIME -cf - -C $dir .`,
-                   `gzip -n -6`)
-    open(out, "w") do io
-        run(pipeline(cmd; stdout = io))
+"Build the archive `out` of the files `files` (relative to `dir`): a reproducible tar piped to `xz -6 -T1`."
+function build_archive(dir::AbstractString, files::Vector{String}, out::AbstractString)
+    list = tempname()
+    try
+        write(list, join(files, "\n") * "\n")
+        tar = `tar --sort=name --owner=0 --group=0 --numeric-owner --mtime=$ARCHIVE_MTIME -cf - -C $dir -T $list`
+        open(io -> run(pipeline(pipeline(tar, `xz -6 -T1 -c`); stdout=io)), out, "w")
+    finally
+        rm(list; force=true)
     end
     return out
 end
 
-# Read the expected tag out of src/data.jl rather than hardcoding it twice.
-function data_release_tag()
-    s = read(joinpath(REPO, "src", "data.jl"), String)
-    m = match(r"const DATA_RELEASE_TAG = \"([^\"]+)\"", s)
-    m === nothing ? "<tag>" : m.captures[1]
-end
-
-function main(dir::AbstractString, out::AbstractString)
-    println("Validating $dir ...")
+function main(dir::AbstractString, outdir::AbstractString)
     nfiles, nbytes = validate_dataset(dir)
-    println("  ", nfiles, " .jld2 files, ", round(nbytes / 1048576; digits = 1), " MB unpacked")
+    println("$dir: $nfiles .jld2 files, $(round(nbytes / 1048576; digits=1)) MB unpacked")
+    files = dataset_files(dir)
+    mkpath(outdir)
 
-    println("Building $out (reproducible tar.gz) ...")
-    build_archive(dir, out)
+    block = ["const DATA_PACKS = ("]
+    sums = String[]
+    for pack in PACK_NAMES
+        packed = filter(f -> pack_of(f) === pack, files)
+        out = build_archive(dir, packed, joinpath(outdir, archive_name(pack)))
+        bytes, hash = stat(out).size, bytes2hex(open(sha256, out))
+        println(rpad(basename(out), 40), lpad(bytes, 11), " bytes  ", lpad(length(packed), 2), " files  ", hash)
+        push!(sums, "$hash  $(basename(out))\n")
+        push!(block, "    $pack=(archive=\"$(basename(out))\", bytes=$bytes,", "        sha256=\"$hash\"),")
+    end
+    write(joinpath(outdir, "SHA256SUMS"), join(sums))
 
-    sz = stat(out).size
-    hash = bytes2hex(open(sha256, out))
-    println()
-    println("archive : ", out)
-    println("size    : ", sz, " bytes (", round(sz / 1048576; digits = 1), " MB)")
-    println("sha256  : ", hash)
-    println()
-    println("Next steps:")
-    println("  1. Update DATA_SHA256 in src/data.jl to the hash above.")
-    println("     It only changes if the dataset contents changed: entry")
-    println("     timestamps are pinned, so a plain regeneration reproduces it.")
-    println("  2. Attach the archive to the '", data_release_tag(), "' GitHub release")
-    println("     as '", basename(out), "' (the name must match DATA_ARCHIVE_NAME).")
-    println("  3. Verify end-to-end on a clean machine, or by clearing the")
-    println("     datadeps cache and calling greb_data_dir() with no local")
-    println("     greb_input_data/ and no GREB_DATA set.")
+    println("\nPaste into src/data.jl (replacing DATA_PACKS), update the sizes in the pack messages,")
+    println("and attach the archives to the GitHub release under exactly these names:\n")
+    println(join(block, "\n"), "\n)")
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    dataset_dir = length(ARGS) >= 1 ? ARGS[1] : joinpath(REPO, "greb_input_data")
-    output_path = length(ARGS) >= 2 ? ARGS[2] : "greb_input_data-v1.tar.gz"
-    main(dataset_dir, output_path)
+    main(length(ARGS) >= 1 ? ARGS[1] : joinpath(@__DIR__, "..", "..", "greb_input_data"),
+        length(ARGS) >= 2 ? ARGS[2] : pwd())
 end

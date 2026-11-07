@@ -8,17 +8,17 @@ const _JLD2_LOCK = ReentrantLock()
 const _STATIC_FILES = (z_topo="global.topography", glacier="greb.glaciers")
 const _CLIMATOLOGY_FILES = (
     ncep=(Ts_clim="ncep.tsurf.1948-2007.clim", u_clim="ncep.zonal_wind.850hpa.clim",
-          v_clim="ncep.meridional_wind.850hpa.clim", q_clim="ncep.atmospheric_humidity.clim",
-          soil_wetness_clim="ncep.soil_moisture.clim"),
+        v_clim="ncep.meridional_wind.850hpa.clim", q_clim="ncep.atmospheric_humidity.clim",
+        soil_wetness_clim="ncep.soil_moisture.clim"),
     # ERA-Interim has no soil moisture file; it uses the NCEP one
     era=(Ts_clim="erainterim.tsurf.1979-2015.clim", u_clim="erainterim.zonal_wind.850hpa.clim",
-         v_clim="erainterim.meridional_wind.850hpa.clim", q_clim="erainterim.atmospheric_humidity.clim",
-         soil_wetness_clim="ncep.soil_moisture.clim"),
+        v_clim="erainterim.meridional_wind.850hpa.clim", q_clim="erainterim.atmospheric_humidity.clim",
+        soil_wetness_clim="ncep.soil_moisture.clim")
 )
 const _COMMON_CLIMATOLOGY_FILES = (
     cloud_clim="isccp.cloud_cover.clim", mld_clim="woce.ocean_mixed_layer_depth.clim",
     To_clim="Tocean.clim", omega_clim="erainterim.omega.vertmean.clim",
-    omega_std_clim="erainterim.omega_std.vertmean.clim", wind_speed_clim="erainterim.windspeed.850hpa.clim",
+    omega_std_clim="erainterim.omega_std.vertmean.clim", wind_speed_clim="erainterim.windspeed.850hpa.clim"
 )
 const _SOLAR_FILE = "solar_radiation.clim"
 # The sources of a boundary anomaly, and the file of each anomaly by the
@@ -30,11 +30,11 @@ function _boundary_anomaly_files(source::Symbol)
     file(variable) = source === :cmip5_rcp85 ? "cmip5.$variable.rcp85.ensmean.forcing" :
                      "erainterim.$variable.$source.forcing"
     return (Ts_clim=file("tsurf"), u_clim=file("zonal.wind"), v_clim=file("meridional.wind"),
-            omega_clim=file("omega"), wind_speed_clim=file("windspeed"))
+        omega_clim=file("omega"), wind_speed_clim=file("windspeed"))
 end
 # The combined file `climatology/flux_corrections.jld2`: its keys, by the array each fills
 const _FLUX_CORRECTION_KEYS = (Ts_flux_correction="Tsurf_flux_correction", q_flux_correction="vapour_flux_correction",
-                               To_flux_correction="Tocean_flux_correction")
+    To_flux_correction="Tocean_flux_correction")
 # Files that hold several tables each and are read by their own loaders
 const _COMBINED_FILES = ("flux_corrections", "ipcc_scenarios", "solar_paleo", "solar_eccentricity", "solar_obliquity")
 
@@ -49,111 +49,142 @@ function dataset_field_files()
     names = Set{String}(values(_STATIC_FILES))
     push!(names, _SOLAR_FILE)
     for files in (values(_CLIMATOLOGY_FILES)..., _COMMON_CLIMATOLOGY_FILES,
-                  (_boundary_anomaly_files(source) for source in _BOUNDARY_ANOMALY_SOURCES)...)
+        (_boundary_anomaly_files(source) for source in _BOUNDARY_ANOMALY_SOURCES)...)
         union!(names, values(files))
     end
     return names
 end
 
 # Fill the arrays of `fields` named in `files` from the files in `dir`
-function _load_fields!(fields::ClimateFields, dir::String, files::NamedTuple)
+function _load_fields!(fields::ClimateFields, dir::AbstractString, files::NamedTuple)
     for (field, name) in pairs(files)
         getfield(fields, field) .= read_field(joinpath(dir, name * ".jld2")).data
     end
 end
 
+# The text of the error for a dataset file that is not there. A file of an
+# optional pack names the pack.
+function _missing_file_message(filepath::AbstractString)
+    pack = _pack_of_file(basename(filepath))
+    hint = pack === nothing ? "" :
+           ". Add it with download_greb_pack(:$pack) (optional pack)"
+    return "dataset file not found: $filepath$hint"
+end
+
+# Throw unless the open dataset file `file` has the version these loaders read
+# (a file without the entry is from version 1)
+function _check_version(file, filepath::AbstractString)
+    version = haskey(file, "dataset_version") ? Int(file["dataset_version"]) : 1
+    version == DATASET_VERSION ||
+        throw(ArgumentError("$filepath is from dataset version $version; GREBClimate reads $DATASET_VERSION. " *
+                            "Download the current dataset with greb_data_dir()"))
+    return nothing
+end
+
 """
-    read_field(filepath::String)
+    read_field(filepath::AbstractString)
 
 Read a `.jld2` field file written by `tools/dataset/convert_greb_to_jld2.jl`.
+A missing file is an `ArgumentError`.
 
 # Returns
-- named tuple `(data, dim_names, coords, ctl)` where:
+- named tuple `(data, dim_names, coords, ctl, info)` where:
   - `data`: Array{Float32} with shape as stored
   - `dim_names`: Vector{String} of dimension names (e.g., ["lon", "lat", "time"])
   - `coords`: `Dict{Int,Vector{Float64}}` of physical coordinate values per
-    dimension index, or `nothing` if the file has none
+    dimension index (longitude and latitude in degrees, time in days from 1
+    January), or `nothing` if the file has none
   - `ctl`: raw GrADS `.ctl` metadata text, or `nothing` if the file has none
+  - `info`: `Dict{String,Any}` of the other entries of the file: `description`,
+    `units`, `source`, `period` and `dataset_version`
 """
-function read_field(filepath::String)
+function read_field(filepath::AbstractString)
+    isfile(filepath) || throw(ArgumentError(_missing_file_message(filepath)))
     @lock _JLD2_LOCK jldopen(filepath, "r") do file
+        known = ("data", "dim_names", "coords", "ctl")
         return (
             data=file["data"],
             dim_names=file["dim_names"],
             coords=haskey(file, "coords") ? file["coords"] : nothing,
             ctl=haskey(file, "ctl") ? file["ctl"] : nothing,
+            info=Dict{String,Any}(key => file[key] for key in keys(file) if key ∉ known)
         )
     end
 end
 
 """
-    load_solar_forcing(jld2_dir::String, forcing_type::Symbol, index::Int=0)
+    load_solar_forcing(jld2_dir::AbstractString, forcing_type::Symbol, index::Int=0)
 
-Loads an alternate solar-forcing table for paleo/orbital experiments.
+Load an alternate solar-forcing table for paleo/orbital experiments.
 `forcing_type` is `:paleo`, `:eccentricity`, or `:obliquity`; for the latter
-two, `index` selects the matching row by coordinate value. Used by
+two, `index` selects the matching row by coordinate value. Any other
+`forcing_type`, or an `index` not in the table, is an `ArgumentError`. Used by
 [`resolve`](@ref) for a [`SolarTable`](@ref) scenario; `greb_model!` swaps it
 into `fields.sw_solar` for the scenario run.
 """
-function load_solar_forcing(jld2_dir::String, forcing_type::Symbol, index::Int=0)
-
-    if forcing_type == :paleo
-        filepath = joinpath(jld2_dir, "solar_scenarios", "solar_paleo.jld2")
-        result = read_field(filepath)
-        return result.data
-
-    elseif forcing_type == :eccentricity
-        filepath = joinpath(jld2_dir, "solar_scenarios", "solar_eccentricity.jld2")
-        result = read_field(filepath)
-        values = Int.(result.coords[1])
-        pos = findfirst(==(index), values)
-        pos === nothing && throw(ArgumentError("eccentricity index $index is not in the table; available: $(values)"))
-        return result.data[pos, :, :]
-
-    elseif forcing_type == :obliquity
-        filepath = joinpath(jld2_dir, "solar_scenarios", "solar_obliquity.jld2")
-        result = read_field(filepath)
-        values = Int.(result.coords[1])
-        pos = findfirst(==(index), values)
-        pos === nothing && throw(ArgumentError("obliquity index $index is not in the table; available: $(values)"))
-        return result.data[pos, :, :]
-
-    else
-        error("Unknown forcing type: $forcing_type. Use :paleo, :eccentricity, or :obliquity")
-    end
+function load_solar_forcing(jld2_dir::AbstractString, forcing_type::Symbol, index::Int=0)
+    forcing_type in (:paleo, :eccentricity, :obliquity) ||
+        throw(ArgumentError("unknown forcing type: $forcing_type. Use :paleo, :eccentricity, or :obliquity"))
+    result = read_field(joinpath(jld2_dir, "solar_scenarios", "solar_$forcing_type.jld2"))
+    forcing_type === :paleo && return result.data
+    values = Int.(result.coords[1])
+    pos = findfirst(==(index), values)
+    pos === nothing && throw(ArgumentError("$forcing_type index $index is not in the table; available: $(values)"))
+    return result.data[pos, :, :]
 end
 
 """
-    load_co2_scenario(jld2_dir::String, scenario::Symbol) -> Dict{Int,Float32}
+    load_co2_scenario(jld2_dir::AbstractString, scenario::Symbol) -> Dict{Int,Float32}
 
-Loads a `year => CO2` (ppm-equivalent) lookup table for an IPCC scenario
-(e.g. `:ssp585`, `:rcp85`) from the combined `scenario/ipcc_scenarios.jld2`.
-The RCP6.0 table is `:rcp60`.
+Load a `year => CO2` lookup table (ppm) for an IPCC scenario (e.g. `:ssp585`,
+`:rcp85`, `:rcp60`) from the combined `scenario/ipcc_scenarios.jld2`. A missing
+file or table is an `ArgumentError`.
+
+What a table holds depends on the scenario, see [`co2_scenario_label`](@ref):
+the RCP tables hold an equivalent concentration, the SSP tables and `:hist`
+hold CO2 only.
 """
-function load_co2_scenario(jld2_dir::String, scenario::Symbol)
+function load_co2_scenario(jld2_dir::AbstractString, scenario::Symbol)
+    table = _scenario_entry(jld2_dir, scenario, "scenarios")
+    return Dict{Int,Float32}(yr => Float32(co2) for (yr, co2) in table)
+end
+
+"""
+    co2_scenario_label(jld2_dir::AbstractString, scenario::Symbol) -> Symbol
+
+What the CO2 table of `scenario` holds: `:co2` for CO2 only (the SSP tables and
+`:hist`), `:co2_equivalent` for an equivalent concentration that includes the
+other gases and aerosol (the RCP tables). A missing file or table is an
+`ArgumentError`.
+"""
+function co2_scenario_label(jld2_dir::AbstractString, scenario::Symbol)
+    return Symbol(_scenario_entry(jld2_dir, scenario, "labels"))
+end
+
+# What the combined scenario file holds for `scenario` under `entry` ("scenarios" or
+# "labels"), after checking the file, its version and that the scenario is in it
+function _scenario_entry(jld2_dir::AbstractString, scenario::Symbol, entry::AbstractString)
     filepath = joinpath(jld2_dir, "scenario", "ipcc_scenarios.jld2")
-    isfile(filepath) ||
-        error("Scenario file not found: $filepath (run tools/dataset/convert_greb_to_jld2.jl)")
-    scenarios = @lock _JLD2_LOCK jldopen(filepath, "r") do file
-        file["scenarios"]
+    isfile(filepath) || throw(ArgumentError(_missing_file_message(filepath)))
+    values = @lock _JLD2_LOCK jldopen(filepath, "r") do file
+        _check_version(file, filepath)
+        file[entry]
     end
-    # The dataset stores the RCP6.0 table as "rcp6"; its name here is :rcp60
-    scenario === :rcp6 && throw(ArgumentError("the RCP6.0 table is :rcp60, not :rcp6"))
-    key = scenario === :rcp60 ? "rcp6" : string(scenario)
-    haskey(scenarios, key) ||
-        error("No CO2 scenario table for :$scenario in $filepath. Available: $(sort(collect(keys(scenarios))))")
-    return Dict{Int,Float32}(yr => Float32(co2) for (yr, co2) in scenarios[key])
+    haskey(values, string(scenario)) ||
+        throw(ArgumentError("no CO2 scenario table for :$scenario in $filepath. Available: $(sort(collect(keys(values))))"))
+    return values[string(scenario)]
 end
 
 """
-    load_co2_custom(path::String) -> Dict{Int,Float32}
+    load_co2_custom(path::AbstractString) -> Dict{Int,Float32}
 
-Loads a `year => CO2` lookup table for the `:custom_co2` experiment from a
+Load a `year => CO2` lookup table for the `:custom_co2` experiment from a
 plain-text file, one `year CO2` pair per line. Blank lines
-and lines starting with `#` are skipped.
+and lines starting with `#` are skipped. A missing file or a malformed line
+is an `ArgumentError`.
 """
-function load_co2_custom(path::String)
-    isfile(path) || error("Custom CO2 scenario file not found: $path")
+function load_co2_custom(path::AbstractString)
+    isfile(path) || throw(ArgumentError("custom CO2 scenario file not found: $path"))
     table = Dict{Int,Float32}()
     open(path) do io
         for line in eachline(io)
@@ -161,21 +192,24 @@ function load_co2_custom(path::String)
             (isempty(stripped) || startswith(stripped, "#")) && continue
             cols = split(stripped)
             length(cols) >= 2 ||
-                error("Malformed line in custom CO2 scenario file $path: \"$line\" (expected \"year CO2\")")
+                throw(ArgumentError("malformed line in custom CO2 scenario file $path: \"$line\" (expected \"year CO2\")"))
             table[parse(Int, cols[1])] = parse(Float32, cols[2])
         end
     end
     return table
 end
 
+# The file of stored flux corrections in the dataset directory `dir`
+_flux_file(dir::AbstractString) = joinpath(String(dir), "climatology", "flux_corrections.jld2")
+
 """
-    load_flux_corrections!(jld2_dir::String, fields::ClimateFields)
+    load_flux_corrections!(fields::ClimateFields, jld2_dir::AbstractString)
 
 Load the flux corrections from the combined `climatology/flux_corrections.jld2`
 into `fields`. A missing file or a missing table in it is an `ArgumentError`.
 """
-function load_flux_corrections!(jld2_dir::String, fields::ClimateFields)
-    filepath = joinpath(jld2_dir, "climatology", "flux_corrections.jld2")
+function load_flux_corrections!(fields::ClimateFields, jld2_dir::AbstractString)
+    filepath = _flux_file(jld2_dir)
     isfile(filepath) || throw(ArgumentError("flux corrections file not found: $filepath"))
     @lock _JLD2_LOCK jldopen(filepath, "r") do file
         for (field, key) in pairs(_FLUX_CORRECTION_KEYS)
@@ -189,36 +223,34 @@ function load_flux_corrections!(jld2_dir::String, fields::ClimateFields)
 end
 
 """
-    load_boundary_anomaly!(jld2_dir::String, fields::ClimateFields, source::Symbol)
+    load_boundary_anomaly!(fields::ClimateFields, jld2_dir::AbstractString, source::Symbol)
 
-Loads the anomalies of a [`BoundaryAnomaly`](@ref) scenario into
+Load the anomalies of a [`BoundaryAnomaly`](@ref) scenario into
 `fields.boundary_anomaly` (a [`BoundaryAnomalyFields`](@ref)). `source` is
 `:cmip5_rcp85` (the CMIP5 RCP8.5 ensemble mean), or `:elnino` or `:lanina` (the
-ERA-Interim composite mean). Errors on a missing file rather than defaulting
-to zero.
+ERA-Interim composite mean). A missing file is an `ArgumentError`, not a
+default of zero; the files are in the optional dataset packs `:cmip5` and
+`:enso` (see [`download_greb_pack`](@ref)).
 
 The five arrays are allocated at the first load, so `fields` carries none
 until a `BoundaryAnomaly` scenario runs. `fields` holds one source at a time
 and remembers its directory: [`greb_model!`](@ref) does not read the files
 again for a later run on the same `fields`, directory and source.
 """
-function load_boundary_anomaly!(jld2_dir::String, fields::ClimateFields, source::Symbol)
+function load_boundary_anomaly!(fields::ClimateFields, jld2_dir::AbstractString, source::Symbol)
     files = _boundary_anomaly_files(source)
     fields.boundary_anomaly_source = ("", :none)
     anomaly = something(fields.boundary_anomaly, map(_ -> zeros(Float32, xdim, ydim, nstep_yr), files))
     for (name, file) in pairs(files)
-        filepath = joinpath(jld2_dir, "climatology", file * ".jld2")
-        isfile(filepath) ||
-            error("Anomaly forcing file not found: $filepath (run tools/dataset/convert_greb_to_jld2.jl)")
-        anomaly[name] .= read_field(filepath).data
+        anomaly[name] .= read_field(joinpath(jld2_dir, "climatology", file * ".jld2")).data
     end
     fields.boundary_anomaly = anomaly
-    fields.boundary_anomaly_source = (jld2_dir, source)
+    fields.boundary_anomaly_source = (String(jld2_dir), source)
     return nothing
 end
 
 """
-    load_climatology(jld2_dir::String; dataset::Symbol=:ncep, corrections::Bool=true)
+    load_climatology(jld2_dir::AbstractString; dataset::Symbol=:ncep, corrections::Bool=true)
 
 Load all GREB input data from JLD2 formatted files, returning a fresh
 [`ClimateFields`](@ref). `dataset` (`:ncep`/`:era`) selects which
@@ -226,21 +258,27 @@ climatology *files* to read, and any other value is an `ArgumentError`; this
 is independent of `Hydrology.rain_fit`, which only selects the
 rain-regression *coefficients* (see [`Hydrology`](@ref)).
 
-Every file must be there: a missing one is an error. `corrections = false`
+Every file must be there: a missing one is an `ArgumentError`, and the files of
+`dataset = :era` are in the optional pack `:era` (see [`download_greb_pack`](@ref)).
+A dataset of another format version is an `ArgumentError` too. `corrections = false`
 leaves out the stored flux corrections (`climatology/flux_corrections.jld2`),
 for a dataset that has none: the three correction arrays stay zero, and a run
 computes its own with [`SpinUp`](@ref) or runs without, with
 [`NoCorrections`](@ref).
 """
-function load_climatology(jld2_dir::String; dataset::Symbol=:ncep, corrections::Bool=true)
-    if !isdir(jld2_dir)
-        error("JLD2 directory not found: $jld2_dir")
-    end
+function load_climatology(jld2_dir::AbstractString; dataset::Symbol=:ncep, corrections::Bool=true)
+    isdir(jld2_dir) || throw(ArgumentError("JLD2 directory not found: $jld2_dir"))
 
     fields = ClimateFields()
 
     haskey(_CLIMATOLOGY_FILES, dataset) ||
         throw(ArgumentError("unknown dataset :$dataset; use one of $(join(repr.(keys(_CLIMATOLOGY_FILES)), ", "))"))
+
+    topography_path = joinpath(jld2_dir, "static", _STATIC_FILES.z_topo * ".jld2")
+    isfile(topography_path) || throw(ArgumentError(_missing_file_message(topography_path)))
+    @lock _JLD2_LOCK jldopen(topography_path, "r") do file
+        _check_version(file, topography_path)
+    end
 
     @info "Loading static fields"
     _load_fields!(fields, joinpath(jld2_dir, "static"), _STATIC_FILES)
@@ -255,21 +293,15 @@ function load_climatology(jld2_dir::String; dataset::Symbol=:ncep, corrections::
     # Solar radiation (special: lat × time)
     @info "Loading the solar radiation table"
     solar_path = joinpath(jld2_dir, "solar", _SOLAR_FILE * ".jld2")
-    if isfile(solar_path)
-        solar_result = read_field(solar_path)
-        size(solar_result.data) == (ydim, nstep_yr) ||
-            error("$solar_path holds a $(size(solar_result.data)) table, expected ($ydim, $nstep_yr)")
-        fields.sw_solar .= solar_result.data
-    else
-        error("Solar radiation file not found: $solar_path")
-    end
+    solar_result = read_field(solar_path)
+    size(solar_result.data) == (ydim, nstep_yr) ||
+        throw(ArgumentError("$solar_path holds a $(size(solar_result.data)) table, expected ($ydim, $nstep_yr)"))
+    fields.sw_solar .= solar_result.data
 
     if corrections
         @info "Loading the flux corrections"
-        load_flux_corrections!(jld2_dir, fields)
+        load_flux_corrections!(fields, jld2_dir)
     end
-
-    split_winds!(fields)
 
     fields.loaded = true
     @info "Dataset loaded from $jld2_dir"

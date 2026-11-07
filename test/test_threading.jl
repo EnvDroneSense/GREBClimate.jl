@@ -1,14 +1,25 @@
 # Threaded-vs-serial equivalence (spawns its own subprocesses).
 
+"""
+Run `script` in a fresh Julia process on this project with `threads` threads and
+return what it prints. Only the executable of `julia_cmd()` is used, not its
+flags: under Pkg.test those include --check-bounds=yes, which would force the
+subprocess to recompile the world and make these tests ~10x slower.
+"""
+function run_julia(script; threads)
+    exe = first(Base.julia_cmd())
+    project = normpath(joinpath(@__DIR__, ".."))
+    return read(`$exe --startup-file=no --project=$project -t $threads -e $script`, String)
+end
+
 @testset "threaded circulation matches serial (subprocess -t 1 vs -t 2)" begin
     # `tendencies!` runs the two circulation! calls concurrently only when
     # `Threads.nthreads() > 1` and `ws_a !== ws_q`. Thread count is fixed at
     # Julia startup, so both counts are started as subprocesses.
-    utils = joinpath(@__DIR__, "support", "testutils.jl")
+    support = joinpath(@__DIR__, "support")
     script = """
-        using GREBClimate
-        using Test
-        include(raw"$(utils)")
+        include(raw"$(joinpath(support, "imports.jl"))")
+        include(raw"$(joinpath(support, "testutils.jl"))")
         cfg = preset(:full_model; corrections = NoCorrections())
         result = run_synthetic(RunSpec(ctrl = 1, scnr = 0), cfg)
         print(Threads.nthreads())
@@ -16,15 +27,9 @@
             print(" ", gmean(rec.Ts), " ", gmean(rec.Ta), " ", gmean(rec.q))
         end
     """
-    # Only the executable from julia_cmd(), not its flags: under Pkg.test those
-    # include --check-bounds=yes, which would force the subprocess to recompile
-    # the world and make this test ~10x slower.
-    exe = first(Base.julia_cmd())
-    project = normpath(joinpath(@__DIR__, ".."))
-    run_at(n) = begin
-        cmd = `$exe --startup-file=no --project=$project -t $n -e $script`
-        parts = split(strip(read(cmd, String)))
-        (nthreads = parse(Int, parts[1]), digest = parse.(Float64, parts[2:end]))
+    function run_at(n)
+        parts = split(strip(run_julia(script; threads=n)))
+        return (nthreads=parse(Int, parts[1]), digest=parse.(Float64, parts[2:end]))
     end
 
     serial = run_at(1)
@@ -44,12 +49,11 @@ end
     # The synthetic run above uses made-up fields with no sunlight, so it
     # compares little real physics. This one runs a flux-correction spin-up
     # and a control year on the dataset and compares every record field.
-    if !isdir(DATA_DIR)
-        @test_skip "greb_input_data/ not present"
-    else
+    with_dataset() do
         script = """
             using GREBClimate
-            result = Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
+            using Logging: with_logger, NullLogger
+            result = with_logger(NullLogger()) do
                 fields = load_climatology(raw"$(DATA_DIR)"; dataset = :ncep)
                 greb_model!(RunSpec(ctrl = 1, scnr = 0), preset(:full_model; corrections = SpinUp(1));
                             jld2_dir = raw"$(DATA_DIR)", fields = fields)
@@ -58,9 +62,7 @@ end
             print(Threads.nthreads(), " ", finite, " ",
                   hash([getfield(r, v) for r in result.ctrl for v in fieldnames(MonthlyRecord)]))
         """
-        exe = first(Base.julia_cmd())
-        project = normpath(joinpath(@__DIR__, ".."))
-        run_at(n) = split(strip(read(`$exe --startup-file=no --project=$project -t $n -e $script`, String)))
+        run_at(n) = split(strip(run_julia(script; threads=n)))
 
         serial = run_at(1)
         threaded = run_at(2)

@@ -7,26 +7,25 @@
 # One fixture for both testsets: an unloaded (all-zero) climatology, since
 # these tests measure allocations and inferred types, not physics.
 function _kernel_fixture()
-    X, Y = GREBClimate.xdim, GREBClimate.ydim
     fields = ClimateFields()
     r = resolve(preset(:full_model))
     quiet() do
-        init_model!(r, fields)
+        init_model!(fields, r)
     end
     return (
-        fields = fields,
-        r = r,
-        p = r.config.processes,
-        h = r.hydrology,
-        state = ModelState(),
-        ws = ModelWorkspace(),
-        slice = 1,
-        Ts = fill(290.0f0, X, Y),
-        Ta = fill(280.0f0, X, Y),
-        To = fill(285.0f0, X, Y),
-        q = fill(0.006f0, X, Y),
-        T1 = fill(280.0f0, X, Y),
-        dX = zeros(Float32, X, Y),
+        fields=fields,
+        r=r,
+        p=r.config.processes,
+        h=r.hydrology,
+        state=ModelState(),
+        ws=ModelWorkspace(),
+        slice=1,
+        Ts=fill(290.0f0, X, Y),
+        Ta=fill(280.0f0, X, Y),
+        To=fill(285.0f0, X, Y),
+        q=fill(0.006f0, X, Y),
+        T1=fill(280.0f0, X, Y),
+        dX=zeros(Float32, X, Y)
     )
 end
 
@@ -40,30 +39,35 @@ end
     # two. tendencies! is larger because it returns a 16-field tuple; its two
     # circulation! calls run serially here, so nothing pays for @spawn.
     kernels = [
-        ("SWradiation!", () -> SWradiation!(f.Ts, f.fields, f.state, f.slice, f.p, f.ws), 64),
-        ("LWradiation!", () -> LWradiation!(f.Ts, f.Ta, f.q, 340.0f0, f.fields, f.slice, f.p, f.ws), 64),
-        ("hydro!", () -> hydro!(f.Ts, f.q, f.fields, f.slice, f.p, f.h, f.ws), 64),
-        ("seaice!", () -> seaice!(f.Ts, f.fields, f.slice, f.p), 0),
-        ("deep_ocean!", () -> deep_ocean!(f.Ts, f.To, f.fields, f.slice, f.p, f.ws), 64),
-        ("convergence!", () -> convergence!(f.T1, f.fields, f.slice, f.ws), 0),
-        ("diffusion!", () -> diffusion!(f.T1, GREBClimate.z_air, f.fields, f.ws), 0),
-        ("advection!", () -> advection!(f.T1, GREBClimate.z_air, f.fields, f.ws, f.slice, f.p), 0),
-        ("circulation!", () -> circulation!(f.T1, GREBClimate.z_air, f.dX, f.fields, f.ws, f.slice, f.p), 0),
+        ("SWradiation!", () -> SWradiation!(f.ws, f.Ts, f.fields, f.state, f.slice, f.p), 64),
+        ("LWradiation!", () -> LWradiation!(f.ws, f.Ts, f.Ta, f.q, 340.0f0, f.fields, f.slice, f.p), 64),
+        ("hydro!", () -> hydro!(f.ws, f.Ts, f.q, f.fields, f.slice, f.p, f.h), 64),
+        ("seaice!", () -> seaice!(f.fields, f.Ts, f.slice, f.p), 0),
+        ("deep_ocean!", () -> deep_ocean!(f.ws, f.Ts, f.To, f.fields, f.slice, f.p), 64),
+        ("convergence!", () -> convergence!(f.ws, f.T1, f.fields, f.slice), 0),
+        ("diffusion!", () -> diffusion!(f.ws, f.T1, z_air, f.fields), 0),
+        ("advection!", () -> advection!(f.ws, f.T1, z_air, f.fields, f.slice, f.p), 0),
+        ("circulation!", () -> circulation!(f.dX, f.T1, z_air, f.fields, f.ws, f.slice, f.p), 0),
         ("tendencies!", () -> tendencies!(340.0f0, f.Ts, f.Ta, f.To, f.q, f.fields, f.state, f.ws, f.slice, f.r), 256),
+        ("to_ghosted!", () -> GREBClimate.to_ghosted!(f.ws.X_work, f.T1), 0),
+        ("refresh_ghosts!", () -> GREBClimate.refresh_ghosts!(f.ws.X_work), 0)
     ]
 
     # The table is hand-written; this is what stops a new kernel slipping past
     # it. "Kernel" means a `!`-named function defined in one of these files.
+    # The kernels are not exported, so the search needs `all = true`; the
+    # `_`-prefixed workers are reached through their public wrapper.
     kernel_files = ("physics/radiation.jl", "physics/hydrology.jl",
         "physics/ocean.jl", "physics/circulation.jl", "core/tendencies.jl")
     defined_in_kernel_file(fn) = any(methods(fn)) do m
         path = replace(String(m.file), '\\' => '/')
         any(kf -> endswith(path, kf), kernel_files)
     end
-    all_kernels = Set(String(n) for n in names(GREBClimate)
-                      if endswith(String(n), "!") &&
-                         getproperty(GREBClimate, n) isa Function &&
-                         defined_in_kernel_file(getproperty(GREBClimate, n)))
+    all_kernels = Set(String(n) for n in names(GREBClimate; all=true)
+    if endswith(String(n), "!") && !startswith(String(n), r"[_#]") &&
+           getproperty(GREBClimate, n) isa Function &&
+           defined_in_kernel_file(getproperty(GREBClimate, n)))
+    @test !isempty(all_kernels)   # an empty set would make the next check pass on anything
     @test setdiff(all_kernels, Set(first.(kernels))) == Set{String}()
 
     for (name, thunk, budget) in kernels
@@ -84,15 +88,15 @@ end
 
     F32 = Matrix{Float32}
     signatures = [
-        (SWradiation!, (F32, ClimateFields, ModelState, Int, Processes, ModelWorkspace)),
-        (LWradiation!, (F32, F32, F32, Float32, ClimateFields, Int, Processes, ModelWorkspace)),
-        (hydro!, (F32, F32, ClimateFields, Int, Processes, ResolvedHydrology, ModelWorkspace)),
-        (seaice!, (F32, ClimateFields, Int, Processes)),
-        (deep_ocean!, (F32, F32, ClimateFields, Int, Processes, ModelWorkspace)),
-        (convergence!, (F32, ClimateFields, Int, ModelWorkspace)),
-        (diffusion!, (F32, Float32, ClimateFields, ModelWorkspace)),
-        (advection!, (F32, Float32, ClimateFields, ModelWorkspace, Int, Processes)),
-        (circulation!, (F32, Float32, F32, ClimateFields, ModelWorkspace, Int, Processes)),
+        (SWradiation!, (ModelWorkspace, F32, ClimateFields, ModelState, Int, Processes)),
+        (LWradiation!, (ModelWorkspace, F32, F32, F32, Float32, ClimateFields, Int, Processes)),
+        (hydro!, (ModelWorkspace, F32, F32, ClimateFields, Int, Processes, ResolvedHydrology)),
+        (seaice!, (ClimateFields, F32, Int, Processes)),
+        (deep_ocean!, (ModelWorkspace, F32, F32, ClimateFields, Int, Processes)),
+        (convergence!, (ModelWorkspace, F32, ClimateFields, Int)),
+        (diffusion!, (ModelWorkspace, F32, Float32, ClimateFields)),
+        (advection!, (ModelWorkspace, F32, Float32, ClimateFields, Int, Processes)),
+        (circulation!, (F32, F32, Float32, ClimateFields, ModelWorkspace, Int, Processes))
     ]
 
     for (kernel, argtypes) in signatures

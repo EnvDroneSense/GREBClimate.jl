@@ -1,0 +1,55 @@
+# Metadata of the dataset files, read by convert_greb_to_jld2.jl and package_dataset.jl.
+# One line per single-field file: description, units, source (a key of [sources]), period,
+# and the pack the file ships in. The keys of [field] are the files the model reads;
+# test/test_io.jl checks that every file the loaders read is here, in the pack the loaders name.
+# The text of [sources] and the periods are generic where the original files do not say more.
+
+[sources]
+greb = "GREB model input file (Dommenget and colleagues, Monash University)"
+ncep = "NCEP/NCAR reanalysis, as supplied with the GREB model input files"
+era = "ERA-Interim reanalysis (ECMWF), as supplied with the GREB model input files"
+isccp = "ISCCP cloud climatology, as supplied with the GREB model input files"
+woce = "WOCE ocean mixed-layer depth climatology, as supplied with the GREB model input files"
+cmip5 = "CMIP5 RCP8.5 ensemble mean, as supplied with the GREB model input files"
+enso = "ERA-Interim El Nino and La Nina composite anomaly, as supplied with the GREB model input files"
+ipcc = "IPCC RCP and SSP scenario tables, as supplied with the GREB model input files"
+
+[field]
+"Tocean.clim" = {description="Deep-ocean temperature", units="K", source="greb", period="mean year, years not recorded in the source", pack="core"}
+"cmip5.meridional.wind.rcp85.ensmean.forcing" = {description="Anomaly of meridional wind", units="m s-1", source="cmip5", period="mean year, years not recorded in the source", pack="cmip5"}
+"cmip5.omega.rcp85.ensmean.forcing" = {description="Anomaly of vertical velocity", units="Pa s-1", source="cmip5", period="mean year, years not recorded in the source", pack="cmip5"}
+"cmip5.tsurf.rcp85.ensmean.forcing" = {description="Anomaly of surface temperature", units="K", source="cmip5", period="mean year, years not recorded in the source", pack="cmip5"}
+"cmip5.windspeed.rcp85.ensmean.forcing" = {description="Anomaly of wind speed", units="m s-1", source="cmip5", period="mean year, years not recorded in the source", pack="cmip5"}
+"cmip5.zonal.wind.rcp85.ensmean.forcing" = {description="Anomaly of zonal wind", units="m s-1", source="cmip5", period="mean year, years not recorded in the source", pack="cmip5"}
+"erainterim.atmospheric_humidity.clim" = {description="Specific humidity", units="kg kg-1", source="era", period="mean year, years not recorded in the source", pack="era"}
+"erainterim.meridional.wind.elnino.forcing" = {description="Anomaly of meridional wind", units="m s-1", source="enso", period="mean year, years not recorded in the source", pack="enso"}
+"erainterim.meridional.wind.lanina.forcing" = {description="Anomaly of meridional wind", units="m s-1", source="enso", period="mean year, years not recorded in the source", pack="enso"}
+"erainterim.meridional_wind.850hpa.clim" = {description="Meridional wind at 850 hPa", units="m s-1", source="era", period="mean year, years not recorded in the source", pack="era"}
+"erainterim.omega.elnino.forcing" = {description="Anomaly of vertical velocity", units="Pa s-1", source="enso", period="mean year, years not recorded in the source", pack="enso"}
+"erainterim.omega.lanina.forcing" = {description="Anomaly of vertical velocity", units="Pa s-1", source="enso", period="mean year, years not recorded in the source", pack="enso"}
+"erainterim.omega.vertmean.clim" = {description="Vertical velocity, vertical mean", units="Pa s-1", source="era", period="mean year, years not recorded in the source", pack="core"}
+"erainterim.omega_std.vertmean.clim" = {description="Standard deviation of the vertical velocity, vertical mean", units="Pa s-1", source="era", period="mean year, years not recorded in the source", pack="core"}
+"erainterim.tsurf.1979-2015.clim" = {description="Surface temperature", units="K", source="era", period="1979-2015 mean year", pack="era"}
+"erainterim.tsurf.elnino.forcing" = {description="Anomaly of surface temperature", units="K", source="enso", period="mean year, years not recorded in the source", pack="enso"}
+"erainterim.tsurf.lanina.forcing" = {description="Anomaly of surface temperature", units="K", source="enso", period="mean year, years not recorded in the source", pack="enso"}
+"erainterim.windspeed.850hpa.clim" = {description="Wind speed at 850 hPa", units="m s-1", source="era", period="mean year, years not recorded in the source", pack="core"}
+"erainterim.windspeed.elnino.forcing" = {description="Anomaly of wind speed", units="m s-1", source="enso", period="mean year, years not recorded in the source", pack="enso"}
+"erainterim.windspeed.lanina.forcing" = {description="Anomaly of wind speed", units="m s-1", source="enso", period="mean year, years not recorded in the source", pack="enso"}
+"erainterim.zonal.wind.elnino.forcing" = {description="Anomaly of zonal wind", units="m s-1", source="enso", period="mean year, years not recorded in the source", pack="enso"}
+"erainterim.zonal.wind.lanina.forcing" = {description="Anomaly of zonal wind", units="m s-1", source="enso", period="mean year, years not recorded in the source", pack="enso"}
+"erainterim.zonal_wind.850hpa.clim" = {description="Zonal wind at 850 hPa", units="m s-1", source="era", period="mean year, years not recorded in the source", pack="era"}
+"global.topography" = {description="Topography; ocean points are below 0", units="m", source="greb", period="static", pack="core"}
+"greb.glaciers" = {description="Glacier mask, 1 on glaciers", units="1", source="greb", period="static", pack="core"}
+"isccp.cloud_cover.clim" = {description="Cloud cover fraction", units="1", source="isccp", period="mean year, years not recorded in the source", pack="core"}
+"ncep.atmospheric_humidity.clim" = {description="Specific humidity", units="kg kg-1", source="ncep", period="mean year, years not recorded in the source", pack="core"}
+"ncep.meridional_wind.850hpa.clim" = {description="Meridional wind at 850 hPa", units="m s-1", source="ncep", period="mean year, years not recorded in the source", pack="core"}
+"ncep.soil_moisture.clim" = {description="Soil moisture", units="1", source="ncep", period="mean year, years not recorded in the source", pack="core"}
+"ncep.tsurf.1948-2007.clim" = {description="Surface temperature", units="K", source="ncep", period="1948-2007 mean year", pack="core"}
+"ncep.zonal_wind.850hpa.clim" = {description="Zonal wind at 850 hPa", units="m s-1", source="ncep", period="mean year, years not recorded in the source", pack="core"}
+"solar_radiation.clim" = {description="24-hour mean top-of-atmosphere solar radiation", units="W m-2", source="greb", period="mean year", pack="core"}
+"woce.ocean_mixed_layer_depth.clim" = {description="Ocean mixed-layer depth", units="m", source="woce", period="mean year, years not recorded in the source", pack="core"}
+
+[flux_correction]
+Tsurf_flux_correction = {description="Surface temperature flux correction", units="W m-2"}
+vapour_flux_correction = {description="Water vapour flux correction", units="kg m-2 s-1"}
+Tocean_flux_correction = {description="Deep-ocean temperature flux correction", units="W m-2"}

@@ -54,9 +54,9 @@ Scenario years $(@bind n_scnr Slider(0:50, default=15, show_value=true))
 Run the model $(@bind go CheckBox(default=false))"""
 
 # ╔═╡ 79fdb975-0f02-43f7-9a05-39e8f5408c5f
-result = go ? redirect_stdout(devnull) do
+result = go ? Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
     greb_model!(RunSpec(ctrl=n_ctrl, scnr=n_scnr), preset(experiment);
-                jld2_dir=data_dir, fields=deepcopy(fields))   # the model mutates fields
+        jld2_dir=data_dir, fields=fields)
 end : nothing;
 
 # ╔═╡ 372f4e9a-f1be-4e57-b293-b2592e29c60f

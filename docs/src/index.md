@@ -4,14 +4,12 @@ A Julia translation of the **Globally Resolved Energy Balance (GREB)**
 climate model, originally developed by Dietmar Dommenget and colleagues at
 Monash University.
 
-The model simulates the global energy balance on a **3.75° × 3.75°** grid
-(96 longitudes × 48 latitudes), stepping every 12 hours with 30-minute
-sub-steps for atmospheric circulation (730 time steps per year). The
+It runs on a fixed 96 × 48 grid with a 12-hour step; the
 [Model overview](@ref) explains its components.
 
 ## Installation
 
-Requires Julia 1.10 (the current LTS) or later.
+Requires Julia 1.10 or later.
 
 ```julia
 using Pkg
@@ -24,7 +22,7 @@ Or, working from a clone:
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
 
-The model needs a ~439 MB input dataset, which [`greb_data_dir`](@ref)
+The model needs a 439 MB input dataset (a 321 MB download), which [`greb_data_dir`](@ref)
 downloads and caches on first use; see [Input data](@ref).
 
 ## Where to go next
@@ -35,6 +33,6 @@ downloads and caches on first use; see [Input data](@ref).
 | [Input data](@ref) | Where the dataset comes from, how it is found, and its layout |
 | [Model overview](@ref) | What the model computes and how a run is structured |
 | [Time and calendar](@ref) | The model calendar, the time value of a run, and what the time system does not do yet |
-| [Plots and notebook](@ref) | The `viz/` plotting toolbox and the Pluto explorer |
+| [Plots and notebook](@ref) | The `viz/` plotting toolbox, how to read the plots, and the Pluto explorer |
 | [Configuration](@ref) | The parts of a configuration, their options, and the experiment presets |
 | [API Reference](@ref) | Every exported function and type |

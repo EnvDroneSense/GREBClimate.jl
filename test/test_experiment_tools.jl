@@ -21,13 +21,13 @@ end
     flat = ET.polar_amplification(ones_map)
     @test flat.north ≈ 1 && flat.south ≈ 1
 
-    pole = [abs(GREBClimate.lat_grid[j]) >= 60 ? 2.0f0 : 1.0f0 for _ in 1:X, j in 1:Y]
+    pole = [abs(lat_grid[j]) >= 60 ? 2.0f0 : 1.0f0 for _ in 1:X, j in 1:Y]
     amp = ET.polar_amplification(pole)
     @test amp.north ≈ amp.south > 1
     @test amp.north ≈ 2 / ET.area_mean(pole)
 
     z_topo = synthetic_fields().z_topo
-    land = Float32.(GREBClimate.is_land.(z_topo))
+    land = Float32.(is_land.(z_topo))
     @test any(land .== 1) && any(land .== 0)
     lo = ET.land_ocean(land, z_topo)
     @test lo.land ≈ 1 && abs(lo.ocean) < 1e-12
@@ -49,7 +49,7 @@ end
 end
 
 @testset "annual means group by record time" begin
-    times = [(year = 1950 + (m - 1) ÷ 12, month = mod1(m, 12)) for m in 1:30]
+    times = record_times(1950, 30)
     records = [uniform_record(Float32(m)) for m in 1:30]
     years, values = ET.annual_means(records, times, :Ts)
     @test years == [1950, 1951]                      # 1952 has six months only
@@ -59,31 +59,31 @@ end
 end
 
 @testset "in_range_report" begin
-    times = [(year = 1950, month = m) for m in 1:3]
-    fine = [uniform_record(280f0; q = 0.01f0) for _ in 1:3]
+    times = record_times(1950, 3)
+    fine = [uniform_record(280.0f0; q=0.01f0) for _ in 1:3]
     @test ET.in_range_report(fine, times, false) === nothing
-    runaway = [fine[1], uniform_record(280f0; q = 0.01f0, Ts = 1f24), fine[3]]
-    @test ET.in_range_report(runaway, times, false) == (year = 1950, month = 2, field = :Ts, value = 1f24)
-    nan = [fine[1], fine[2], uniform_record(280f0; q = 0.01f0, Ta = NaN32)]
+    runaway = [fine[1], uniform_record(280.0f0; q=0.01f0, Ts=1.0f24), fine[3]]
+    @test ET.in_range_report(runaway, times, false) == (year=1950, month=2, field=:Ts, value=1.0f24)
+    nan = [fine[1], fine[2], uniform_record(280.0f0; q=0.01f0, Ta=NaN32)]
     @test ET.in_range_report(nan, times, false).month == 3
     # An anomaly of a few kelvin is fine; the absolute range does not apply to it
-    small = [uniform_record(2f0; q = 0.001f0) for _ in 1:3]
+    small = [uniform_record(2.0f0; q=0.001f0) for _ in 1:3]
     @test ET.in_range_report(small, times, true) === nothing
     @test ET.in_range_report(small, times, false).field == :Ts
-    @test ET.in_range_report([uniform_record(1f24; q = 0.001f0)], times[1:1], true).field == :Ts
+    @test ET.in_range_report([uniform_record(1.0f24; q=0.001f0)], times[1:1], true).field == :Ts
 end
 
 @testset "summarize reduces a model result" begin
-    result = run_synthetic(RunSpec(ctrl = 1, scnr = 2), preset(:co2_double; corrections = NoCorrections()))
+    result = run_synthetic(RunSpec(ctrl=1, scnr=2), preset(:co2_double; corrections=NoCorrections()))
     s = ET.summarize(result)
     @test s.scnr_anomaly && s.ctrl.years == [1970] && s.scnr.years == [1950, 1951]
     @test all(length(s.scnr[k]) == 2 for k in (:Ts, :precip, :ice, :net))
     @test s.ctrl.Ts[1] ≈ gmean([global_mean(r.Ts) for r in result.ctrl])
     @test s.scnr.net[2] ≈ gmean([global_mean(r.sw) - global_mean(r.olr) for r in result.scnr[13:24]])
-    @test s.out_of_range == (ctrl = nothing, scnr = nothing)
+    @test s.out_of_range == (ctrl=nothing, scnr=nothing)
 
     # A scenario can leave the range while its control is fine
-    broken = merge(result, (scnr = [uniform_record(1f24; q = 0.001f0); result.scnr[2:end]],))
+    broken = merge(result, (scnr=[uniform_record(1.0f24; q=0.001f0); result.scnr[2:end]],))
     @test ET.summarize(broken).out_of_range.ctrl === nothing
     @test ET.summarize(broken).out_of_range.scnr.field == :Ts
 end

@@ -62,12 +62,12 @@ function evolution_frame(ev::Evolution, i::Integer; fields=nothing)
         n = length(p.frames)
         k = mod1(i, n)
         geomap(p.frames[k]; fields=fields, c=p.anom ? :balance : :viridis, clims=p.clims,
-               title=lstrip("$(p.title): $(p.labels[k])  ($k/$n)", [':', ' ']), titlefontsize=10,
-               colorbar_title=unitlabel(ev.var))
+            title=lstrip("$(p.title): $(p.labels[k])  ($k/$n)", [':', ' ']), titlefontsize=10,
+            colorbar_title=unitlabel(ev.var))
     end
     length(panels) == 1 ? only(panels) :
-        Plots.plot(panels...; layout=(1, length(panels)), size=(600 * length(panels), 340),
-                   left_margin=7Plots.mm, bottom_margin=5Plots.mm)
+    Plots.plot(panels...; layout=(1, length(panels)), size=(600 * length(panels), 340),
+        left_margin=7Plots.mm, bottom_margin=5Plots.mm)
 end
 
 """

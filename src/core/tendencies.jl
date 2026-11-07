@@ -1,11 +1,10 @@
 """
     tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, slice, r::ResolvedConfig; ws_a=ws, ws_q=ws)
 
-Runs one timestep's physics pipeline: [`SWradiation!`](@ref) →
-[`LWradiation!`](@ref) → sensible heat → [`hydro!`](@ref) →
-[`circulation!`](@ref) (temperature, then humidity) → [`deep_ocean!`](@ref)
-and returns a named tuple of every intermediate flux/tendency needed by
-[`diagnostics!`](@ref) and the caller's own state update.
+Run one timestep's physics and return a named tuple of the fluxes and
+tendencies that the caller's state update and [`output!`](@ref) read. [`circulation!`](@ref) (temperature, then humidity) starts first,
+then [`SWradiation!`](@ref) → [`LWradiation!`](@ref) → sensible heat →
+[`hydro!`](@ref) → [`deep_ocean!`](@ref) run on `ws`.
 
 The two `circulation!` calls are independent of each other and of every
 other stage (each reads only pre-timestep state and writes disjoint
@@ -15,25 +14,25 @@ while the remaining stages run on `ws`. With the default `ws_a=ws_q=ws` they
 run one after the other.
 """
 function tendencies!(CO2, Ts, Ta, To, q, fields::ClimateFields, state::ModelState, ws::ModelWorkspace,
-    slice::Int, r::ResolvedConfig; ws_a::ModelWorkspace=ws, ws_q::ModelWorkspace=ws)
+        slice::Int, r::ResolvedConfig; ws_a::ModelWorkspace=ws, ws_q::ModelWorkspace=ws)
 
     p = r.config.processes
     parallel = Threads.nthreads() > 1 && ws_a !== ws_q
 
     # Atmospheric circulation - temperature/water-vapor diffusion/advection.
     if parallel
-        t_a = Threads.@spawn circulation!(Ta, z_air, ws_a.dTa_crcl, fields, ws_a, slice, p)
-        t_q = Threads.@spawn circulation!(q, z_vapor, ws_q.dq_crcl, fields, ws_q, slice, p)
+        t_a = Threads.@spawn circulation!(ws_a.dTa_crcl, Ta, z_air, fields, ws_a, slice, p)
+        t_q = Threads.@spawn circulation!(ws_q.dq_crcl, q, z_vapor, fields, ws_q, slice, p)
     else
-        circulation!(Ta, z_air, ws_a.dTa_crcl, fields, ws_a, slice, p)
-        circulation!(q, z_vapor, ws_q.dq_crcl, fields, ws_q, slice, p)
+        circulation!(ws_a.dTa_crcl, Ta, z_air, fields, ws_a, slice, p)
+        circulation!(ws_q.dq_crcl, q, z_vapor, fields, ws_q, slice, p)
     end
 
     # Short-wave radiation -> albedo, SW flux
-    sw_out = SWradiation!(Ts, fields, state, slice, p, ws)
+    sw_out = SWradiation!(ws, Ts, fields, state, slice, p)
 
     # Long-wave radiation -> LW_surf, LW_up, LW_down, emissivity
-    lw_out = LWradiation!(Ts, Ta, q, CO2, fields, slice, p, ws)
+    lw_out = LWradiation!(ws, Ts, Ta, q, CO2, fields, slice, p)
 
     # Sensible heat flux
     Q_sens = ws.Q_sens
@@ -44,10 +43,10 @@ function tendencies!(CO2, Ts, Ta, To, q, fields::ClimateFields, state::ModelStat
     end
 
     # Hydrological cycle -> latent heat + evaporation/rain tendencies
-    hy_out = hydro!(Ts, q, fields, slice, p, r.hydrology, ws)
+    hy_out = hydro!(ws, Ts, q, fields, slice, p, r.hydrology)
 
     # Deep ocean coupling
-    do_out = deep_ocean!(Ts, To, fields, slice, p, ws)
+    do_out = deep_ocean!(ws, Ts, To, fields, slice, p)
 
     if parallel
         wait(t_a)

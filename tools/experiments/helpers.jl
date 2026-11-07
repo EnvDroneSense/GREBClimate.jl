@@ -1,12 +1,9 @@
-# Shared helpers for experiment scripts: reduce a `greb_model!` result to a few
-# numbers and compute the usual diagnostics from maps and series.
+# Helpers for experiment scripts: reduce a `greb_model!` result to a few numbers
+# and compute the usual diagnostics from maps and series. Pure functions; none
+# runs the model. Every mean is area-weighted. `summarize` reads the result's
+# `scnr_anomaly` to tell anomalies from absolute records.
 #
 #   include("helpers.jl"); using .ExperimentTools: summarize, gregory
-#
-# Pure functions on records, series and maps; none of them runs the model.
-# Every mean is area-weighted. The scenario records of a `greb_model!` result are
-# anomalies when its `scnr_anomaly` is true; the reducer and the sensitivity
-# estimate read that entry.
 
 module ExperimentTools
 
@@ -75,7 +72,7 @@ amplitude is `hypot(a, b)` and the lag is in samples, positive when the series
 peaks later than `sin`.
 """
 function sine_fit(series::AbstractVector{<:Real}, period::Real)
-    t = 0:(length(series) - 1)
+    t = 0:(length(series)-1)
     ω = 2π / period
     design = hcat(ones(length(t)), sin.(ω .* t), cos.(ω .* t))
     c, a, b = design \ Float64.(series)
@@ -96,12 +93,12 @@ function annual_means(records, times, f)
     length(records) == length(times) || throw(DimensionMismatch("$(length(records)) records, $(length(times)) times"))
     value(rec) = f isa Symbol ? global_mean(getproperty(rec, f)) : Float64(f(rec))
     sums = Dict{Int,Float64}()
-    count = Dict{Int,Int}()
+    months = Dict{Int,Int}()
     for (rec, t) in zip(records, times)
         sums[t.year] = get(sums, t.year, 0.0) + value(rec)
-        count[t.year] = get(count, t.year, 0) + 1
+        months[t.year] = get(months, t.year, 0) + 1
     end
-    years = sort!([y for (y, n) in count if n == 12])
+    years = sort!([y for (y, n) in months if n == 12])
     return years, [sums[y] / 12 for y in years]
 end
 
@@ -117,6 +114,7 @@ range.
 function in_range_report(records, times, anomaly::Bool)
     limits = G.RangeCheck().limits
     for (rec, t) in zip(records, times), field in keys(limits)
+
         lower, upper = limits[field]
         for x in getproperty(rec, field)
             ok = anomaly ? isfinite(x) && abs(x) <= upper - lower : lower <= x <= upper
@@ -140,16 +138,16 @@ function summarize(result)
     series(records, times) = begin
         years, Ts = annual_means(records, times, :Ts)
         (; years, Ts,
-           precip=annual_means(records, times, :precip)[2],
-           ice=annual_means(records, times, :ice)[2],
-           net=annual_means(records, times, rec -> global_mean(rec.sw) - global_mean(rec.olr))[2])
+            precip=annual_means(records, times, :precip)[2],
+            ice=annual_means(records, times, :ice)[2],
+            net=annual_means(records, times, rec -> global_mean(rec.sw) - global_mean(rec.olr))[2])
     end
     anomaly = get(result, :scnr_anomaly, false)
     return (ctrl=series(result.ctrl, result.ctrl_time),
-            scnr=series(result.scnr, result.scnr_time),
-            scnr_anomaly=anomaly,
-            out_of_range=(ctrl=in_range_report(result.ctrl, result.ctrl_time, false),
-                          scnr=in_range_report(result.scnr, result.scnr_time, anomaly)))
+        scnr=series(result.scnr, result.scnr_time),
+        scnr_anomaly=anomaly,
+        out_of_range=(ctrl=in_range_report(result.ctrl, result.ctrl_time, false),
+            scnr=in_range_report(result.scnr, result.scnr_time, anomaly)))
 end
 
 """
@@ -173,8 +171,8 @@ function gregory(dTs::AbstractVector{<:Real}, dnet::AbstractVector{<:Real})
     forcing = my - feedback * mx
     residual = y .- (forcing .+ feedback .* x)
     r2 = 1 - sum(abs2, residual) / sum(abs2, y .- my)
-    return (forcing=forcing, feedback=feedback, sensitivity=-forcing / feedback, r2=r2,
-            reached=x[end], remaining=y[end])
+    return (forcing=forcing, feedback=feedback, sensitivity=(-forcing / feedback), r2=r2,
+        reached=x[end], remaining=y[end])
 end
 
 end # module
