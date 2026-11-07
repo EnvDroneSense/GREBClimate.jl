@@ -52,6 +52,7 @@ jobs:
       # Separate process: profile.jl and run_benchmarks.jl both define main.
       - name: Load the profiler and run the Fortran harness self-test
         run: |
+          julia --project=. -e 'import Pkg; Pkg.instantiate()'
           julia --project=. -e 'include("benchmark/profile.jl")'
           julia --project=. benchmark/fortran/run_fortran_comparison.jl selftest
 
