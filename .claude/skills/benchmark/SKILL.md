@@ -1,6 +1,6 @@
 ---
 name: benchmark
-description: Run GREBClimate.jl's timing benchmarks (benchmark/run_benchmarks.jl) and its profiler (benchmark/profile.jl) and report results honestly, accounting for machine noise. Use when the user asks to benchmark, time, profile, or check the speed of the model, or to compare thread counts. Allocations are checked by the test suite, not here.
+description: Run GREBClimate.jl's timing benchmarks (benchmark/run_benchmarks.jl) its profiler (benchmark/profile.jl) and its Fortran comparison (benchmark/fortran/), and report results honestly, accounting for machine noise. Use when the user asks to benchmark, time, profile, or check the speed of the model, or to compare thread counts. Allocations are checked by the test suite, not here.
 ---
 
 # GREB benchmark
@@ -64,6 +64,24 @@ A run writes `report.md` (a Markdown table of the run, then the result tables) a
 | A share is a ceiling, not a gain | Prove a gain with the same-process comparison at the end of this file |
 
 Quote shares only from a run of the default size, with its commit and sample count; the old reference shape was dropped because it went stale.
+
+## Fortran comparison
+
+`benchmark/fortran/run_fortran_comparison.jl` checks the model against the original Fortran GREB and times both. It needs gfortran and the Fortran source (`GREB_GFORTRAN`, `GREB_FORTRAN_DIR`) and runs in the package environment. The developer docs page "Fortran comparison" has the details.
+
+| Mode | Answers | Command |
+|---|---|---|
+| `selftest` | Whether the script's own logic works (no compiler needed) | `julia --project=. benchmark/fortran/run_fortran_comparison.jl selftest` |
+| `verify` | Whether Julia and the Fortran give the same scenario temperatures (the gate; about 1 minute) | `... verify` |
+| `compare` | Fortran builds and Julia timed in shuffled trials, after the gate passes | `... compare [reps]` |
+| `memory`, `io`, `build` | Peak memory (Windows), the Fortran's output cost, the compile step | `... memory` |
+
+| Rule | Why |
+|---|---|
+| Run `verify` before quoting any Fortran timing | `compare` runs it first and reports no timings when it fails |
+| Discard a `compare` run whose self-check (`control / official`) is off by more than 5 % | The two builds are identical, so the machine was noisy |
+| The Julia time is a fresh process | Start-up, package load and compilation are inside it, so it is an end-to-end figure, not a kernel timing |
+| Exit code 1 means the mode failed | Missing tooling, a failed gate or a failed self-check |
 
 ## Other checks
 

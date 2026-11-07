@@ -94,7 +94,8 @@ effects below about 5 % at the scale of a year cannot be resolved there.
 
 ## Results
 
-Every run of `year`, `years`, `stages` and `compare` appends a line per variant
+Every run of `year`, `years`, `stages` and `compare`, and the `compare` mode of
+`fortran/run_fortran_comparison.jl` (mode `fortran`), appends a line per variant
 to `benchmark/results/<date>.csv` (gitignored): `date,commit,mode,name,threads,samples,min_s,median_s,ratio_min,ratio_median,selfcheck,state`.
 The ratio columns are empty outside `compare`, `selfcheck` is filled on the
 baseline-copy row, and `state` is `quiet` or `NOISY`. The commit carries
@@ -172,4 +173,4 @@ report, `Profile.Allocs.BufferType` is the data buffer of an array.
 | `profile.jl` | The sampling profile above |
 | `common.jl` | Argument and flag parsing, dataset lookup, the inputs of a single stage, silenced logging, machine state and result records, shared with `profile.jl` and the Fortran comparison. Needs no Chairmarks |
 | `Project.toml` | Chairmarks and the package for `run_benchmarks.jl`. `Manifest.toml` is gitignored. `profile.jl` still runs in the package environment (`--project=.`) |
-| `fortran/` | Local only (excluded in `.git/info/exclude`, not in the repository). `run_fortran_comparison.jl` times and checks GREBClimate.jl against the original Fortran GREB (modes `compare`, `memory`, `verify`, `io`, `build`, `selftest`); `peak_memory.ps1` is its Windows peak-memory helper. Needs gfortran and the Fortran source (`GREB_GFORTRAN`, `GREB_FORTRAN_DIR`) |
+| `fortran/` | `run_fortran_comparison.jl` times and checks GREBClimate.jl against the original Fortran GREB (modes `compare`, `memory`, `verify`, `io`, `build`, `selftest`; `driver` is the Julia run it starts itself); `peak_memory.ps1` is its Windows peak-memory helper. Run it with `julia --project=. benchmark/fortran/run_fortran_comparison.jl [mode] [reps]`. `verify` is the gate and `compare` runs it first. `selftest` needs no compiler. The other modes need gfortran and the Fortran source (`GREB_GFORTRAN`, `GREB_FORTRAN_DIR`), and exit 1 when either is missing |

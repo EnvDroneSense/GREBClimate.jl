@@ -213,10 +213,10 @@ header line when it is new. `ratios` is `(min, median)` against the baseline,
 ratio or `nothing`; `quiet` is what `machine_footer` returned.
 """
 function record_result(mode::AbstractString, name::AbstractString, times::Vector{Float64}, quiet::Bool;
-        ratios=nothing, selfcheck=nothing)
+        ratios=nothing, selfcheck=nothing, threads::Int=Threads.nthreads())
     commit, dirty = repo_state()
     fields = (Dates.format(now(), "yyyy-mm-ddTHH:MM:SS"), commit * (dirty ? "-dirty" : ""), mode, name,
-        Threads.nthreads(), length(times), minimum(times), _median(times),
+        threads, length(times), minimum(times), _median(times),
         ratios === nothing ? "" : ratios[1], ratios === nothing ? "" : ratios[2],
         selfcheck === nothing ? "" : selfcheck, quiet ? "quiet" : "NOISY")
     mkpath(RESULTS_DIR)

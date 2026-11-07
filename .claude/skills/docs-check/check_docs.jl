@@ -26,6 +26,7 @@ const DOC_FILES = ["README.md", "DATA_README.md", "CHANGELOG.md",
                    "docs/src/data.md", "docs/src/model.md", "docs/src/viz/index.md",
                    "docs/src/viz/plots.md", "docs/src/viz/tools.md",
                    "docs/src/viz/interpreting.md", "docs/src/dev/benchmarks.md", "docs/src/dev/profiling.md",
+                   "docs/src/dev/fortran.md",
                    "CONTRIBUTING.md"]
 
 failures = String[]

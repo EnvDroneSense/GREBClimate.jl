@@ -144,6 +144,17 @@ An entry outside "Changes to model results" leaves results unchanged.
   `tree.txt` and `flat.txt` now start at `greb_model!` and not at the profiler's
   own frames, the script returns an exit code and rejects extra arguments, and
   the helpers it shares with `run_benchmarks.jl` moved to `common.jl`.
+- The Fortran comparison (`benchmark/fortran/run_fortran_comparison.jl`, with
+  `peak_memory.ps1`) is now in the repository. The Julia side is a function of
+  the script, started in a child process, in place of a generated text script, so
+  a renamed package function fails when the script loads. A failed gate,
+  missing tooling or a failed self-check exits with code 1. `verify` also fails
+  when the Fortran anomaly is below 0.1 K, the input link is recreated when
+  `GREB_FORTRAN_DIR` changes, and the Windows-only linker flag is no longer
+  passed on Linux. `compare` now prints the machine state like the other
+  harnesses and appends its rows to `benchmark/results/` (`record_result` takes
+  a `threads` keyword for this). The script uses the helpers in `common.jl`, and
+  the developer docs have a page "Fortran comparison".
 - The test that every physics kernel has an allocation budget checked nothing
   since 2.1.0, because it listed only exported names. It now finds unexported
   kernels, fails when it finds none, and covers `to_ghosted!` and

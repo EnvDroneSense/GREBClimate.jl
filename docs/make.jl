@@ -39,6 +39,7 @@ makedocs(
             "Dataset tools" => "dev/dataset_tools.md",
             "Benchmarks" => "dev/benchmarks.md",
             "Profiling" => "dev/profiling.md",
+            "Fortran comparison" => "dev/fortran.md",
         ],
         "API Reference" => "api.md",
     ],
