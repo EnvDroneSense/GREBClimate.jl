@@ -22,7 +22,6 @@ const SHARD = [
     ("test_invariants.jl", "light", "smoke", 10),
     ("test_presets.jl", "light", "standard", 16),
     ("test_budgets.jl", "light", "standard", 11),
-    ("test_experiment_tools.jl", "light", "standard", 5),
     ("test_physics.jl", "light", "standard", 26),
     ("test_regression.jl", "light", "standard", 8),
     ("test_threading.jl", "light", "full", 25),
@@ -94,8 +93,7 @@ const SOURCE_MAP = [
     ("src/core/ensemble.jl", ["model", "ensemble", "@standard"]),
     ("ext/", ["enzyme"]),
     ("tools/dataset/", ["dataset_tools", "io"]),
-    ("tools/experiments/", ["experiment_tools"]),
-    ("tools/", ["experiment_tools", "dataset_tools"])
+    ("tools/", ["dataset_tools"])
 ]
 
 # Paths that run the full suite although they are named: the package module,
