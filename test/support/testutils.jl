@@ -61,15 +61,16 @@ end
 
 """
 Write `climatology/flux_corrections.jld2` into `dir`, each table filled with
-its value. A table given as `nothing` is left out of the file.
+its value. A table given as `nothing` is left out of the file; `version=nothing` leaves out
+the dataset version (a version 1 file).
 """
-function write_flux_corrections(dir; Ts=0.0f0, q=0.0f0, To=0.0f0)
+function write_flux_corrections(dir; Ts=0.0f0, q=0.0f0, To=0.0f0, version=GREBClimate.DATASET_VERSION)
     mkpath(joinpath(dir, "climatology"))
     jldopen(joinpath(dir, "climatology", "flux_corrections.jld2"), "w") do file
         for (key, value) in (("Tsurf_flux_correction", Ts), ("vapour_flux_correction", q), ("Tocean_flux_correction", To))
             value === nothing || (file[key] = fill(value, X, Y, N))
         end
-        file["dataset_version"] = GREBClimate.DATASET_VERSION
+        version === nothing || (file["dataset_version"] = version)
     end
     return dir
 end
@@ -78,13 +79,14 @@ end
 Write a minimal `scenario/ipcc_scenarios.jld2` into `dir`. `table` maps the
 scenario key to a year=>ppm Dict; the label of each table is `co2_equivalent`
 for an `rcp` key and `co2` for any other.
+`version=nothing` leaves out the dataset version (a version 1 file).
 """
-function write_ipcc_scenarios(dir, table)
+function write_ipcc_scenarios(dir, table; version=GREBClimate.DATASET_VERSION)
     mkpath(joinpath(dir, "scenario"))
     jldopen(joinpath(dir, "scenario", "ipcc_scenarios.jld2"), "w") do file
         file["scenarios"] = table
         file["labels"] = Dict(key => startswith(key, "rcp") ? "co2_equivalent" : "co2" for key in keys(table))
-        file["dataset_version"] = GREBClimate.DATASET_VERSION
+        version === nothing || (file["dataset_version"] = version)
     end
     return dir
 end

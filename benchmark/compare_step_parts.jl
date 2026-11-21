@@ -32,8 +32,7 @@ function main(args)
     flags, pos = split_flags(args)
     check_flags("compare_step_parts", flags, ("seconds",))
     seconds = parse(Float64, get(flags, "seconds", "5"))
-    dir = isempty(pos) ? default_data_dir() : pos[1]
-    isdir(dir) || error("dataset directory not found: $dir. Set GREB_DATA or pass a path.")
+    dir = check_data_dir(isempty(pos) ? default_data_dir() : pos[1])
     (; fields, r, slice, Ts) = stage_inputs(dir, preset(:full_model))
     p = r.config.processes
     t = ModelTime(scenario, 1950, 1)

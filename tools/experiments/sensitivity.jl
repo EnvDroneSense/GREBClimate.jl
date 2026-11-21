@@ -25,12 +25,15 @@ function main(args)
     spinup = parse(Int, get(args, 3, "3"))
     ctrl = parse(Int, get(args, 4, "5"))
 
+    # Refuse before the spin-up, not after 100 scenario years
+    config = preset(name; corrections=SpinUp(spinup))
+    config.scenario.output === :anomaly && ctrl >= 1 && years >= 1 ||
+        error("`$name` needs an anomaly output, a control run and scenario years")
+
     dir = greb_data_dir(; allow_download=false)
     dir === nothing && error("no local dataset found")
     fields = load_climatology(dir; dataset=:ncep)
-    result = greb_model!(RunSpec(ctrl=ctrl, scnr=years), preset(name; corrections=SpinUp(spinup));
-        jld2_dir=dir, fields=fields)
-    result.scnr_anomaly || error("the scenario of `$name` is not an anomaly")
+    result = greb_model!(RunSpec(ctrl=ctrl, scnr=years), config; jld2_dir=dir, fields=fields)
 
     s = summarize(result)
     for phase in (:ctrl, :scnr)

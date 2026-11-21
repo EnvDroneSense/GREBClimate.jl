@@ -97,7 +97,7 @@ All 3D fields are 96×48×730 (one year at 12-hour steps).
 
 | Files | Used by |
 |-------|---------|
-| `cmip5.{tsurf,zonal.wind,meridional.wind,windspeed,omega}.rcp85.ensmean.forcing.bin` | `:rcp85` (CMIP5 ensemble-mean anomalies) |
+| `cmip5.{tsurf,zonal.wind,meridional.wind,windspeed,omega}.rcp85.ensmean.forcing.bin` | `:rcp85_boundary` (CMIP5 ensemble-mean anomalies) |
 | `erainterim.{tsurf,zonal.wind,meridional.wind,windspeed,omega}.{elnino,lanina}.forcing.bin` | `:elnino`, `:lanina` |
 
 ## Optional inputs

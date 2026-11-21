@@ -47,9 +47,9 @@ or a folder of your own is never extended automatically.
 |:-----|------:|---------:|:-----------|
 | `core` | 17 | 103 MB | every run |
 | `era` | 4 | 38 MB | `load_climatology(dir; dataset = :era)` |
-| `cmip5` | 5 | 54 MB | the `:rcp85` experiment |
+| `cmip5` | 5 | 54 MB | the `:rcp85_boundary` experiment |
 | `enso` | 10 | 121 MB | the `:elnino` and `:lanina` experiments |
-| `solar` | 3 | 4 MB | the `:paleo_231kyr`, `:eccentricity` and `:obliquity` experiments |
+| `solar` | 3 | 4 MB | the `:paleo_231kyr`, `:paleo_solar_modern_co2`, `:eccentricity` and `:obliquity` experiments |
 
 Two environment variables matter:
 

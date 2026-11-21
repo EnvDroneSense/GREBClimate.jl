@@ -31,7 +31,14 @@ Inf run, a late error, or no error.
   `preset(:co2_double; percent=5)`.
 - A dataset table of the wrong size, or with NaN or Inf. An ocean-only field
   (mixed-layer depth, deep-ocean temperature) may hold NaN at land cells.
-- A custom CO2 file that lists a year twice.
+- A custom CO2 file that lists a year twice, or a CO2 value that is NaN, Inf or
+  negative. The message names the file and the line.
+- `load_solar_forcing` refuses a table that is not `48 x 730` or that holds NaN
+  or Inf. Before, a `(1, 730)` table filled every latitude row.
+- `greb_model!` with an uninitialized `ClimateFields`: `ArgumentError`, not
+  `ErrorException`.
+- `resolve` of a `CO2Table` or `SolarTable` scenario with no `jld2_dir` says to
+  pass `jld2_dir`, not to download a pack.
 - A dataset file of another version in any loader. Before, only some loaders
   checked.
 - A missing data directory in `greb_data_dir`: `ArgumentError`, not
@@ -41,6 +48,11 @@ Inf run, a late error, or no error.
 - `greb_model!` refuses a start with a pressure weight above 1.001 (bathymetry
   in `z_topo`) or a zero mixed-layer depth at an ocean cell. Pass
   `allow_uninitialized=true` to skip both checks.
+
+### Features
+
+- `lat_grid` and `lon_grid` are exported: the latitudes and longitudes of the
+  grid cell centres in degrees, for labelling maps.
 
 ### Fixes
 
@@ -54,6 +66,8 @@ Inf run, a late error, or no error.
 
 - Docstrings and comments are shorter and in Simplified Technical English.
   Comment blocks above internal functions are docstrings.
+- The docs name the `:rcp85_boundary` experiment as the one the `cmip5` pack
+  serves, and list `:paleo_solar_modern_co2` under the `solar` pack.
 
 ### Tools and tests
 
@@ -61,6 +75,10 @@ Inf run, a late error, or no error.
   without the dataset, and `SOURCE_MAP` maps more source files to the tests
   that check them.
 - Tests for repeated claims were removed or merged.
+- `tools/experiments/sensitivity.jl` refuses a preset without an anomaly
+  output before the run, not after it.
+- The benchmark scripts share `check_data_dir` in `benchmark/common.jl`. The
+  dataset-version tests use a `version` keyword of the fixture writers.
 - `benchmark/compare_step_parts.jl` times `forcing` and the loop order of
   `seaice!` in one process.
 
