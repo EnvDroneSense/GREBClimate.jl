@@ -91,8 +91,10 @@ function diffusion!(ws::ModelWorkspace, T1, h_scl, fields::ClimateFields)
     return nothing
 end
 
-# Core kernel. `Tp`/`wzp` are ghosted with valid ghost rows; the tendency lands in
-# the plain `(xdim, ydim)` `ws.dX_diff`.
+"""
+Kernel of `diffusion!`. `Tp`/`wzp` are ghosted with valid ghost rows; the tendency lands in
+the plain `(xdim, ydim)` `ws.dX_diff`.
+"""
 function _diffusion!(ws::ModelWorkspace, Tp::Matrix{Float32}, wzp::Matrix{Float32})
     dX_diff = ws.dX_diff
 
@@ -236,7 +238,7 @@ function advection!(ws::ModelWorkspace, T1, h_scl, fields::ClimateFields, slice:
     return nothing
 end
 
-# Core kernel. `Tp`/`wzp` are ghosted; the switch check has already run.
+"Kernel of `advection!`. `Tp`/`wzp` are ghosted; the switch check has already run."
 function _advection!(ws::ModelWorkspace, Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateFields, slice::Int)
     dX_adv = ws.dX_adv
 

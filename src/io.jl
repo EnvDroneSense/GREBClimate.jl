@@ -55,9 +55,11 @@ function dataset_field_files()
     return names
 end
 
-# Copy the table `data` read from `source` into `dest`. Broadcasting would fill
-# `dest` from a smaller table without an error, so the size must match. NaN is
-# an error, except at the cells of `nan_ok` (land cells of an ocean-only field).
+"""
+Copy the table `data` read from `source` into `dest`. Broadcasting would fill
+`dest` from a smaller table without an error, so the size must match. NaN is
+an error, except at the cells of `nan_ok` (land cells of an ocean-only field).
+"""
 function _fill_checked!(dest::AbstractArray, data, source::AbstractString; nan_ok=nothing)
     size(data) == size(dest) ||
         throw(ArgumentError("$source holds a $(size(data)) table, expected $(size(dest))"))
@@ -74,8 +76,10 @@ end
 # The fields that the dataset defines at ocean cells only
 const _OCEAN_ONLY_FIELDS = (:mld_clim, :To_clim)
 
-# Fill the arrays of `fields` named in `files` from the files in `dir`. Land
-# cells (`z_topo` is loaded first) may hold NaN in an ocean-only field.
+"""
+Fill the arrays of `fields` named in `files` from the files in `dir`. Land
+cells (`z_topo` is loaded first) may hold NaN in an ocean-only field.
+"""
 function _load_fields!(fields::ClimateFields, dir::AbstractString, files::NamedTuple)
     for (field, name) in pairs(files)
         path = joinpath(dir, name * ".jld2")
@@ -84,8 +88,10 @@ function _load_fields!(fields::ClimateFields, dir::AbstractString, files::NamedT
     end
 end
 
-# The text of the error for a dataset file that is not there. A file of an
-# optional pack names the pack.
+"""
+The text of the error for a dataset file that is not there. A file of an
+optional pack names the pack.
+"""
 function _missing_file_message(filepath::AbstractString)
     pack = _pack_of_file(basename(filepath))
     hint = pack === nothing ? "" :
@@ -93,8 +99,10 @@ function _missing_file_message(filepath::AbstractString)
     return "dataset file not found: $filepath$hint"
 end
 
-# Throw unless the open dataset file `file` has the version these loaders read
-# (a file without the entry is from version 1)
+"""
+Throw unless the open dataset file `file` has the version these loaders read
+(a file without the entry is from version 1).
+"""
 function _check_version(file, filepath::AbstractString)
     version = haskey(file, "dataset_version") ? Int(file["dataset_version"]) : 1
     version == DATASET_VERSION ||
@@ -183,8 +191,10 @@ function co2_scenario_label(jld2_dir::AbstractString, scenario::Symbol)
     return Symbol(_scenario_entry(jld2_dir, scenario, "labels"))
 end
 
-# What the combined scenario file holds for `scenario` under `entry` ("scenarios" or
-# "labels"), after checking the file, its version and that the scenario is in it
+"""
+What the combined scenario file holds for `scenario` under `entry` ("scenarios" or
+"labels"), after checking the file, its version and that the scenario is in it.
+"""
 function _scenario_entry(jld2_dir::AbstractString, scenario::Symbol, entry::AbstractString)
     filepath = joinpath(jld2_dir, "scenario", "ipcc_scenarios.jld2")
     isfile(filepath) || throw(ArgumentError(_missing_file_message(filepath)))
@@ -224,8 +234,10 @@ function load_co2_custom(path::AbstractString)
     return table
 end
 
-# The file of stored flux corrections in the dataset directory `dir`; normalized so
-# `flux_source` matches however the directory is spelled
+"""
+The file of stored flux corrections in the dataset directory `dir`; normalized so
+`flux_source` matches however the directory is spelled.
+"""
 _flux_file(dir::AbstractString) = normpath(joinpath(String(dir), "climatology", "flux_corrections.jld2"))
 
 """

@@ -195,9 +195,11 @@ end
 # A fresh copy of a state's arrays
 _copy_surface(s::SurfaceState) = SurfaceState(copy(s.Ts), copy(s.Ta), copy(s.To), copy(s.q))
 
-# The corrections of a `Stored` run. With a dataset directory they are read from its file
-# unless `fields` already holds them from that file; without one, the ones in `fields`
-# are used (`load_climatology` loads them)
+"""
+The corrections of a `Stored` run. With a dataset directory they are read from its file
+unless `fields` already holds them from that file; without one, the ones in `fields`
+are used (`load_climatology` loads them).
+"""
 function _use_stored_corrections!(fields::ClimateFields, jld2_dir::AbstractString, in_place::Bool)
     isempty(jld2_dir) && return nothing
     file = _flux_file(jld2_dir)
@@ -209,8 +211,10 @@ function _use_stored_corrections!(fields::ClimateFields, jld2_dir::AbstractStrin
     return nothing
 end
 
-# The control run: `years` years from a copy of `surf_ini`. Returns the monthly records and
-# their times
+"""
+The control run: `years` years from a copy of `surf_ini`. Returns the monthly records and
+their times.
+"""
 function _control_run!(r::ResolvedConfig, fields::ClimateFields, surf_ini::SurfaceState, CO2_ctrl, years,
         state::ModelState, ws::ModelWorkspace, acc::MonthlyAccumulator;
         ws_a::ModelWorkspace, ws_q::ModelWorkspace, observer)
@@ -230,8 +234,10 @@ function _control_run!(r::ResolvedConfig, fields::ClimateFields, surf_ini::Surfa
     return output, times
 end
 
-# The scenario run: `years` years from a copy of `surf_ini`, after the control run `ctrl_output`
-# has set the ice cover the surface masks need. Returns the monthly records and their times
+"""
+The scenario run: `years` years from a copy of `surf_ini`, after the control run `ctrl_output`
+has set the ice cover the surface masks need. Returns the monthly records and their times.
+"""
 function _scenario_run!(r::ResolvedConfig, fields::ClimateFields, surf_ini::SurfaceState, CO2_ctrl, years,
         ctrl_output, state::ModelState, ws::ModelWorkspace, acc::MonthlyAccumulator;
         ws_a::ModelWorkspace, ws_q::ModelWorkspace, observer)

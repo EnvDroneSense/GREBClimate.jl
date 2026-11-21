@@ -23,8 +23,10 @@ function atmosphere_flux(tend, i, j)
     return @atmosphere_flux(i, j)
 end
 
-# What an observer of `greb_model!` is handed at each call. The arrays are the
-# model's own, not copies.
+"""
+What an observer of `greb_model!` is handed at each call. The arrays are the
+model's own, not copies.
+"""
 _step_view(t::ModelTime, CO2, Ts, Ta, To, q, tend, fields, r) = (; time=t, phase=t.phase, step=t.step, year=year(t), step_of_year=step_of_year(t),
     CO2, Ts, Ta, To, q, tend, fields, resolved=r)
 
@@ -153,9 +155,11 @@ end
 
 in_range(c::RangeCheck) = c.first === nothing
 
-# Lowest and highest value of `A` and the number of cells outside
-# `lower..upper`. A NaN fails both comparisons, so it counts as outside; the
-# extremes skip it.
+"""
+Lowest and highest value of `A` and the number of cells outside
+`lower..upper`. A NaN fails both comparisons, so it counts as outside; the
+extremes skip it.
+"""
 function _range(A::AbstractMatrix{Float32}, lower::Float32, upper::Float32)
     lo, hi, outside = Inf32, -Inf32, 0
     @turbo for i in eachindex(A)

@@ -171,8 +171,10 @@ function greb_data_dir(path::Union{Nothing,AbstractString}=nothing;
     return @datadep_str DATA_DEP_NAME
 end
 
-# The one question of a first download: everything (true), or the core pack only.
-# Without an answer (no stdin) it is the core pack, whose own prompt then follows.
+"""
+The one question of a first download: everything (true), or the core pack only.
+Without an answer (no stdin) it is the core pack, whose own prompt then follows.
+"""
 function _download_everything()
     lowercase(get(ENV, "DATADEPS_ALWAYS_ACCEPT", "")) == "true" && return true
     total = round(Int, sum(p.bytes for p in values(DATA_PACKS)) / 1e6)

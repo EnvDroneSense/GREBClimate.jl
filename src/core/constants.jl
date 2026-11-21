@@ -134,7 +134,7 @@ const xghost = xdim + 2 * nghost
 const polar_threshold = 2.5f5  # 250 km in meters
 const is_polar = [dxlat_grid[k] <= polar_threshold for k in 1:ydim]
 
-# Sub-steps per timestep for a row whose longest stable sub-step is `dt_max`
+"Sub-steps per timestep for a row whose longest stable sub-step is `dt_max`."
 _polar_substeps(dt_max) = max(1, round(Int, Δt_crcl / dt_max))
 
 function _polar_diff_step(k)
