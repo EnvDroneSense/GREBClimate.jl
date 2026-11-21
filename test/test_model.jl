@@ -10,6 +10,25 @@
     @test result.ctrl[1] isa MonthlyRecord
 end
 
+@testset "greb_model! refuses bathymetry in z_topo and a zero mixed-layer depth at the start" begin
+    cfg = preset(:full_model; corrections=NoCorrections())
+    # The error comes from the check, before any step runs
+    bathymetry = constant_fields(z_topo=-4000.0)
+    bathymetry.loaded = true
+    @test_throws "pressure weight" greb_model!(RunSpec(ctrl=0, scnr=0), cfg; fields=bathymetry)
+    shallow = constant_fields(z_topo=-1.0)
+    shallow.loaded = true
+    shallow.mld_clim[7, 9, 100] = 0.0f0
+    @test_throws "mixed-layer depth" greb_model!(RunSpec(ctrl=0, scnr=0), cfg; fields=shallow)
+    # The opt-in skips both checks
+    @test greb_model!(RunSpec(ctrl=0, scnr=0), cfg; fields=bathymetry, allow_uninitialized=true) !== nothing
+    # A land cell with no mixed layer is fine
+    land = constant_fields(z_topo=1.0)
+    land.loaded = true
+    land.mld_clim .= 0.0f0
+    @test greb_model!(RunSpec(ctrl=0, scnr=0), cfg; fields=land) !== nothing
+end
+
 @testset "qflux_correction! pulls Ts/To/q to climatology; Ta gets no correction" begin
     # All ocean, with a Ts climatology that varies from cell to cell
     fields = constant_fields(z_topo=-1.0)

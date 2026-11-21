@@ -50,6 +50,26 @@ function init_model!(fields::ClimateFields, r::ResolvedConfig)
     return (surf=surf, CO2_ctrl=CO2_ctrl)
 end
 
+"""
+    _check_run_fields(fields, p::Processes)
+
+Refuse fields the physics cannot use: a pressure weight above 1.001 (a
+`z_topo` that holds bathymetry, not a height near sea level) and a mixed-layer
+depth of 0 or less at an ocean cell of a run with an ocean. Run after `derive_fields!`.
+"""
+function _check_run_fields(fields::ClimateFields, p::Processes)
+    wmax = max(maximum(fields.wz_air), maximum(fields.wz_vapor))
+    wmax > 1.001f0 &&
+        error("z_topo gives a pressure weight of $wmax (above 1.001): the topography must be a height with ocean cells at 0 m or just below, not ocean depth. Pass allow_uninitialized=true to skip this check.")
+    if p.ocean !== :none
+        for k in 1:nstep_yr, j in 1:ydim, i in 1:xdim
+            is_land(fields.z_topo[i, j]) || fields.mld_clim[i, j, k] > 0.0f0 ||
+                error("mixed-layer depth $(fields.mld_clim[i, j, k]) m at ocean cell ($i, $j), step $k: it must be above 0. Pass allow_uninitialized=true to skip this check.")
+        end
+    end
+    return nothing
+end
+
 _add_boundary_anomaly!(::SurfaceForcing, fields::ClimateFields) = fields
 
 function _add_boundary_anomaly!(b::BoundaryAnomaly, fields::ClimateFields)
@@ -339,6 +359,7 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
         end
 
         ini = init_model!(fields, r)
+        allow_uninitialized || _check_run_fields(fields, config.processes)
         surf_ini, CO2_ctrl = ini.surf, ini.CO2_ctrl
 
         # Workspace and accumulator. `ws_a`/`ws_q` are separate `circulation!`
