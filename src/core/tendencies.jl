@@ -28,29 +28,44 @@ function tendencies!(CO2, Ts, Ta, To, q, fields::ClimateFields, state::ModelStat
         circulation!(ws_q.dq_crcl, q, z_vapor, fields, ws_q, slice, p)
     end
 
-    # Short-wave radiation -> albedo, SW flux
-    sw_out = SWradiation!(ws, Ts, fields, state, slice, p)
+    # If a stage throws, let both circulation tasks finish first: they write
+    # the workspaces, and a caller that catches the error may reuse them
+    local sw_out, lw_out, Q_sens, hy_out, do_out
+    try
+        # Short-wave radiation -> albedo, SW flux
+        sw_out = SWradiation!(ws, Ts, fields, state, slice, p)
 
-    # Long-wave radiation -> LW_surf, LW_up, LW_down, emissivity
-    lw_out = LWradiation!(ws, Ts, Ta, q, CO2, fields, slice, p)
+        # Long-wave radiation -> LW_surf, LW_up, LW_down, emissivity
+        lw_out = LWradiation!(ws, Ts, Ta, q, CO2, fields, slice, p)
 
-    # Sensible heat flux
-    Q_sens = ws.Q_sens
-    if p.atmosphere
-        @. Q_sens = ct_sens * (Ta - Ts)
-    else
-        fill!(Q_sens, 0.0f0)
-    end
+        # Sensible heat flux
+        Q_sens = ws.Q_sens
+        if p.atmosphere
+            @. Q_sens = ct_sens * (Ta - Ts)
+        else
+            fill!(Q_sens, 0.0f0)
+        end
 
-    # Hydrological cycle -> latent heat + evaporation/rain tendencies
-    hy_out = hydro!(ws, Ts, q, fields, slice, p, r.hydrology)
+        # Hydrological cycle -> latent heat + evaporation/rain tendencies
+        hy_out = hydro!(ws, Ts, q, fields, slice, p, r.hydrology)
 
-    # Deep ocean coupling
-    do_out = deep_ocean!(ws, Ts, To, fields, slice, p)
+        # Deep ocean coupling
+        do_out = deep_ocean!(ws, Ts, To, fields, slice, p)
 
-    if parallel
-        wait(t_a)
-        wait(t_q)
+        if parallel
+            wait(t_a)
+            wait(t_q)
+        end
+    catch
+        if parallel
+            for t in (t_a, t_q)
+                try
+                    wait(t)
+                catch
+                end
+            end
+        end
+        rethrow()
     end
 
     return (albedo=sw_out.albedo,

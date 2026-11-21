@@ -1,3 +1,7 @@
+@testset "the flux-correction path ignores how the directory is spelled" begin
+    @test GREBClimate._flux_file("data/x/../climatology/..") == GREBClimate._flux_file("data")
+end
+
 # JLD2 loading, dataset resolution, and converter/archive consistency.
 
 @testset "load_climatology: every file is read; a missing flux-corrections file or table is an error" begin

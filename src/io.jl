@@ -224,8 +224,9 @@ function load_co2_custom(path::AbstractString)
     return table
 end
 
-# The file of stored flux corrections in the dataset directory `dir`
-_flux_file(dir::AbstractString) = joinpath(String(dir), "climatology", "flux_corrections.jld2")
+# The file of stored flux corrections in the dataset directory `dir`; normalized so
+# `flux_source` matches however the directory is spelled
+_flux_file(dir::AbstractString) = normpath(joinpath(String(dir), "climatology", "flux_corrections.jld2"))
 
 """
     load_flux_corrections!(fields::ClimateFields, jld2_dir::AbstractString)
