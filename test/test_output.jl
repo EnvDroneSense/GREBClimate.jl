@@ -173,6 +173,13 @@ end
     @test isnan(s.Ta[40, 30])
 end
 
+@testset "lat_grid and lon_grid hold the cell centres" begin
+    @test length(lat_grid) == ydim && length(lon_grid) == xdim
+    @test (first(lat_grid), last(lat_grid)) == (-88.125f0, 88.125f0)
+    @test (first(lon_grid), last(lon_grid)) == (1.875f0, 358.125f0)
+    @test issorted(lat_grid; lt=<=) && issorted(lon_grid; lt=<=)
+end
+
 @testset "global_mean weights each row by the cosine of its latitude" begin
     @test global_mean(fill(3.5f0, X, Y)) ≈ 3.5
     # A field equal to the latitude weight: mean of cos^2 over mean of cos

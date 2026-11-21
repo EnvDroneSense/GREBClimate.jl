@@ -94,7 +94,18 @@ const emissivity_fit = Float32[9.0721, 106.7252, 61.5562, 0.0179, 0.0028,
 # ── Transport geometry [m, degrees] ───────────────────────────────
 const deg_grid = 2.0f0 * pi_f32 * 6.371f6 / 360.0f0
 const dyy_grid = dlat * deg_grid
+"""
+Latitudes of the grid cell centres [degrees north], south to north: a `Vector{Float32}`
+of length `ydim` (48), from -88.125 to 88.125. Row `j` of a field is at `lat_grid[j]`.
+"""
 const lat_grid = Float32[dlat * k - dlat / 2.0f0 - 90.0f0 for k in 1:ydim]
+
+"""
+Longitudes of the grid cell centres [degrees east], eastward from the prime meridian: a
+`Vector{Float32}` of length `xdim` (96), from 1.875 to 358.125. Column `i` of a field is at
+`lon_grid[i]`.
+"""
+const lon_grid = Float32[(i - 0.5f0) * dlon for i in 1:xdim]
 const dxlat_grid = Float32[dlon * deg_grid * cos(2.0f0 * pi_f32 / 360.0f0 * lat_grid[k]) for k in 1:ydim]
 
 # ── Diffusion coefficients ──────────────────────────────────────

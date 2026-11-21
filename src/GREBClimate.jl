@@ -34,6 +34,7 @@ export apply_co2_mask!, apply_surface_mask!, forcing
 export monthly_climatology, scenario_anomalies, ice_climatology, global_mean
 export greb_model!, run_ensemble
 export xdim, ydim, nstep_yr
+export lat_grid, lon_grid
 export step_of_year, day_of_year, month_of_step, decimal_year, ModelTime
 
 include("core/constants.jl")

@@ -3,7 +3,7 @@ _year_label(t::ModelTime) = t.phase === spinup ? "spin-up year $(year(t) - t.sta
 
 # The two cells of the annual summary line: label, longitude index, latitude index
 function _sample_cell(lon, lat)
-    i = argmin(abs.(((1:xdim) .- 0.5f0) .* dlon .- lon))
+    i = argmin(abs.(lon_grid .- lon))
     j = argmin(abs.(lat_grid .- lat))
     return ("$lon E $lat N", i, j)
 end
