@@ -11,7 +11,7 @@ The model runs many simulated years, so its kernels are written around that. The
 
 ## A change that must not alter results
 
-A refactor or an optimisation is checked with exact equality, not with tolerances. With the dataset present, save a snapshot on the commit before the change and compare after it, once at one thread and once at two:
+A refactor or an optimization is checked with exact equality, not with tolerances. With the dataset present, save a snapshot on the commit before the change and compare after it, once at one thread and once at two:
 
 ```bash
 julia --project=. -t 1 tools/validation/bit_identity.jl save snap_t1.jld2
@@ -39,6 +39,6 @@ julia --project=docs -e 'using Pkg; Pkg.develop(path="."); Pkg.instantiate()'
 julia --project=docs docs/make.jl
 ```
 
-Docstring examples in ```` ```jldoctest ```` blocks run during the docs build, and a mismatch fails the build. If you change the behaviour or signature of an exported function, check whether an example needs updating. `julia .claude/skills/docs-check/check_docs.jl` checks links, version claims and exported names in seconds.
+Docstring examples in ```` ```jldoctest ```` blocks run during the docs build, and a mismatch fails the build. If you change the behavior or signature of an exported function, check whether an example needs updating. `julia .claude/skills/docs-check/check_docs.jl` checks links, version claims and exported names in seconds.
 
 The site has two live versions: [stable](https://EnvDroneSense.github.io/GREBClimate.jl/stable/) is the latest release, built when the release tag is created, and [dev](https://EnvDroneSense.github.io/GREBClimate.jl/dev/) follows the `dev` branch. Pull requests build the docs and run the doctests but deploy nothing.

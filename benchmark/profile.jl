@@ -333,7 +333,7 @@ end
 
 "The configuration and fields every mode runs. One year is run first so compilation is not profiled; `greb_model!` restores `fields`, so they are reused."
 function workload(jld2_dir::AbstractString)
-    isdir(jld2_dir) || error("JLD2 data directory not found: $jld2_dir. Set GREB_DATA or pass a path.")
+    check_data_dir(jld2_dir)
     cfg = preset(:full_model; corrections=Stored())
     fields = load_climatology(jld2_dir; dataset=:ncep)
     without_logs() do
@@ -472,7 +472,7 @@ end
 "Check one model step for runtime dispatch with JET (static, nothing is timed); returns the report directory."
 function profile_dispatch(jld2_dir::AbstractString; out_dir=nothing)
     JET = load_optional("JET", "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b")   # before the set-up, so a missing package fails early
-    isdir(jld2_dir) || error("JLD2 data directory not found: $jld2_dir. Set GREB_DATA or pass a path.")
+    check_data_dir(jld2_dir)
     (; fields, r, CO2, state, ws, Ts, Ta, To, q) = stage_inputs(jld2_dir, preset(:full_model))
     acc = GREBClimate.MonthlyAccumulator()
     records = GREBClimate.MonthlyRecord[]

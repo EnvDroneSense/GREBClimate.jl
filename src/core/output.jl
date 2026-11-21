@@ -2,15 +2,20 @@
 _year_label(t::ModelTime) = t.phase === spinup ? "spin-up year $(year(t) - t.start_year + 1)" : string(year(t))
 
 # The two cells of the annual summary line: label, longitude index, latitude index
-const _SAMPLE_CELLS = (("178 E 9 N", 48, 27), ("58 E 51 N", 16, 38))
+function _sample_cell(lon, lat)
+    i = argmin(abs.(lon_grid .- lon))
+    j = argmin(abs.(lat_grid .- lat))
+    return ("$lon E $lat N", i, j)
+end
+const _SAMPLE_CELLS = (_sample_cell(178, 9), _sample_cell(58, 51))
 
 """
     diagnostics!(t::ModelTime, surf::SurfaceState, state)
 
-Accumulate the current timestep into `state`'s annual-mean buffers; at the
-last timestep of the year, averages them, logs the annual summary line
+Accumulate the current timestep into `state`'s annual-mean buffers. At the
+last timestep of the year, average them, log the annual summary line
 (the area-weighted global mean and two sample cells, in °C) with `@info`, and
-resets the accumulators for the next year.
+reset the accumulators for the next year.
 """
 function diagnostics!(t::ModelTime, surf::SurfaceState, state::ModelState)
     # Accumulate
@@ -42,9 +47,9 @@ end
 """
     output!(t::ModelTime, surf::SurfaceState, tend, ws, output_buf, times, acc)
 
-Accumulate the current timestep into `acc`; on the last timestep of a month,
-pushes the monthly-mean [`MonthlyRecord`](@ref) onto `output_buf` and its
-[`RecordTime`](@ref) onto `times`, and resets `acc`. `tend` is the
+Accumulate the current timestep into `acc`. On the last timestep of a month,
+push the monthly-mean [`MonthlyRecord`](@ref) onto `output_buf` and its
+[`RecordTime`](@ref) onto `times`, and reset `acc`. `tend` is the
 `NamedTuple` [`tendencies!`](@ref) returns; `ws.precip`/`evap`/
 `qcrcl` hold this step's converted precipitation/evaporation/moisture-
 circulation output.
@@ -67,9 +72,9 @@ end
 
 One full model timestep at time `t`: computes [`tendencies!`](@ref),
 integrates `Ts`/`Ta`/`To`/`q` forward with flux corrections applied, runs
-[`seaice!`](@ref), then dispatches to [`output!`](@ref) and
-[`diagnostics!`](@ref). `ws_a`/`ws_q` are forwarded to
-[`tendencies!`](@ref) - see its docstring for the opt-in threading they
+[`seaice!`](@ref), then calls [`output!`](@ref) and
+[`diagnostics!`](@ref). It forwards `ws_a`/`ws_q` to
+[`tendencies!`](@ref), whose docstring describes the opt-in threading they
 enable. `observer` is called before and after the update (see
 [`greb_model!`](@ref)).
 """

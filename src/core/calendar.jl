@@ -48,7 +48,7 @@ julia> day_of_year(1), day_of_year(2), day_of_year(3)
 """
 day_of_year(it::Integer) = mod((it - 1) ÷ steps_per_day, days_per_year) + 1
 
-"Month (1-12) that day `day` of the year (1-365) falls in."
+"Month (1-12) of day `day` of the year (1-365)."
 function month_of_day(day::Integer)
     month = 1
     while day > last_day_of_month[month]
@@ -140,7 +140,7 @@ is_year_end(t::ModelTime) = is_year_end(t.step)
 "Month (1-12) of `t`."
 month(t::ModelTime) = month_of_step(t.step)
 
-"Calendar year of `t`. Any whole number: 0 and negative years count on as the others do."
+"Calendar year of `t`. Any whole number: year 0 and negative years work like other years."
 year(t::ModelTime) = t.start_year + (t.step - 1) ÷ nstep_yr
 
 """

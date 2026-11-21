@@ -169,6 +169,7 @@ report, `Profile.Allocs.BufferType` is the data buffer of an array.
 |:-----|:-----|
 | `run_benchmarks.jl` | The modes above |
 | `compare.jl` | `compare_kernels`: the interleaved comparison |
+| `compare_step_parts.jl` | Same-process timing of `forcing` and of `seaice!` against a j-outer loop copy: `julia --project=benchmark -t 2,0 benchmark/compare_step_parts.jl [jld2_dir] [--seconds=S]` |
 | `counters.jl` | Hardware counters through LinuxPerf; loaded only by `--counters` |
 | `profile.jl` | The sampling profile above |
 | `common.jl` | Argument and flag parsing, dataset lookup, the inputs of a single stage, silenced logging, machine state and result records, shared with `profile.jl` and the Fortran comparison. Needs no Chairmarks |

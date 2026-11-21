@@ -36,4 +36,4 @@ Add one only if it guards public-API behaviour or a physics or budget invariant,
 ## Guards that need upkeep
 
 - `test_invariants.jl` builds `all_kernels` from `names(GREBClimate; all=true)`: every `!` function in a kernel file, exported or not, needs a row in the `kernels` allocation table (equality-checked). `_` workers are skipped and covered through their wrapper; a new `_` worker with no wrapper is never checked, so give it one. The `signatures` table has no such check.
-- `test_enzyme.jl` runs only where Enzyme is found (default environment or a shared `enzyme` environment); elsewhere, CI included, it skips.
+- `test_enzyme.jl` runs only where Enzyme is found (default environment or a shared `enzyme` environment); elsewhere it skips. The main CI skips it; the `Optional tests` workflow runs it, and `test_dataset_tools.jl`, when `ext/` or `tools/dataset/` change, weekly, or on demand.

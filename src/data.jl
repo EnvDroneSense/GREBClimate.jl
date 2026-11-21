@@ -52,9 +52,9 @@ const _PACK_CONTENT = (
     core="the static fields, the NCEP climatology, the fields common to both datasets, the flux corrections, " *
          "the solar radiation and the CO2 tables",
     era="the ERA-Interim climatology (dataset = :era)",
-    cmip5="the CMIP5 RCP8.5 anomalies (the :rcp85 experiment)",
+    cmip5="the CMIP5 RCP8.5 anomalies (the :rcp85_boundary experiment)",
     enso="the El Nino and La Nina anomalies (the :elnino and :lanina experiments)",
-    solar="the paleo and orbital solar tables (the :paleo_231kyr, :eccentricity and :obliquity experiments)"
+    solar="the paleo and orbital solar tables (the :paleo_231kyr, :paleo_solar_modern_co2, :eccentricity and :obliquity experiments)"
 )
 
 function _pack_message(pack::Symbol)
@@ -87,8 +87,8 @@ end
 const _OPTIONAL_PACK_FILES = (
     era=["climatology/$name.jld2" for name in values(_CLIMATOLOGY_FILES.era) if !startswith(name, "ncep.")],
     cmip5=["climatology/$name.jld2" for name in values(_boundary_anomaly_files(:cmip5_rcp85))],
-    enso=["climatology/$name.jld2" for source in (:elnino, :lanina) for name in values(_boundary_anomaly_files(source))],
-    solar=["solar_scenarios/solar_$kind.jld2" for kind in (:paleo, :eccentricity, :obliquity)]
+    enso=["climatology/$name.jld2" for source in _BOUNDARY_ANOMALY_SOURCES if source !== :cmip5_rcp85 for name in values(_boundary_anomaly_files(source))],
+    solar=["solar_scenarios/solar_$kind.jld2" for kind in _SOLAR_TABLE_KINDS]
 )
 
 # The optional pack that holds the file `name` (with or without ".jld2"), or `nothing`
@@ -136,16 +136,15 @@ result = greb_model!(RunSpec(), preset(:co2_double); jld2_dir = dir, fields = fi
 """
 function greb_data_dir(path::Union{Nothing,AbstractString}=nothing;
         allow_download::Bool=true, packs::Symbol=:all)
-    packs in (:all, :core) ||
-        throw(ArgumentError("packs must be :all or :core, got :$packs"))
+    _check_option(:packs, packs, (:all, :core))
     if path !== nothing && !isempty(path)
-        isdir(path) || error("GREB dataset directory not found: $path")
+        isdir(path) || throw(ArgumentError("GREB dataset directory not found: $path"))
         return String(path)
     end
 
     env = get(ENV, "GREB_DATA", "")
     if !isempty(env)
-        isdir(env) || error("GREB_DATA points at a directory that does not exist: $env")
+        isdir(env) || throw(ArgumentError("GREB_DATA points at a directory that does not exist: $env"))
         return env
     end
 
@@ -171,8 +170,10 @@ function greb_data_dir(path::Union{Nothing,AbstractString}=nothing;
     return @datadep_str DATA_DEP_NAME
 end
 
-# The one question of a first download: everything (true), or the core pack only.
-# Without an answer (no stdin) it is the core pack, whose own prompt then follows.
+"""
+The one question of a first download: everything (true), or the core pack only.
+Without an answer (no stdin) it is the core pack, whose own prompt then follows.
+"""
 function _download_everything()
     lowercase(get(ENV, "DATADEPS_ALWAYS_ACCEPT", "")) == "true" && return true
     total = round(Int, sum(p.bytes for p in values(DATA_PACKS)) / 1e6)
@@ -190,21 +191,19 @@ end
 """
     download_greb_pack(pack::Symbol; dir = greb_data_dir()) -> String
 
-Add dataset pack `pack` (`:era`, `:cmip5`, `:enso` or `:solar`, or `:all`) to the dataset directory `dir` 
-and return `dir`. Downloadeds via DataDeps on first use, copies files into `dir`; skips files already present. 
-An unknown pack is an `ArgumentError`.
+Add dataset pack `pack` (`:era`, `:cmip5`, `:enso` or `:solar`, or `:all`) to the dataset directory `dir`
+and return `dir`. The first call downloads the pack with DataDeps. It copies the files into `dir` and
+skips files that are already there. An unknown pack is an `ArgumentError`.
 
 | Pack | Adds |
 |:-----|:-----|
-| `:era` | ERA-Interim climatology ()`load_climatology(dir; dataset = :era)`) |
-| `:cmip5` | CMIP5 RCP8.5 anomalies (`:rcp85`) |
+| `:era` | ERA-Interim climatology (`load_climatology(dir; dataset = :era)`) |
+| `:cmip5` | CMIP5 RCP8.5 anomalies (`:cmip5_rcp85`) |
 | `:enso` | El Nino and La Nina anomalies (`:elnino`, `:lanina`) |
-| `:solar` | paleo/orbital solar tables (`:paleo_231kyr`, `:eccentricity`, `:obliquity`) |
+| `:solar` | paleo/orbital solar tables (`:paleo`, `:eccentricity`, `:obliquity`) |
 """
 function download_greb_pack(pack::Symbol; dir::Union{Nothing,AbstractString}=nothing)
-    pack === :all || pack in _OPTIONAL_PACKS ||
-        throw(ArgumentError("unknown dataset pack :$pack; the optional packs are " *
-                            join(repr.(_OPTIONAL_PACKS), ", ") * ", or :all"))
+    _check_option(:pack, pack, (_OPTIONAL_PACKS..., :all))
     target = greb_data_dir(dir; packs=:core)
     if pack === :all
         foreach(p -> download_greb_pack(p; dir=target), _OPTIONAL_PACKS)
@@ -219,7 +218,8 @@ function download_greb_pack(pack::Symbol; dir::Union{Nothing,AbstractString}=not
         dest = joinpath(target, file)
         isfile(dest) && continue
         isfile(joinpath(source, file)) ||
-            error("the downloaded pack :$pack lacks $file (looked in $source)")
+            error("the downloaded pack :$pack lacks $file (looked in $source). " *
+                  "Remove that folder and call download_greb_pack(:$pack) again")
         mkpath(dirname(dest))
         cp(joinpath(source, file), dest)
     end
@@ -231,14 +231,15 @@ end
 
 Path of the already-downloaded dataset, or `nothing` if it is absent. Looks
 only, never downloads: the public DataDeps calls fetch missing data, so this
-uses the internal `DataDeps.try_determine_load_path`, and treats any error
-from it as "not cached".
+uses the internal `DataDeps.try_determine_load_path`. An error from it counts
+as "not cached" and logs one warning, so a renamed DataDeps function is visible.
 """
 function _cached_datadep_path()
     try
         path = DataDeps.try_determine_load_path(DATA_DEP_NAME, @__FILE__)
         return (path !== nothing && isdir(path)) ? String(path) : nothing
-    catch
+    catch err
+        @warn "Could not look for a cached dataset: DataDeps.try_determine_load_path failed" exception=err maxlog=1
         return nothing
     end
 end

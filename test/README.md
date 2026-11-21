@@ -27,10 +27,12 @@ A subset run proves only the files it ran.
 | Physics kernels | `test_physics`, `test_invariants`, `test_budgets` | `src/physics/`, `src/core/tendencies.jl`, `budgets.jl` |
 | Whole model | `test_model`, `test_ensemble`, `test_golden`, `test_threading` | `src/core/model.jl`, `ensemble.jl` |
 | Package checks | `test_aqua`, `test_enzyme` | whole package, `ext/` |
-| Maintainer tools | `test_experiment_tools`, `test_dataset_tools` (run by name only) | `tools/` |
+| Maintainer tools | `test_dataset_tools` (run by name only) | `tools/` |
 | The test setup itself | `test_selection` | `support/selection.jl` |
 
 The exact source-to-test map is `SOURCE_MAP` in `support/selection.jl`.
+
+The workflow `.github/workflows/optional-tests.yml` runs `test_enzyme` (with the Enzyme dependency) and `test_dataset_tools`. It starts when `ext/`, `tools/dataset/`, `src/io.jl` or `src/data.jl` change, every week, and by hand. The main CI runs neither.
 
 ## Support
 

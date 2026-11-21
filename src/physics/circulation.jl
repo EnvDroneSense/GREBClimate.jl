@@ -79,7 +79,7 @@ end
 """
     diffusion!(ws::ModelWorkspace, T1, h_scl, fields::ClimateFields)
 
-Meridional + zonal diffusion of `T1` (temperature or humidity), writing the
+Meridional and zonal diffusion of `T1` (temperature or humidity), writing the
 tendency into `ws.dX_diff`. `h_scl` (`z_air` or `z_vapor`) selects the
 topographic weighting field.
 """
@@ -91,8 +91,10 @@ function diffusion!(ws::ModelWorkspace, T1, h_scl, fields::ClimateFields)
     return nothing
 end
 
-# Core kernel. `Tp`/`wzp` are ghosted with valid ghost rows; the tendency lands in
-# the plain `(xdim, ydim)` `ws.dX_diff`.
+"""
+Kernel of `diffusion!`. `Tp`/`wzp` are ghosted with valid ghost rows; the tendency lands in
+the plain `(xdim, ydim)` `ws.dX_diff`.
+"""
 function _diffusion!(ws::ModelWorkspace, Tp::Matrix{Float32}, wzp::Matrix{Float32})
     dX_diff = ws.dX_diff
 
@@ -219,7 +221,7 @@ end
 """
     advection!(ws::ModelWorkspace, T1, h_scl, fields::ClimateFields, slice, p::Processes)
 
-Meridional + zonal advection of `T1` (temperature or humidity), writing the
+Meridional and zonal advection of `T1` (temperature or humidity), writing the
 tendency into `ws.dX_adv`. Gated by `p.heat_advection`/`p.vapor_advection`
 depending on `h_scl`.
 """
@@ -236,7 +238,7 @@ function advection!(ws::ModelWorkspace, T1, h_scl, fields::ClimateFields, slice:
     return nothing
 end
 
-# Core kernel. `Tp`/`wzp` are ghosted; the switch check has already run.
+"Kernel of `advection!`. `Tp`/`wzp` are ghosted; the switch check has already run."
 function _advection!(ws::ModelWorkspace, Tp::Matrix{Float32}, wzp::Matrix{Float32}, fields::ClimateFields, slice::Int)
     dX_adv = ws.dX_adv
 

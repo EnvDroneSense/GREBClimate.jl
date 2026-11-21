@@ -13,6 +13,12 @@ function default_data_dir()
     return dir
 end
 
+"Stops unless `dir` is a directory; returns it. The dataset directory of a script comes through here."
+function check_data_dir(dir::AbstractString)
+    isdir(dir) || error("dataset directory not found: $dir. Set GREB_DATA or pass a path.")
+    return String(dir)
+end
+
 "Parse an integer of at least `min` (default 0), e.g. for `--ctrl=10`."
 function parse_nonneg_int(name::AbstractString, s::AbstractString; min::Int=0)
     n = tryparse(Int, s)

@@ -19,7 +19,7 @@ function seaice!(fields::ClimateFields, Ts0, slice::Int, p::Processes)
 
     if p.ice_albedo
         # Compute ice‑dependent heat capacity for ocean points
-        @inbounds @fastmath for i in 1:xdim, j in 1:ydim
+        @inbounds @fastmath for j in 1:ydim, i in 1:xdim
 
             is_ocean = !@is_land(z_topo[i, j])
             T = Ts0[i, j]
@@ -37,7 +37,7 @@ function seaice!(fields::ClimateFields, Ts0, slice::Int, p::Processes)
         end
     else
         # Without the ice-albedo feedback the ocean keeps its open-water capacity
-        @inbounds @fastmath for i in 1:xdim, j in 1:ydim
+        @inbounds @fastmath for j in 1:ydim, i in 1:xdim
 
             cap_surf[i, j] = ifelse(@is_land(z_topo[i, j]), cap_land, cap_ocean * mld[i, j])
         end
@@ -77,7 +77,7 @@ function deep_ocean!(ws::ModelWorkspace, Ts, To, fields::ClimateFields, slice::I
     mld_prev = clim_slice(fields.mld_clim, previous_slice(slice))
 
     # ── Entrainment & detrainment & turbulent mixing ──────
-    @turbo for i in 1:xdim, j in 1:ydim
+    @turbo for j in 1:ydim, i in 1:xdim
 
         is_ocean = !@is_land(z_topo[i, j])
         # Entrainment/detrainment require Ts >= To_ice2

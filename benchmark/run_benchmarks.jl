@@ -180,8 +180,7 @@ function main(args::Vector{String})
     length(rest) <= (_MODE_REPS[sym] ? 2 : 1) ||
         error("the $mode mode takes ", _MODE_REPS[sym] ? "[jld2_dir] [reps]" : "[jld2_dir] and no reps argument", ", got: ", join(rest, " "))
 
-    jld2_dir = !isempty(rest) ? rest[1] : default_data_dir()
-    isdir(jld2_dir) || error("dataset directory not found: $jld2_dir. Set GREB_DATA or pass a path.")
+    jld2_dir = check_data_dir(!isempty(rest) ? rest[1] : default_data_dir())
     reps = length(rest) >= 2 ? parse_reps(rest[2]) : nothing
 
     if mode == "year"

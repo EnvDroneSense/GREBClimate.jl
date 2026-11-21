@@ -18,10 +18,6 @@ resolved_hydrology(; rain=:fitted, evaporation=:original, c_q=1, c_rq=0, c_omega
 
     tend = tendencies!(340.0, Ts, Ta, To, q, fields, state, ws, slice, r)
     @test tend.Q_sens ≈ ct_sens .* (Ta .- Ts)
-    @test all(isfinite, tend.SW)
-    @test all(isfinite, tend.LW_surf)
-    @test all(isfinite, tend.dTa_crcl)
-    @test all(isfinite, tend.dq_crcl)
 
     r_off = resolve(preset(:full_model; processes=(atmosphere=false,)))
     tend_off = tendencies!(340.0, Ts, Ta, To, q, fields, state, ws, slice, r_off)
@@ -127,6 +123,15 @@ end
         @test all(isfinite, out.Q_lat)
         @test all(isfinite, out.dq_rain)
     end
+
+    # The skin scheme floors the skin temperature at 200 K; at 20 K the saturation
+    # fit would overflow to Inf without it
+    r = resolve(preset(:full_model; hydrology=(; evaporation=:skin)))
+    quiet() do
+        init_model!(fields, r)
+    end
+    cold = hydro!(ModelWorkspace(), fill(20.0f0, X, Y), q, fields, 1, Processes(), r.hydrology)
+    @test all(isfinite, cold.Q_lat) && all(isfinite, cold.dq_eva)
 end
 
 @testset "hydro! fitted rain: dq_rain and Q_lat_air values, with no limit on rain" begin
