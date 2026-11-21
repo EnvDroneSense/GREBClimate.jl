@@ -61,6 +61,10 @@ Inf run, a late error, or no error.
   workspaces.
 - `fields.flux_source` is the same for every spelling of the dataset
   directory.
+- `seaice!` and `deep_ocean!` loop over the latitude index in the outer loop, as
+  the arrays are stored. The results do not change. `seaice!` runs about 3.5 times
+  faster in isolation, about 2 % of a year, and the loop no longer depends on
+  `@turbo` to reorder it.
 
 ### Documentation
 
