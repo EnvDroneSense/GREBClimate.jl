@@ -90,6 +90,7 @@ function write_solar_scenarios(dir; sentinel=999.0)
             file["data"] = fill(sentinel, 1, Y, N)
             file["dim_names"] = ["index", "lat", "time"]
             file["coords"] = Dict(1 => [0.0])
+            file["dataset_version"] = GREBClimate.DATASET_VERSION
         end
     end
     return dir

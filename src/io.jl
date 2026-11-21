@@ -84,7 +84,7 @@ function _load_fields!(fields::ClimateFields, dir::AbstractString, files::NamedT
     for (field, name) in pairs(files)
         path = joinpath(dir, name * ".jld2")
         land = field in _OCEAN_ONLY_FIELDS ? is_land.(fields.z_topo) : nothing
-        _fill_checked!(getfield(fields, field), read_field(path).data, path; nan_ok=land)
+        _fill_checked!(getfield(fields, field), _read_checked(path).data, path; nan_ok=land)
     end
 end
 
@@ -104,11 +104,21 @@ Throw unless the open dataset file `file` has the version these loaders read
 (a file without the entry is from version 1).
 """
 function _check_version(file, filepath::AbstractString)
-    version = haskey(file, "dataset_version") ? Int(file["dataset_version"]) : 1
+    _check_version(haskey(file, "dataset_version") ? Int(file["dataset_version"]) : 1, filepath)
+end
+
+function _check_version(version::Integer, filepath::AbstractString)
     version == DATASET_VERSION ||
         throw(ArgumentError("$filepath is from dataset version $version; GREBClimate reads $DATASET_VERSION. " *
                             "Download the current dataset with greb_data_dir()"))
     return nothing
+end
+
+# `read_field` for the loaders: also refuses a file of another dataset version
+function _read_checked(filepath::AbstractString)
+    result = read_field(filepath)
+    _check_version(Int(get(result.info, "dataset_version", 1)), filepath)
+    return result
 end
 
 """
@@ -155,7 +165,7 @@ into `fields.sw_solar` for the scenario run.
 function load_solar_forcing(jld2_dir::AbstractString, forcing_type::Symbol, index::Int=0)
     forcing_type in (:paleo, :eccentricity, :obliquity) ||
         throw(ArgumentError("unknown forcing type: $forcing_type. Use :paleo, :eccentricity, or :obliquity"))
-    result = read_field(joinpath(jld2_dir, "solar_scenarios", "solar_$forcing_type.jld2"))
+    result = _read_checked(joinpath(jld2_dir, "solar_scenarios", "solar_$forcing_type.jld2"))
     forcing_type === :paleo && return result.data
     values = Int.(result.coords[1])
     pos = findfirst(==(index), values)
@@ -250,6 +260,7 @@ function load_flux_corrections!(fields::ClimateFields, jld2_dir::AbstractString)
     filepath = _flux_file(jld2_dir)
     isfile(filepath) || throw(ArgumentError("flux corrections file not found: $filepath"))
     @lock _JLD2_LOCK jldopen(filepath, "r") do file
+        _check_version(file, filepath)
         for (field, key) in pairs(_FLUX_CORRECTION_KEYS)
             haskey(file, key) || throw(ArgumentError("$key not found in $filepath"))
             land = field === :To_flux_correction ? is_land.(fields.z_topo) : nothing
@@ -282,7 +293,7 @@ function load_boundary_anomaly!(fields::ClimateFields, jld2_dir::AbstractString,
     anomaly = something(fields.boundary_anomaly, map(_ -> zeros(Float32, xdim, ydim, nstep_yr), files))
     for (name, file) in pairs(files)
         path = joinpath(jld2_dir, "climatology", file * ".jld2")
-        _fill_checked!(anomaly[name], read_field(path).data, path)
+        _fill_checked!(anomaly[name], _read_checked(path).data, path)
     end
     fields.boundary_anomaly = anomaly
     fields.boundary_anomaly_source = (String(jld2_dir), source)
@@ -300,7 +311,7 @@ rain-regression *coefficients* (see [`Hydrology`](@ref)).
 
 Every file must be there: a missing one is an `ArgumentError`, and the files of
 `dataset = :era` are in the optional pack `:era` (see [`download_greb_pack`](@ref)).
-A dataset of another format version is an `ArgumentError` too. `corrections = false`
+A file of another dataset format version is an `ArgumentError` too. `corrections = false`
 leaves out the stored flux corrections (`climatology/flux_corrections.jld2`),
 for a dataset that has none: the three correction arrays stay zero, and a run
 computes its own with [`SpinUp`](@ref) or runs without, with
@@ -313,12 +324,6 @@ function load_climatology(jld2_dir::AbstractString; dataset::Symbol=:ncep, corre
 
     haskey(_CLIMATOLOGY_FILES, dataset) ||
         throw(ArgumentError("unknown dataset :$dataset; use one of $(join(repr.(keys(_CLIMATOLOGY_FILES)), ", "))"))
-
-    topography_path = joinpath(jld2_dir, "static", _STATIC_FILES.z_topo * ".jld2")
-    isfile(topography_path) || throw(ArgumentError(_missing_file_message(topography_path)))
-    @lock _JLD2_LOCK jldopen(topography_path, "r") do file
-        _check_version(file, topography_path)
-    end
 
     @info "Loading static fields"
     _load_fields!(fields, joinpath(jld2_dir, "static"), _STATIC_FILES)
@@ -333,7 +338,7 @@ function load_climatology(jld2_dir::AbstractString; dataset::Symbol=:ncep, corre
     # Solar radiation (special: lat × time)
     @info "Loading the solar radiation table"
     solar_path = joinpath(jld2_dir, "solar", _SOLAR_FILE * ".jld2")
-    solar_result = read_field(solar_path)
+    solar_result = _read_checked(solar_path)
     _fill_checked!(fields.sw_solar, solar_result.data, solar_path)
 
     if corrections
