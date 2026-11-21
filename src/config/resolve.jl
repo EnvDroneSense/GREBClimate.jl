@@ -69,8 +69,7 @@ end
 
 _co2_table(::CO2Path, jld2_dir) = Dict{Int,Float32}()
 # The dataset tables need a directory; without one the loader would send the user to a download
-_need_dir(what, jld2_dir) =
-    isempty(jld2_dir) && throw(ArgumentError("$what reads a dataset file: pass jld2_dir"))
+_need_dir(what, jld2_dir) = isempty(jld2_dir) && throw(ArgumentError("$what reads a dataset file: pass jld2_dir"))
 
 function _co2_table(c::CO2Table, jld2_dir)
     _need_dir("CO2Table(:$(c.key))", jld2_dir)
