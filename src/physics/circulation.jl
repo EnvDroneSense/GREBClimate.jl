@@ -79,7 +79,7 @@ end
 """
     diffusion!(ws::ModelWorkspace, T1, h_scl, fields::ClimateFields)
 
-Meridional + zonal diffusion of `T1` (temperature or humidity), writing the
+Meridional and zonal diffusion of `T1` (temperature or humidity), writing the
 tendency into `ws.dX_diff`. `h_scl` (`z_air` or `z_vapor`) selects the
 topographic weighting field.
 """
@@ -219,7 +219,7 @@ end
 """
     advection!(ws::ModelWorkspace, T1, h_scl, fields::ClimateFields, slice, p::Processes)
 
-Meridional + zonal advection of `T1` (temperature or humidity), writing the
+Meridional and zonal advection of `T1` (temperature or humidity), writing the
 tendency into `ws.dX_adv`. Gated by `p.heat_advection`/`p.vapor_advection`
 depending on `h_scl`.
 """

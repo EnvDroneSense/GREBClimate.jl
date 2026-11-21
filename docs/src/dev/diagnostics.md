@@ -1,6 +1,6 @@
 # Diagnostics
 
-`tools/diagnostics/budget.jl` checks the model's bookkeeping. For one preset it runs a control and a scenario phase with an observer attached and reports, per phase, whether each store changes by the sum of its flows, how often a limiter held a cell, and the global-mean flows. It needs the local dataset.
+`tools/diagnostics/budget.jl` checks the model's bookkeeping. For one preset it runs a control and a scenario phase with an observer attached. It reports, per phase, whether each store changes by the sum of its flows, how often a limiter held a cell, and the global-mean flows. It needs the local dataset.
 
 ```bash
 julia --project=. -t 2,0 tools/diagnostics/budget.jl [preset] [years]

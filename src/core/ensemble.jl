@@ -26,7 +26,7 @@ end
 | `kwargs` | Passed on to every `greb_model!` call, for example `allow_uninitialized`. An `observer` would be shared by all members and called from several tasks at once |
 
 Start Julia with several threads (`-t 8,0`) for the members to run in
-parallel; the gain depends on the machine. Things to keep in mind:
+parallel. The gain depends on the machine. Keep in mind:
 
 - A member whose physics differs from the stored flux corrections needs its
   own [`SpinUp`](@ref): the stored ones fit the configuration they were

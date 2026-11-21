@@ -280,7 +280,7 @@ end
 """
     load_climatology(jld2_dir::AbstractString; dataset::Symbol=:ncep, corrections::Bool=true)
 
-Load all GREB input data from JLD2 formatted files, returning a fresh
+Load all GREB input data from the JLD2 files and return a new
 [`ClimateFields`](@ref). `dataset` (`:ncep`/`:era`) selects which
 climatology *files* to read, and any other value is an `ArgumentError`; this
 is independent of `Hydrology.rain_fit`, which only selects the

@@ -35,8 +35,8 @@ GREB is a conceptual climate model that simulates the global energy balance on a
 - **Deconstruction experiments**: switch individual feedback processes off to isolate their role in the mean climate or the 2×CO₂ response ([switches](https://EnvDroneSense.github.io/GREBClimate.jl/stable/configuration/))
 - **Two climatologies**: NCEP and ERA-Interim
 - **Ensembles**: run many configurations side by side with `run_ensemble`, each member identical to its own single run
-- **Fast**: SIMD-vectorised physics, and the temperature and humidity transport run concurrently with `julia -t 2,0`
-- **Enzyme support (optional)**: the radiation, hydrology and sea-ice kernels use plain loops so that [Enzyme](https://github.com/EnzymeAD/Enzyme.jl) can differentiate them; the derivative rules for the fast `log`/`exp` load only when Enzyme is loaded
+- **Fast**: SIMD-vectorized physics. The temperature and humidity transport run concurrently with `julia -t 2,0`
+- **Enzyme support (optional)**: the radiation, hydrology and sea-ice kernels use plain loops so that [Enzyme](https://github.com/EnzymeAD/Enzyme.jl) can differentiate them. The derivative rules for the fast `log`/`exp` load only when Enzyme is loaded
 - **Plots and notebook**: maps, time series, seasonal cycles, zonal means, Hovmöller diagrams, run comparisons, animations and building blocks for your own plots ([guide](https://EnvDroneSense.github.io/GREBClimate.jl/stable/viz/))
 
 ## 🚀 Quick Start
@@ -103,7 +103,7 @@ A run has three phases, in years:
 
 `result.ctrl` and `result.scnr` are vectors of monthly means, each a `NamedTuple` of 96×48 fields (`Ts, Ta, To, q, albedo, ice, precip, evap, qcrcl, sw, lw, qlat, qsens, olr, lwdown`). `result.scnr` is an **anomaly** against the control's final year, except for the orbital experiments and runs with `ctrl=0`. `global_mean(rec.Ts)` gives an area-weighted global mean, and `run_ensemble` runs a list of configurations side by side.
 
-The [Tutorial](https://EnvDroneSense.github.io/GREBClimate.jl/stable/tutorial/) covers configuration switches, experiment keywords, reading the results, ensembles and run checks. Two scripts run the steps: [`examples/quickstart.jl`](examples/quickstart.jl), and [`examples/feedback_deconstruction.jl`](examples/feedback_deconstruction.jl), which asks which processes carry the warming of a doubled CO2. The [Examples](https://EnvDroneSense.github.io/GREBClimate.jl/stable/examples/) page shows their output.
+The [Tutorial](https://EnvDroneSense.github.io/GREBClimate.jl/stable/tutorial/) covers configuration switches, experiment keywords, reading the results, ensembles and run checks. Two scripts show the steps: [`examples/quickstart.jl`](examples/quickstart.jl) and [`examples/feedback_deconstruction.jl`](examples/feedback_deconstruction.jl). The second script asks which processes carry the warming of a doubled CO2. The [Examples](https://EnvDroneSense.github.io/GREBClimate.jl/stable/examples/) page shows their output.
 
 ## 🔬 Model Components
 

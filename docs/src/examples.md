@@ -1,6 +1,6 @@
 # Examples
 
-Two scripts in `examples/` run the steps of the [Tutorial](tutorial.md) end to end. Run each from the repository root. Both read the dataset the way [`greb_data_dir`](@ref) does, and take an optional dataset directory as the last argument.
+Two scripts in `examples/` show the steps of the [Tutorial](tutorial.md) in full. Run each from the repository root. Both read the dataset the way [`greb_data_dir`](@ref) does, and take an optional dataset directory as the last argument.
 
 | Script | Question | Command |
 |:-------|:---------|:--------|

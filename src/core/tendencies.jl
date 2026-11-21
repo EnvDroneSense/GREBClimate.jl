@@ -2,8 +2,8 @@
     tendencies!(CO2, Ts, Ta, To, q, fields, state, ws, slice, r::ResolvedConfig; ws_a=ws, ws_q=ws)
 
 Run one timestep's physics and return a named tuple of the fluxes and
-tendencies that the caller's state update and [`output!`](@ref) read. [`circulation!`](@ref) (temperature, then humidity) starts first,
-then [`SWradiation!`](@ref) → [`LWradiation!`](@ref) → sensible heat →
+tendencies that the caller's state update and [`output!`](@ref) read. [`circulation!`](@ref) (temperature, then humidity) starts first. Then
+[`SWradiation!`](@ref) → [`LWradiation!`](@ref) → sensible heat →
 [`hydro!`](@ref) → [`deep_ocean!`](@ref) run on `ws`.
 
 The two `circulation!` calls are independent of each other and of every

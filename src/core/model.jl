@@ -17,7 +17,7 @@ const _OVERRIDES = (
 """
     init_model!(fields::ClimateFields, r::ResolvedConfig)
 
-One-time per-run setup: resets the CO2 mask to full CO2, applies the climatologies the
+One-time per-run setup. It resets the CO2 mask to full CO2, applies the climatologies the
 [`Processes`](@ref) options replace (flat topography, cloud cover, humidity,
 mixed layer) and zeroes the flux corrections for `NoCorrections()`, derives
 the fields that follow from them ([`derive_fields!`](@ref)), then computes the
@@ -115,7 +115,7 @@ Run `years` years of `tendencies!` to derive the flux corrections of the
 surface temperature, the deep ocean and the humidity
 (`fields.Ts_flux_correction`, `To_flux_correction`, `q_flux_correction`) that
 hold the control climate at the observed climatology. Updates
-`Ts`/`Ta`/`To`/`q` in place as it integrates. `ws_a`/`ws_q` are forwarded to [`tendencies!`](@ref).
+`Ts`/`Ta`/`To`/`q` in place as it integrates. It forwards `ws_a`/`ws_q` to [`tendencies!`](@ref).
 """
 function qflux_correction!(CO2_ctrl, Ts, Ta, To, q, fields::ClimateFields, state::ModelState, r::ResolvedConfig, ws::ModelWorkspace, years;
         ws_a::ModelWorkspace=ws, ws_q::ModelWorkspace=ws)
@@ -152,6 +152,7 @@ function qflux_correction!(CO2_ctrl, Ts, Ta, To, q, fields::ClimateFields, state
         dq_eva = tend.dq_eva
         dq_rain = tend.dq_rain
 
+        # Each correction moves this step's value onto the climatology; `Ta` has none
         @turbo for j in 1:ydim
             for i in 1:xdim
                 ts0 = Ts[i, j] + dT_ocean[i, j] + Δt * @surface_flux(i, j) / cap_surf[i, j]

@@ -120,8 +120,8 @@ the other:
 
 So `A[j-1, k]` is `P[j+2, k]`.
 
-`nghost` is the zonal stencils' reach, so it is 3 and they spell their offsets
-out literally (`j` … `j+6`); widening the stencil means widening both.
+The zonal stencils reach 3 cells, so `nghost` is 3. They write their offsets
+as literals (`j` … `j+6`); to widen the stencil, change both.
 """
 const nghost = 3
 "Row count of a ghosted circulation buffer (`xdim + 2nghost`)."

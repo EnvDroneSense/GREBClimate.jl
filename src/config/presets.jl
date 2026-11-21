@@ -120,8 +120,8 @@ The [`Config`](@ref) of a named experiment ([`preset_names`](@ref) lists them).
 an `ArgumentError`.
 
 Every preset runs the default physics with a 3-year [`SpinUp`](@ref), except
-the two deconstructions, which run the MSCM physics ([`mscm_hydrology`](@ref),
-`moisture_convergence = false`) their switches were designed for.
+the two deconstructions. These run the MSCM physics ([`mscm_hydrology`](@ref),
+`moisture_convergence = false`) that their switches were designed for.
 `:decon_mean_climate` (mean-climate deconstruction; run it with
 `RunSpec(scnr = 0)`) also takes the [`Stored`](@ref) corrections, so a
 switched-off process changes the climate. `:decon_2xco2` is the 2×CO2-response

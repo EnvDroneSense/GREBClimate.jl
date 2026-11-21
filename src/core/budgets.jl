@@ -83,6 +83,8 @@ end
 
 _floor(T) = ifelse(T < min_T_K, min_T_K, T)
 
+# Redo the state update from the state saved at :after_tendencies, count the
+# floors and clamps it applies, and keep the largest difference from the model's result
 function _check_step!(b::BudgetCheck, view)
     tend, fields, slice = view.tend, view.fields, view.step_of_year
     r = view.resolved

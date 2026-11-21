@@ -46,7 +46,7 @@ plot_timeseries(result; annual = true)
 ```
 
 `result` is what `greb_model!` returns and `fields` the climatology from
-`load_climatology`. Two commands run the whole toolbox:
+`load_climatology`. These commands run the whole toolbox:
 
 ```bash
 julia --project=viz viz/demo.jl [output_dir]   # runs GREB and saves every plot

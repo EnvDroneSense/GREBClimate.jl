@@ -41,7 +41,7 @@ Where a new script goes:
 Scripts that run the model should read the local dataset with
 `greb_data_dir(; allow_download=false)` and never download it.
 
-External data (NetCDF sources, converted records, observations) lives in the
-gitignored `Data/` folder. Converters that need a package the model does not
+External data (NetCDF sources, converted records, observations) is in the
+`Data/` folder, which Git ignores. Converters that need a package the model does not
 depend on, such as NCDatasets, say so in their header; add it to your default
 environment rather than to the project.
