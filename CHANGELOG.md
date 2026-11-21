@@ -79,8 +79,11 @@ Inf run, a late error, or no error.
   without the dataset, and `SOURCE_MAP` maps more source files to the tests
   that check them.
 - Tests for repeated claims were removed or merged.
-- `tools/experiments/sensitivity.jl` refuses a preset without an anomaly
-  output before the run, not after it.
+- `tools/experiments/` (`sensitivity.jl`, `co2_sweep.jl`, `helpers.jl`), its
+  test `test_experiment_tools.jl` and the docs page "Experiments" are removed.
+  The repository GREBExperiments holds these scripts and their helpers.
+- The workflow `Optional tests` runs `test_enzyme.jl` and `test_dataset_tools.jl`.
+  CompatHelper no longer checks `test/`.
 - The benchmark scripts share `check_data_dir` in `benchmark/common.jl`. The
   dataset-version tests use a `version` keyword of the fixture writers.
 - `benchmark/compare_step_parts.jl` times `forcing` and the loop order of
