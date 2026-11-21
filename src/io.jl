@@ -159,18 +159,28 @@ read_field(filepath::AbstractString) = _open_dataset_file(_read_field_entries, f
 Load an alternate solar-forcing table for paleo/orbital experiments.
 `forcing_type` is `:paleo`, `:eccentricity`, or `:obliquity`; for the latter
 two, `index` selects the matching row by coordinate value. Any other
-`forcing_type`, or an `index` not in the table, is an `ArgumentError`. Used by
+`forcing_type`, an `index` not in the table, a table that is not `ydim x nstep_yr`
+and a table with NaN or Inf are an `ArgumentError`. Used by
 [`resolve`](@ref) for a [`SolarTable`](@ref) scenario; `greb_model!` swaps it
 into `fields.sw_solar` for the scenario run.
 """
 function load_solar_forcing(jld2_dir::AbstractString, forcing_type::Symbol, index::Int=0)
     _check_option(:forcing_type, forcing_type, _SOLAR_TABLE_KINDS)
-    result = _read_checked(joinpath(jld2_dir, "solar_scenarios", "solar_$forcing_type.jld2"))
-    forcing_type === :paleo && return result.data
-    values = Int.(result.coords[1])
-    pos = findfirst(==(index), values)
-    pos === nothing && throw(ArgumentError("$forcing_type index $index is not in the table; available: $(values)"))
-    return result.data[pos, :, :]
+    path = joinpath(jld2_dir, "solar_scenarios", "solar_$forcing_type.jld2")
+    result = _read_checked(path)
+    if forcing_type === :paleo
+        table = result.data
+    else
+        values = Int.(result.coords[1])
+        pos = findfirst(==(index), values)
+        pos === nothing && throw(ArgumentError("$forcing_type index $index is not in the table; available: $(values)"))
+        table = result.data[pos, :, :]
+    end
+    # A (1, N) table would fill every latitude row of `fields.sw_solar` without an error
+    size(table) == (ydim, nstep_yr) ||
+        throw(ArgumentError("$path holds a $(size(table)) table, expected $((ydim, nstep_yr))"))
+    all(isfinite, table) || throw(ArgumentError("$path holds NaN or Inf values"))
+    return table
 end
 
 """
@@ -219,22 +229,24 @@ end
 Load a `year => CO2` lookup table for the `:custom_co2` experiment from a
 plain-text file, one `year CO2` pair per line. Blank lines
 and lines starting with `#` are skipped. A missing file, a malformed line or a
-year that appears twice is an `ArgumentError`.
+year that appears twice, or a CO2 value that is NaN, Inf or negative, is an
+`ArgumentError` that names the line.
 """
 function load_co2_custom(path::AbstractString)
     isfile(path) || throw(ArgumentError("custom CO2 scenario file not found: $path"))
     table = Dict{Int,Float32}()
     open(path) do io
-        for line in eachline(io)
+        for (n, line) in enumerate(eachline(io))
             stripped = strip(line)
             (isempty(stripped) || startswith(stripped, "#")) && continue
             cols = split(stripped)
-            length(cols) >= 2 ||
-                throw(ArgumentError("malformed line in custom CO2 scenario file $path: \"$line\" (expected \"year CO2\")"))
-            year = parse(Int, cols[1])
+            year = length(cols) >= 2 ? tryparse(Int, cols[1]) : nothing
+            ppm = year === nothing ? nothing : tryparse(Float32, cols[2])
+            ppm === nothing &&
+                throw(ArgumentError("malformed line $n in custom CO2 scenario file $path: \"$line\" (expected \"year CO2\")"))
             haskey(table, year) &&
                 throw(ArgumentError("year $year appears twice in custom CO2 scenario file $path"))
-            table[year] = parse(Float32, cols[2])
+            table[year] = _check_ppm("CO2 of year $year (line $n of $path)", ppm)
         end
     end
     return table
@@ -316,8 +328,7 @@ function load_climatology(jld2_dir::AbstractString; dataset::Symbol=:ncep, corre
 
     fields = ClimateFields()
 
-    haskey(_CLIMATOLOGY_FILES, dataset) ||
-        throw(ArgumentError("unknown dataset :$dataset; use one of $(join(repr.(keys(_CLIMATOLOGY_FILES)), ", "))"))
+    _check_option(:dataset, dataset, keys(_CLIMATOLOGY_FILES))
 
     @info "Loading static fields"
     _load_fields!(fields, joinpath(jld2_dir, "static"), _STATIC_FILES)

@@ -127,6 +127,12 @@ end
         @test_throws ArgumentError load_co2_custom(bad_path)
         write(bad_path, "1950 300.0\n1950 301.0\n")
         @test_throws "1950 appears twice" load_co2_custom(bad_path)
+        # A value that gives a NaN run, or a word for a number, names its line
+        for (text, message) in (("1950 300\n1951 NaN\n", "line 2"), ("1950 -50\n", "line 1"),
+            ("19x0 300\n", "malformed line 1"))
+            write(bad_path, text)
+            @test_throws message load_co2_custom(bad_path)
+        end
         rm(bad_path)
         @test !isfile(bad_path)
     end
@@ -145,6 +151,11 @@ end
         @test_throws ArgumentError load_solar_forcing(dir, :obliquity, 7)
         @test_throws ArgumentError load_solar_forcing(dir, :eccentricity, 7)
         @test_throws ArgumentError load_solar_forcing(dir, :bogus)
+        # A table of the wrong size or with NaN would otherwise fill every cell
+        for (value, dims) in ((999.0, (1, N)), (NaN, (Y, N)))
+            write_field(joinpath(dir, "solar_scenarios", "solar_paleo.jld2"), value, dims; dim_names=["lat", "time"])
+            @test_throws ArgumentError load_solar_forcing(dir, :paleo)
+        end
     end
 end
 
@@ -239,15 +250,9 @@ end
         # A file without the entry is from version 1: the loaders refuse it and say so
         write_unversioned(old)
         @test_throws "dataset version 1" load_climatology(dir)
-        write_ipcc_scenarios(dir, Dict("rcp60" => Dict(1950 => 1.0)))
-        jldopen(joinpath(dir, "scenario", "ipcc_scenarios.jld2"), "w") do file
-            file["scenarios"] = Dict("rcp6" => Dict(1950 => 1.0))
-        end
+        write_ipcc_scenarios(dir, Dict("rcp60" => Dict(1950 => 1.0)); version=nothing)
         @test_throws "dataset version 1" load_co2_scenario(dir, :rcp60)
-        write_flux_corrections(dir)
-        jldopen(joinpath(dir, "climatology", "flux_corrections.jld2"), "w") do file
-            file["Tsurf_flux_correction"] = fill(0.0f0, X, Y, N)
-        end
+        write_flux_corrections(dir; version=nothing)
         @test_throws "dataset version 1" load_flux_corrections!(ClimateFields(), dir)
     end
 end
