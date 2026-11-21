@@ -138,6 +138,38 @@ function synthetic_fields()
     return f
 end
 
+"""
+A `ClimateFields` with sunlight, vertical motion, varying humidity, a seasonal
+mixed layer, mountains and glacier cells, for a run that exercises every kernel
+term without the dataset. The land is the western 40 columns; the rest is ocean at -0.1 m.
+"""
+function rich_fields()
+    f = ClimateFields()
+    for k in 1:N, j in 1:Y, i in 1:X
+        lat = lat_grid[j]
+        season = cospi(2 * k / N)
+        f.Ts_clim[i, j, k] = 288.0f0 - 45.0f0 * sind(lat)^2 + 5.0f0 * season * sind(lat) + 2.0f0 * sinpi(2 * i / X)
+        f.u_clim[i, j, k] = 8.0f0 * sind(2 * lat) + 3.0f0 * cospi(4 * i / X)
+        f.v_clim[i, j, k] = 2.0f0 * cospi(2 * i / X) * cosd(lat)
+        f.q_clim[i, j, k] = 0.012f0 * cosd(lat)^2 + 0.001f0 + 0.002f0 * sinpi(2 * i / X)^2
+        f.omega_clim[i, j, k] = 0.005f0 * sinpi(6 * j / Y) * cospi(2 * i / X)
+        f.omega_std_clim[i, j, k] = 0.01f0
+        f.wind_speed_clim[i, j, k] = 6.0f0 + 2.0f0 * abs(sind(lat))
+        f.mld_clim[i, j, k] = 60.0f0 + 30.0f0 * season * sind(lat)
+        f.cloud_clim[i, j, k] = 0.5f0 + 0.2f0 * sinpi(2 * j / Y)
+        f.soil_wetness_clim[i, j, k] = 0.4f0
+        f.To_clim[i, j, k] = 283.0f0 - 10.0f0 * sind(lat)^2
+    end
+    for k in 1:N, j in 1:Y
+        f.sw_solar[j, k] = max(0.0f0, 340.0f0 * cosd(lat_grid[j]) * (1.0f0 + 0.3f0 * cospi(2 * k / N) * sind(lat_grid[j])))
+    end
+    for j in 1:Y, i in 1:X
+        f.z_topo[i, j] = i <= 40 ? 300.0f0 + 1500.0f0 * sinpi(i / 40)^2 : -0.1f0
+        f.glacier[i, j] = (i <= 40 && j >= Y - 3) ? 1.0f0 : 0.0f0
+    end
+    return f
+end
+
 gmean(x) = sum(x) / length(x)
 
 """

@@ -128,10 +128,13 @@ end
     # annual mean ~0.917, IS ice under the Fortran-matching rule.
     icmn_ctrl[2, 1, 1] = 0.0
     icmn_ctrl[2, 1, 2:12] .= 1.0
+    # Cell C: an annual mean of exactly 0.5 is ice
+    icmn_ctrl[3, 1, 1:6] .= 1.0
 
     apply_surface_mask!(fields, SurfaceMask(:ocean), icmn_ctrl)
     @test fields.co2_part[1, 1] == 1.0  # January said "ice"; annual mean says no
     @test fields.co2_part[2, 1] == 0.5  # January said "no ice"; annual mean says yes
+    @test fields.co2_part[3, 1] == 0.5
 
     # The land/ice variant inverts the ocean mask and exempts ice cells.
     f_li = ClimateFields()

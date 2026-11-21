@@ -24,6 +24,7 @@ const SHARD = [
     ("test_budgets.jl", "light", "standard", 11),
     ("test_experiment_tools.jl", "light", "standard", 5),
     ("test_physics.jl", "light", "standard", 26),
+    ("test_regression.jl", "light", "standard", 8),
     ("test_threading.jl", "light", "full", 25),
     ("test_enzyme.jl", "light", "full", 45),
     ("test_model.jl", "heavy", "full", 49),
@@ -78,14 +79,14 @@ end
 # The thread comparison (test_threading.jl) and the golden run (test_golden.jl)
 # are not mapped: they are slow, so the full suite runs them before a release.
 const SOURCE_MAP = [
-    ("src/physics/", ["physics", "budgets", "invariants"]),
-    ("src/core/tendencies.jl", ["physics", "budgets", "invariants"]),
+    ("src/physics/", ["physics", "budgets", "invariants", "regression"]),
+    ("src/core/tendencies.jl", ["physics", "budgets", "invariants", "regression"]),
     ("src/core/budgets.jl", ["budgets", "invariants"]),
     ("src/config/", ["config", "presets", "processes", "scenario"]),
     ("src/forcing/", ["config", "presets", "processes", "scenario", "model"]),
     ("src/core/calendar.jl", ["calendar", "output"]),
     ("src/core/state.jl", ["state", "output", "physics", "invariants", "processes"]),
-    ("src/core/output.jl", ["state", "output", "budgets", "model"]),
+    ("src/core/output.jl", ["state", "output", "budgets", "model", "regression"]),
     ("src/core/postprocess.jl", ["state", "output"]),
     ("src/io.jl", ["io"]),
     ("src/data.jl", ["io"]),

@@ -116,6 +116,9 @@ end
     seen = at_first_step(v -> (Ts=copy(v.Ts), CO2=v.CO2), RunSpec(ctrl=0, scnr=1),
         preset(:sst_plus1; corrections=NoCorrections()); point=:after_tendencies, jld2_dir="")
     @test all(==(1.0f0), seen.Ts) && seen.CO2 == 340
+    # ... also when the scenario's own CO2 differs from the control's
+    held = Config(; scenario=Scenario(co2=ConstantCO2(680), surface=SSTOffset(1)), corrections=NoCorrections())
+    @test at_first_step(v -> v.CO2, RunSpec(ctrl=0, scnr=1), held; jld2_dir="") == 340
 
     # The original-GREB physics of the deconstruction presets, end to end
     result_dmc = quiet() do
@@ -216,6 +219,18 @@ end
         @test all(==(20.0f0), first_tclim(:rcp85_boundary, dir))
         @test_throws ArgumentError first_tclim(:rcp85_boundary, joinpath(dir, "elsewhere"))
         @test reused.boundary_anomaly_source == ("", :none)    # a failed load leaves no source
+    end
+end
+
+@testset "a boundary-anomaly scenario starts its first step on the climatology plus the anomaly" begin
+    # The seasonal fixture: the carried-over state (December) differs from January's climatology
+    with_tempdir() do dir
+        write_boundary_anomalies(dir)
+        fields = rich_fields()
+        january = copy(fields.Ts_clim[:, :, 1])
+        ts = at_first_step(v -> copy(v.Ts), RunSpec(ctrl=0, scnr=1), preset(:elnino; corrections=NoCorrections());
+            fields, jld2_dir=dir, allow_uninitialized=true, point=:after_tendencies)
+        @test all(isapprox.(ts, january .+ 7.0f0; atol=1.0f-4))     # 7 K is the El Nino Ts anomaly written above
     end
 end
 

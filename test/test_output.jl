@@ -121,7 +121,10 @@ _time_loop_fields() = constant_fields(z_topo=-1.0, swet=0.5, u=2.0, v=1.0, omega
     # A heat capacity so large that one step cannot lift Ts back over the floor
     fields.cap_surf .= 1.0f12
     s = (; initial_state(ini)..., Ts=fill(min_T_K - 0.5, X, Y))
+    q_before = s.q[9, 10]
+    fields.q_flux_correction[9, 10, 1] = -0.5f0     # takes more humidity than the cell holds
     out = step!(control_time(), ini.CO2_ctrl, s, fields, cfg)
+    @test s.q[9, 10] ≈ 0.1f0 * q_before     # the limiter leaves a tenth
 
     @test all(isfinite, s.Ts)
     @test all(isfinite, s.Ta)
@@ -130,6 +133,13 @@ _time_loop_fields() = constant_fields(z_topo=-1.0, swet=0.5, u=2.0, v=1.0, omega
     @test all(>=(min_T_K), s.Ts)
     @test all(>=(min_T_K), s.Ta)
     @test isempty(out.records) && isempty(out.times)
+
+    # Air so hot that one step of emission overshoots below the floor
+    fields = _time_loop_fields()
+    ini = init_model!(fields, cfg)
+    s = (; initial_state(ini)..., Ta=fill(3000.0f0, X, Y))
+    step!(control_time(), ini.CO2_ctrl, s, fields, cfg)
+    @test all(==(min_T_K), s.Ta)
 end
 
 @testset "time_loop! writes the step's precipitation, evaporation and moisture circulation to ws" begin
