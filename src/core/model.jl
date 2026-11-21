@@ -201,8 +201,6 @@ are used (`load_climatology` loads them).
 """
 function _use_stored_corrections!(fields::ClimateFields, jld2_dir::AbstractString, in_place::Bool)
     isempty(jld2_dir) && return nothing
-    file = _flux_file(jld2_dir)
-    isfile(file) || throw(ArgumentError("Stored() found no flux corrections at $file"))
     if !in_place
         @info "Loading the stored flux corrections"
         load_flux_corrections!(fields, String(jld2_dir))
@@ -324,7 +322,7 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
         jld2_dir::AbstractString="", fields::ClimateFields=ClimateFields(),
         allow_uninitialized::Bool=false, observer=nothing)
     if !fields.loaded && !allow_uninitialized
-        error("""
+        throw(ArgumentError("""
               greb_model! was given an uninitialized ClimateFields (all-zero climatology).
 
               Load the data and pass it through:
@@ -333,7 +331,7 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
 
               If a data-free run is intended (precompilation, config/scenario-plumbing
               tests), opt in explicitly with `allow_uninitialized=true`.
-              """)
+              """))
     end
     config = r.config
     s = config.scenario

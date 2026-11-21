@@ -18,6 +18,9 @@ end
     @test r.config == preset(:full_model)
     @test isempty(r.co2_table) && r.solar_table === nothing
     @test_throws ArgumentError resolve(preset(:custom_co2))          # no path
+    # A table scenario without a directory says so, not "download a pack"
+    @test_throws "pass jld2_dir" resolve(preset(:rcp45))
+    @test_throws "pass jld2_dir" resolve(preset(:obliquity; index=0))
     with_tempdir() do dir
         write_ipcc_scenarios(dir, Dict("rcp45" => Dict(1950 => 401.0)))
         @test resolve(preset(:rcp45); jld2_dir=dir).co2_table == Dict(1950 => 401.0f0)

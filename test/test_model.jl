@@ -11,6 +11,8 @@
     shallow.loaded = true
     shallow.mld_clim[7, 9, 100] = 0.0f0
     @test_throws "mixed-layer depth" greb_model!(RunSpec(ctrl=0, scnr=0), cfg; fields=shallow)
+    # A ClimateFields that no loader filled is a user error
+    @test_throws ArgumentError greb_model!(RunSpec(ctrl=0, scnr=0), cfg; fields=ClimateFields())
     # The opt-in skips both checks
     @test greb_model!(RunSpec(ctrl=0, scnr=0), cfg; fields=bathymetry, allow_uninitialized=true) !== nothing
     # A land cell with no mixed layer is fine
