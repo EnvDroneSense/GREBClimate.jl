@@ -2,7 +2,12 @@
 _year_label(t::ModelTime) = t.phase === spinup ? "spin-up year $(year(t) - t.start_year + 1)" : string(year(t))
 
 # The two cells of the annual summary line: label, longitude index, latitude index
-const _SAMPLE_CELLS = (("178 E 9 N", 48, 27), ("58 E 51 N", 16, 38))
+function _sample_cell(lon, lat)
+    i = argmin(abs.(((1:xdim) .- 0.5f0) .* dlon .- lon))
+    j = argmin(abs.(lat_grid .- lat))
+    return ("$lon E $lat N", i, j)
+end
+const _SAMPLE_CELLS = (_sample_cell(178, 9), _sample_cell(58, 51))
 
 """
     diagnostics!(t::ModelTime, surf::SurfaceState, state)

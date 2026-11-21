@@ -192,11 +192,11 @@ end
 
             withenv("GREB_DATA" => nothing) do
                 # a non-existent explicit path is an error, not a silent fallback
-                @test_throws ErrorException greb_data_dir(joinpath(tmp_a, "nope"))
+                @test_throws ArgumentError greb_data_dir(joinpath(tmp_a, "nope"))
             end
             # so is a GREB_DATA pointing nowhere
             withenv("GREB_DATA" => joinpath(tmp_a, "nope")) do
-                @test_throws ErrorException greb_data_dir()
+                @test_throws ArgumentError greb_data_dir()
             end
 
             # A downloaded dataset is the directory `<load path>/GREB-input-data`.

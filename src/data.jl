@@ -139,13 +139,13 @@ function greb_data_dir(path::Union{Nothing,AbstractString}=nothing;
     packs in (:all, :core) ||
         throw(ArgumentError("packs must be :all or :core, got :$packs"))
     if path !== nothing && !isempty(path)
-        isdir(path) || error("GREB dataset directory not found: $path")
+        isdir(path) || throw(ArgumentError("GREB dataset directory not found: $path"))
         return String(path)
     end
 
     env = get(ENV, "GREB_DATA", "")
     if !isempty(env)
-        isdir(env) || error("GREB_DATA points at a directory that does not exist: $env")
+        isdir(env) || throw(ArgumentError("GREB_DATA points at a directory that does not exist: $env"))
         return env
     end
 
@@ -192,16 +192,16 @@ end
 """
     download_greb_pack(pack::Symbol; dir = greb_data_dir()) -> String
 
-Add dataset pack `pack` (`:era`, `:cmip5`, `:enso` or `:solar`, or `:all`) to the dataset directory `dir` 
-and return `dir`. Downloadeds via DataDeps on first use, copies files into `dir`; skips files already present. 
-An unknown pack is an `ArgumentError`.
+Add dataset pack `pack` (`:era`, `:cmip5`, `:enso` or `:solar`, or `:all`) to the dataset directory `dir`
+and return `dir`. The first call downloads the pack with DataDeps. It copies the files into `dir` and
+skips files that are already there. An unknown pack is an `ArgumentError`.
 
 | Pack | Adds |
 |:-----|:-----|
-| `:era` | ERA-Interim climatology ()`load_climatology(dir; dataset = :era)`) |
-| `:cmip5` | CMIP5 RCP8.5 anomalies (`:rcp85`) |
+| `:era` | ERA-Interim climatology (`load_climatology(dir; dataset = :era)`) |
+| `:cmip5` | CMIP5 RCP8.5 anomalies (`:cmip5_rcp85`) |
 | `:enso` | El Nino and La Nina anomalies (`:elnino`, `:lanina`) |
-| `:solar` | paleo/orbital solar tables (`:paleo_231kyr`, `:eccentricity`, `:obliquity`) |
+| `:solar` | paleo/orbital solar tables (`:paleo`, `:eccentricity`, `:obliquity`) |
 """
 function download_greb_pack(pack::Symbol; dir::Union{Nothing,AbstractString}=nothing)
     pack === :all || pack in _OPTIONAL_PACKS ||
@@ -233,14 +233,15 @@ end
 
 Path of the already-downloaded dataset, or `nothing` if it is absent. Looks
 only, never downloads: the public DataDeps calls fetch missing data, so this
-uses the internal `DataDeps.try_determine_load_path`, and treats any error
-from it as "not cached".
+uses the internal `DataDeps.try_determine_load_path`. An error from it counts
+as "not cached" and logs one warning, so a renamed DataDeps function is visible.
 """
 function _cached_datadep_path()
     try
         path = DataDeps.try_determine_load_path(DATA_DEP_NAME, @__FILE__)
         return (path !== nothing && isdir(path)) ? String(path) : nothing
-    catch
+    catch err
+        @warn "Could not look for a cached dataset: DataDeps.try_determine_load_path failed" exception=err maxlog=1
         return nothing
     end
 end

@@ -38,7 +38,6 @@ parallel. The gain depends on the machine. Keep in mind:
 function run_ensemble(reduce, run::RunSpec, configs; fields::ClimateFields, jld2_dir::AbstractString="",
         ntasks::Integer=Threads.nthreads(), logger=NullLogger(), kwargs...)
     ntasks >= 1 || throw(ArgumentError("ntasks must be at least 1, got $ntasks"))
-    haskey(kwargs, :fields) && throw(ArgumentError("fields is given once, for all members"))
     members = collect(configs)
     isempty(members) && return []
     ntasks = min(ntasks, length(members))

@@ -41,9 +41,8 @@ function init_model!(fields::ClimateFields, r::ResolvedConfig)
     derive_fields!(fields, p)
 
     # Initial conditions from the last time step of the climatology
-    Ts = fields.Ts_clim[:, :, nstep_yr] |> copy
-    surf = SurfaceState(Ts, copy(Ts), fields.To_clim[:, :, nstep_yr] |> copy,
-        fields.q_clim[:, :, nstep_yr] |> copy)
+    Ts = fields.Ts_clim[:, :, nstep_yr]   # a slice is already a copy
+    surf = SurfaceState(Ts, copy(Ts), fields.To_clim[:, :, nstep_yr], fields.q_clim[:, :, nstep_yr])
 
     CO2_ctrl = p.co2 ? c.scenario.control_co2 : 0.0f0
 
