@@ -342,7 +342,7 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
         throw(ArgumentError("a SurfaceMask is built from the control run's ice cover: use ctrl >= 1"))
     # Refuse a CO2 table that lacks a scenario year now, not after the spin-up and control run
     if s.co2 isa Union{CO2Table,CO2File} && config.processes.co2 && run.scnr > 0
-        missing_years = [y for y in s.start_year:(s.start_year + run.scnr - 1) if !haskey(r.co2_table, y)]
+        missing_years = [y for y in s.start_year:(s.start_year+run.scnr-1) if !haskey(r.co2_table, y)]
         isempty(missing_years) ||
             error("No CO2 data for year $(first(missing_years)) in the scenario's CO2 table (loaded $(length(r.co2_table)) years)")
     end

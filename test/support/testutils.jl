@@ -161,9 +161,11 @@ function rich_fields()
         f.To_clim[i, j, k] = 283.0f0 - 10.0f0 * sind(lat)^2
     end
     for k in 1:N, j in 1:Y
+
         f.sw_solar[j, k] = max(0.0f0, 340.0f0 * cosd(lat_grid[j]) * (1.0f0 + 0.3f0 * cospi(2 * k / N) * sind(lat_grid[j])))
     end
     for j in 1:Y, i in 1:X
+
         f.z_topo[i, j] = i <= 40 ? 300.0f0 + 1500.0f0 * sinpi(i / 40)^2 : -0.1f0
         f.glacier[i, j] = (i <= 40 && j >= Y - 3) ? 1.0f0 : 0.0f0
     end

@@ -78,8 +78,7 @@ struct CO2Step <: CO2Path
     before::Float32
     after::Float32
     year::Int
-    CO2Step(before::Real, after::Real, year::Integer) =
-        new(_check_ppm(:before, before), _check_ppm(:after, after), year)
+    CO2Step(before::Real, after::Real, year::Integer) = new(_check_ppm(:before, before), _check_ppm(:after, after), year)
 end
 
 """
@@ -279,8 +278,7 @@ struct Scenario
     control_co2::Float32
     start_year::Int
     output::Symbol
-    Scenario(co2, co2_mask, solar, surface, control_co2, start_year, output) =
-        new(co2, co2_mask, solar, surface, _check_ppm(:control_co2, control_co2), start_year, output)
+    Scenario(co2, co2_mask, solar, surface, control_co2, start_year, output) = new(co2, co2_mask, solar, surface, _check_ppm(:control_co2, control_co2), start_year, output)
 end
 
 function Scenario(; co2=ConstantCO2(340), co2_mask=UniformMask(), solar=ModernSolar(),

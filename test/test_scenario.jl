@@ -71,12 +71,13 @@ end
         () -> SeasonalCO2(Inf, 340, :boreal_winter), () -> Scenario(control_co2=NaN),
         () -> SolarConstant(NaN), () -> SolarCycle(1, 0), () -> SolarCycle(NaN, 11),
         () -> EarthSunDistance(-100), () -> RunSpec(ctrl=-1), () -> RunSpec(scnr=-1)]
-    refused(f) = try
-        f()
-        false
-    catch err
-        err isa ArgumentError
-    end
+    refused(f) =
+        try
+            f()
+            false
+        catch err
+            err isa ArgumentError
+        end
     @test all(refused, bad)
     @test ConstantCO2(0).ppm == 0 && RunSpec(ctrl=0, scnr=0) == RunSpec(0, 0)
 end
