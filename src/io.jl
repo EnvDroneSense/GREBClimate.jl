@@ -21,12 +21,9 @@ const _COMMON_CLIMATOLOGY_FILES = (
     omega_std_clim="erainterim.omega_std.vertmean.clim", wind_speed_clim="erainterim.windspeed.850hpa.clim"
 )
 const _SOLAR_FILE = "solar_radiation.clim"
-# The sources of a boundary anomaly, and the file of each anomaly by the
-# climatology it is added to
-const _BOUNDARY_ANOMALY_SOURCES = (:cmip5_rcp85, :elnino, :lanina)
+# The file of each anomaly of a boundary-anomaly source
 function _boundary_anomaly_files(source::Symbol)
-    source in _BOUNDARY_ANOMALY_SOURCES ||
-        throw(ArgumentError("source must be :cmip5_rcp85, :elnino or :lanina, got :$source"))
+    _check_option(:source, source, _BOUNDARY_ANOMALY_SOURCES)
     file(variable) = source === :cmip5_rcp85 ? "cmip5.$variable.rcp85.ensmean.forcing" :
                      "erainterim.$variable.$source.forcing"
     return (Ts_clim=file("tsurf"), u_clim=file("zonal.wind"), v_clim=file("meridional.wind"),
@@ -104,22 +101,38 @@ Throw unless the open dataset file `file` has the version these loaders read
 (a file without the entry is from version 1).
 """
 function _check_version(file, filepath::AbstractString)
-    _check_version(haskey(file, "dataset_version") ? Int(file["dataset_version"]) : 1, filepath)
-end
-
-function _check_version(version::Integer, filepath::AbstractString)
+    version = haskey(file, "dataset_version") ? Int(file["dataset_version"]) : 1
     version == DATASET_VERSION ||
         throw(ArgumentError("$filepath is from dataset version $version; GREBClimate reads $DATASET_VERSION. " *
                             "Download the current dataset with greb_data_dir()"))
     return nothing
 end
 
-# `read_field` for the loaders: also refuses a file of another dataset version
-function _read_checked(filepath::AbstractString)
-    result = read_field(filepath)
-    _check_version(Int(get(result.info, "dataset_version", 1)), filepath)
-    return result
+"""
+Call `f(file)` on the open dataset file `filepath`, under the JLD2 lock. A missing
+file is an `ArgumentError`; with `check_version` a file of another dataset version is too.
+"""
+function _open_dataset_file(f, filepath::AbstractString; check_version::Bool=true)
+    isfile(filepath) || throw(ArgumentError(_missing_file_message(filepath)))
+    return @lock _JLD2_LOCK jldopen(filepath, "r") do file
+        check_version && _check_version(file, filepath)
+        return f(file)
+    end
 end
+
+function _read_field_entries(file)
+    known = ("data", "dim_names", "coords", "ctl")
+    return (
+        data=file["data"],
+        dim_names=file["dim_names"],
+        coords=haskey(file, "coords") ? file["coords"] : nothing,
+        ctl=haskey(file, "ctl") ? file["ctl"] : nothing,
+        info=Dict{String,Any}(key => file[key] for key in keys(file) if key ∉ known)
+    )
+end
+
+# `read_field` for the loaders: also refuses a file of another dataset version
+_read_checked(filepath::AbstractString) = _open_dataset_file(_read_field_entries, filepath)
 
 """
     read_field(filepath::AbstractString)
@@ -138,19 +151,7 @@ A missing file is an `ArgumentError`.
   - `info`: `Dict{String,Any}` of the other entries of the file: `description`,
     `units`, `source`, `period` and `dataset_version`
 """
-function read_field(filepath::AbstractString)
-    isfile(filepath) || throw(ArgumentError(_missing_file_message(filepath)))
-    @lock _JLD2_LOCK jldopen(filepath, "r") do file
-        known = ("data", "dim_names", "coords", "ctl")
-        return (
-            data=file["data"],
-            dim_names=file["dim_names"],
-            coords=haskey(file, "coords") ? file["coords"] : nothing,
-            ctl=haskey(file, "ctl") ? file["ctl"] : nothing,
-            info=Dict{String,Any}(key => file[key] for key in keys(file) if key ∉ known)
-        )
-    end
-end
+read_field(filepath::AbstractString) = _open_dataset_file(_read_field_entries, filepath; check_version=false)
 
 """
     load_solar_forcing(jld2_dir::AbstractString, forcing_type::Symbol, index::Int=0)
@@ -163,8 +164,7 @@ two, `index` selects the matching row by coordinate value. Any other
 into `fields.sw_solar` for the scenario run.
 """
 function load_solar_forcing(jld2_dir::AbstractString, forcing_type::Symbol, index::Int=0)
-    forcing_type in (:paleo, :eccentricity, :obliquity) ||
-        throw(ArgumentError("unknown forcing type: $forcing_type. Use :paleo, :eccentricity, or :obliquity"))
+    _check_option(:forcing_type, forcing_type, _SOLAR_TABLE_KINDS)
     result = _read_checked(joinpath(jld2_dir, "solar_scenarios", "solar_$forcing_type.jld2"))
     forcing_type === :paleo && return result.data
     values = Int.(result.coords[1])
@@ -207,11 +207,7 @@ What the combined scenario file holds for `scenario` under `entry` ("scenarios" 
 """
 function _scenario_entry(jld2_dir::AbstractString, scenario::Symbol, entry::AbstractString)
     filepath = joinpath(jld2_dir, "scenario", "ipcc_scenarios.jld2")
-    isfile(filepath) || throw(ArgumentError(_missing_file_message(filepath)))
-    values = @lock _JLD2_LOCK jldopen(filepath, "r") do file
-        _check_version(file, filepath)
-        file[entry]
-    end
+    values = _open_dataset_file(file -> file[entry], filepath)
     haskey(values, string(scenario)) ||
         throw(ArgumentError("no CO2 scenario table for :$scenario in $filepath. Available: $(sort(collect(keys(values))))"))
     return values[string(scenario)]
@@ -258,9 +254,7 @@ into `fields`. A missing file or a missing table in it is an `ArgumentError`.
 """
 function load_flux_corrections!(fields::ClimateFields, jld2_dir::AbstractString)
     filepath = _flux_file(jld2_dir)
-    isfile(filepath) || throw(ArgumentError("flux corrections file not found: $filepath"))
-    @lock _JLD2_LOCK jldopen(filepath, "r") do file
-        _check_version(file, filepath)
+    _open_dataset_file(filepath) do file
         for (field, key) in pairs(_FLUX_CORRECTION_KEYS)
             haskey(file, key) || throw(ArgumentError("$key not found in $filepath"))
             land = field === :To_flux_correction ? is_land.(fields.z_topo) : nothing

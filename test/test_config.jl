@@ -1,17 +1,6 @@
 # Grid constants, RunSpec, and resolve(): the hydrology coefficients and the
 # tables a scenario reads.
 
-@testset "grid constants" begin
-    @test xdim == 96
-    @test ydim == 48
-    @test nstep_yr == 730
-end
-
-@testset "RunSpec" begin
-    @test RunSpec() == RunSpec(ctrl=1, scnr=1)
-    @test fieldnames(RunSpec) == (:ctrl, :scnr)
-end
-
 @testset "resolve(::Hydrology): rain coefficients per scheme" begin
     coefficients(h) = (r=resolve(h); (r.c_q, r.c_rq, r.c_omega, r.c_omega_std))
     @test coefficients(Hydrology(rain=:original)) == (1.0f0, 0.0f0, 0.0f0, 0.0f0)

@@ -49,6 +49,16 @@ function write_field(path, value, dims=(X, Y, N); dim_names=["lon", "lat", "time
     return path
 end
 
+"A dataset file with no `dataset_version` entry: the loaders read it as version 1."
+function write_unversioned(path)
+    mkpath(dirname(path))
+    jldopen(path, "w") do file
+        file["data"] = fill(1.0f0, X, Y, N)
+        file["dim_names"] = ["lon", "lat", "time"]
+    end
+    return path
+end
+
 """
 Write `climatology/flux_corrections.jld2` into `dir`, each table filled with
 its value. A table given as `nothing` is left out of the file.

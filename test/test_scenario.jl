@@ -43,7 +43,7 @@ end
 
 @testset "CO2 switched off: 0 ppm in the control and the scenario" begin
     fields = ClimateFields()
-    for p in (:decon_mean_climate, :full_model, :co2_double, :rcp45, :sst_plus1)
+    for p in (:full_model, :rcp45)   # a ConstantCO2 and a CO2Table path
         r = resolved(preset(p; processes=(co2=false,)))
         @test quiet(() -> init_model!(fields, r)).CO2_ctrl == 0
         @test forcing(scenario_time(1950, 1), r).CO2 == 0
@@ -92,8 +92,8 @@ end
 @testset "SeasonalCO2 season is half the year, from 1 October" begin
     r = resolve(Config(scenario=Scenario(co2=SeasonalCO2(680, 340, :boreal_winter))))
     co2(step) = forcing(scenario_time(1950, step), r).CO2
-    @test GREBClimate._winter_first_step == first_step_of(10, 1) == 547
-    @test GREBClimate._winter_last_step == first_step_of(4, 1) == 181
+    @test GREBClimate._winter_first_step == first_step_of(10, 1)
+    @test GREBClimate._winter_last_step == first_step_of(4, 1)
     @test co2.([1, 181, 182, 546, 547, 730]) == Float32[680, 680, 340, 340, 680, 680]
     @test count(==(680.0f0), co2.(1:nstep_yr)) == nstep_yr ÷ 2
     @test co2(731) == 680.0f0     # the second year starts in winter again

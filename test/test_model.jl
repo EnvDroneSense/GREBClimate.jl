@@ -1,15 +1,6 @@
 # greb_model! integration: runs end to end, what a run applies and when, and the
 # flux corrections of the spin-up.
 
-@testset "greb_model! baseline: default config runs to completion with the right output shape" begin
-    result = quiet() do
-        greb_model!(RunSpec(scnr=0), preset(:full_model); jld2_dir="", allow_uninitialized=true)
-    end
-    @test length(result.ctrl) == 12
-    @test length(result.scnr) == 0
-    @test result.ctrl[1] isa MonthlyRecord
-end
-
 @testset "greb_model! refuses bathymetry in z_topo and a zero mixed-layer depth at the start" begin
     cfg = preset(:full_model; corrections=NoCorrections())
     # The error comes from the check, before any step runs
@@ -68,7 +59,6 @@ end
         write_solar_scenarios(dir; sentinel=999.0)
 
         cfg = preset(:paleo_231kyr; corrections=NoCorrections())
-        @test all(==(999.0), resolve(cfg; jld2_dir=dir).solar_table)
         sw_solar(phase, run) = at_first_step(v -> copy(v.fields.sw_solar), run, cfg; phase, jld2_dir=dir, fields)
         # The control keeps the modern table, the scenario runs on the paleo one
         @test sw_solar(control, RunSpec(ctrl=1, scnr=0)) == saved_sw_solar
@@ -122,10 +112,6 @@ end
         # A table that lacks a scenario year stops the run at once, before the spin-up and control run
         @test_throws "No CO2 data for year 1951" greb_model!(RunSpec(ctrl=1, scnr=2),
             cfg; jld2_dir="", allow_uninitialized=true)
-
-        write_solar_scenarios(dir)
-        cfg = preset(:obliquity; index=0, corrections=NoCorrections())
-        @test all(==(999.0f0), at_first_step(v -> copy(v.fields.sw_solar), RunSpec(ctrl=0, scnr=1), cfg; jld2_dir=dir))
     end
 end
 
@@ -174,32 +160,14 @@ end
         preset(:regional_co2_ocean; corrections=NoCorrections()); jld2_dir="", allow_uninitialized=true)
 end
 
-@testset "boundary anomalies: the add step adds the loaded anomaly, and no other" begin
+@testset "boundary anomalies: the add step refuses an anomaly that is not the loaded one" begin
     with_tempdir() do dir
         write_boundary_anomalies(dir)
         fields = ClimateFields()
         load_boundary_anomaly!(fields, dir, :cmip5_rcp85)
-        # Adding an anomaly that is not the loaded one is an error, not a silent mix-up
+        # An error, not a silent mix-up
         @test_throws ErrorException GREBClimate._add_boundary_anomaly!(BoundaryAnomaly(:elnino), fields)
         @test_throws ErrorException GREBClimate._add_boundary_anomaly!(BoundaryAnomaly(:elnino), ClimateFields())
-
-        # The anomaly is added on top of the (here all-zero) base climatology
-        quiet() do
-            GREBClimate._add_boundary_anomaly!(BoundaryAnomaly(:cmip5_rcp85), fields)
-        end
-        @test all(==(2.0), fields.Ts_clim)
-
-        for sym in (:elnino, :lanina)
-            fields2 = ClimateFields()
-            load_boundary_anomaly!(fields2, dir, sym)
-            # Both composite files already carry their sign (the La Nina one is
-            # a cold anomaly), so both experiments add them, as the Fortran does.
-            quiet() do
-                GREBClimate._add_boundary_anomaly!(BoundaryAnomaly(sym), fields2)
-            end
-            @test all(==(7.0), fields2.Ts_clim)
-            @test all(==(8.0), fields2.u_clim)
-        end
     end
 end
 

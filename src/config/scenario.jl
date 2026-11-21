@@ -23,6 +23,10 @@ function _check_finite(name, value)
     return value
 end
 
+# The option sets that the constructors, the loaders and the pack list share
+const _SOLAR_TABLE_KINDS = (:paleo, :obliquity, :eccentricity)
+const _BOUNDARY_ANOMALY_SOURCES = (:cmip5_rcp85, :elnino, :lanina)
+
 """
     ConstantCO2(ppm)
 
@@ -198,7 +202,7 @@ struct SolarTable <: Solar
     kind::Symbol
     index::Int
     function SolarTable(kind::Symbol, index::Integer=get(_MODERN_ROW, kind, 0))
-        _check_option(:kind, kind, (:paleo, :obliquity, :eccentricity))
+        _check_option(:kind, kind, _SOLAR_TABLE_KINDS)
         return new(kind, index)
     end
 end
@@ -246,7 +250,7 @@ result. `source` is `:cmip5_rcp85`, `:elnino` or `:lanina`.
 struct BoundaryAnomaly <: SurfaceForcing
     source::Symbol
     function BoundaryAnomaly(source::Symbol)
-        _check_option(:source, source, (:cmip5_rcp85, :elnino, :lanina))
+        _check_option(:source, source, _BOUNDARY_ANOMALY_SOURCES)
         return new(source)
     end
 end
@@ -259,6 +263,7 @@ control value.
 """
 struct SSTOffset <: SurfaceForcing
     offset::Float32
+    SSTOffset(offset::Real) = new(_check_finite(:offset, offset))
 end
 
 """

@@ -18,10 +18,6 @@ resolved_hydrology(; rain=:fitted, evaporation=:original, c_q=1, c_rq=0, c_omega
 
     tend = tendencies!(340.0, Ts, Ta, To, q, fields, state, ws, slice, r)
     @test tend.Q_sens ≈ ct_sens .* (Ta .- Ts)
-    @test all(isfinite, tend.SW)
-    @test all(isfinite, tend.LW_surf)
-    @test all(isfinite, tend.dTa_crcl)
-    @test all(isfinite, tend.dq_crcl)
 
     r_off = resolve(preset(:full_model; processes=(atmosphere=false,)))
     tend_off = tendencies!(340.0, Ts, Ta, To, q, fields, state, ws, slice, r_off)

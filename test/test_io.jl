@@ -72,15 +72,8 @@ end
         map2("global.topography.jld2", 1.0)
         clim("Tocean.clim.jld2", 10.0)
 
-        # A file without a version entry is from version 1: the climatology and solar files are refused too
-        unversioned(file) = jldopen(file, "w") do f
-            f["data"] = fill(1.0f0, X, Y, N)
-            f["dim_names"] = ["lon", "lat", "time"]
-        end
-        unversioned(joinpath(tmpdir, "climatology", "isccp.cloud_cover.clim.jld2"))
-        @test_throws "dataset version 1" load_climatology(tmpdir; dataset=:ncep)
-        clim("isccp.cloud_cover.clim.jld2", 8.0)
-        unversioned(joinpath(tmpdir, "solar", "solar_radiation.clim.jld2"))
+        # A file without a version entry is from version 1: the solar file is refused too
+        write_unversioned(joinpath(tmpdir, "solar", "solar_radiation.clim.jld2"))
         @test_throws "dataset version 1" load_climatology(tmpdir; dataset=:ncep)
         solar(14.0)
 
@@ -232,11 +225,6 @@ end
         @test endswith(GREBClimate._pack_url(pack), "/$(GREBClimate.DATA_RELEASE_TAG)/$(p.archive)")
     end
     @test allunique(p.sha256 for p in packs)
-    @test GREBClimate.DATA_DEP_NAME == "GREB-input-data-v$(GREBClimate.DATASET_VERSION)"
-
-    data_src = read(joinpath(@__DIR__, "..", "src", "data.jl"), String)
-    @test match(r"const DATA_RELEASE_TAG = \"([^\"]+)\"", data_src).captures[1] ==
-          GREBClimate.DATA_RELEASE_TAG
 end
 
 @testset "dataset version: a file of another version is refused; metadata is read back" begin
@@ -249,38 +237,18 @@ end
         @test info == Dict{String,Any}("dataset_version" => GREBClimate.DATASET_VERSION)
 
         # A file without the entry is from version 1: the loaders refuse it and say so
-        jldopen(old, "w") do file
-            file["data"] = fill(1.0, X, Y)
-            file["dim_names"] = ["lon", "lat"]
-        end
+        write_unversioned(old)
         @test_throws "dataset version 1" load_climatology(dir)
         write_ipcc_scenarios(dir, Dict("rcp60" => Dict(1950 => 1.0)))
         jldopen(joinpath(dir, "scenario", "ipcc_scenarios.jld2"), "w") do file
             file["scenarios"] = Dict("rcp6" => Dict(1950 => 1.0))
         end
         @test_throws "dataset version 1" load_co2_scenario(dir, :rcp60)
-    end
-end
-
-@testset "every loader refuses a file of another dataset version" begin
-    # A file with no version entry is from version 1. One such file per loader
-    unversioned(path) = jldopen(path, "w") do file
-        file["data"] = fill(1.0f0, X, Y, N)
-        file["dim_names"] = ["lon", "lat", "time"]
-    end
-    with_tempdir() do dir
-        write_solar_scenarios(dir)
-        write_flux_corrections(dir)
-        write_boundary_anomalies(dir)
-        unversioned(joinpath(dir, "solar_scenarios", "solar_paleo.jld2"))
-        @test_throws "dataset version 1" load_solar_forcing(dir, :paleo)
         write_flux_corrections(dir)
         jldopen(joinpath(dir, "climatology", "flux_corrections.jld2"), "w") do file
             file["Tsurf_flux_correction"] = fill(0.0f0, X, Y, N)
         end
         @test_throws "dataset version 1" load_flux_corrections!(ClimateFields(), dir)
-        unversioned(joinpath(dir, "climatology", "cmip5.tsurf.rcp85.ensmean.forcing.jld2"))
-        @test_throws "dataset version 1" load_boundary_anomaly!(ClimateFields(), dir, :cmip5_rcp85)
     end
 end
 

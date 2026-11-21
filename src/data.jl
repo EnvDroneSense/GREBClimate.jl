@@ -87,8 +87,8 @@ end
 const _OPTIONAL_PACK_FILES = (
     era=["climatology/$name.jld2" for name in values(_CLIMATOLOGY_FILES.era) if !startswith(name, "ncep.")],
     cmip5=["climatology/$name.jld2" for name in values(_boundary_anomaly_files(:cmip5_rcp85))],
-    enso=["climatology/$name.jld2" for source in (:elnino, :lanina) for name in values(_boundary_anomaly_files(source))],
-    solar=["solar_scenarios/solar_$kind.jld2" for kind in (:paleo, :eccentricity, :obliquity)]
+    enso=["climatology/$name.jld2" for source in _BOUNDARY_ANOMALY_SOURCES if source !== :cmip5_rcp85 for name in values(_boundary_anomaly_files(source))],
+    solar=["solar_scenarios/solar_$kind.jld2" for kind in _SOLAR_TABLE_KINDS]
 )
 
 # The optional pack that holds the file `name` (with or without ".jld2"), or `nothing`
