@@ -19,6 +19,8 @@ An entry outside "Changes to model results" leaves results unchanged.
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-11-21
+
 ### Breaking changes
 
 These inputs now give an `ArgumentError` at once. Before, they gave a NaN or
