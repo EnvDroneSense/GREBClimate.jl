@@ -58,4 +58,3 @@ It takes about a minute with 4 threads. Members with different physics get their
 | [Tutorial](tutorial.md) | The steps of a run, configuration switches, experiment keywords, results, ensembles |
 | [Configuration](configuration.md) | Every `Config` part and its options |
 | [Plots and notebook](viz/index.md) | The `viz/` toolbox that draws a result |
-| [Experiments](dev/experiments.md) | The maintainer scripts that measure climate sensitivity and sweep the CO2 level |

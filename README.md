@@ -105,6 +105,8 @@ A run has three phases, in years:
 
 The [Tutorial](https://EnvDroneSense.github.io/GREBClimate.jl/stable/tutorial/) covers configuration switches, experiment keywords, reading the results, ensembles and run checks. Two scripts show the steps: [`examples/quickstart.jl`](examples/quickstart.jl) and [`examples/feedback_deconstruction.jl`](examples/feedback_deconstruction.jl). The second script asks which processes carry the warming of a doubled CO2. The [Examples](https://EnvDroneSense.github.io/GREBClimate.jl/stable/examples/) page shows their output.
 
+Experiments that run the model many times, such as the effective climate sensitivity and the CO2 sweep, are in the separate repository [GREBExperiments](https://github.com/EnvDroneSense/GREBExperiments). It uses this package as a dependency.
+
 ## 🔬 Model Components
 
 | Component | What it does |

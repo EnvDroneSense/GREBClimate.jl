@@ -40,7 +40,7 @@ GREBClimate.jl/
 ├── docs/                       # Documenter site
 ├── examples/                   # user examples: quickstart.jl, feedback_deconstruction.jl
 ├── viz/                        # plotting toolbox + Pluto notebook (notebooks/), own Project.toml
-├── tools/                      # maintainer scripts: dataset/, diagnostics/, experiments/, validation/ (see tools/README.md)
+├── tools/                      # maintainer scripts: dataset/, diagnostics/, validation/ (see tools/README.md)
 ├── DATA_README.md              # raw .bin input inventory (maintainers)
 └── CHANGELOG.md
 ```
@@ -76,6 +76,7 @@ While developing, run only what a change needs: `julia --project=. test/support/
 
 - A new test file needs a row in the `SHARD` table in [test/support/selection.jl](test/support/selection.jl), or it will not run.
 - A test that calls `greb_data_dir` must pass `allow_download=false`.
+- The workflow `Optional tests` runs `test_enzyme.jl` and `test_dataset_tools.jl` when `ext/`, `tools/dataset/`, `src/io.jl` or `src/data.jl` change. The main CI does not run them.
 - CI has no dataset, so the golden, MSCM, deconstruction and orbital-table tests skip there. Run the whole suite locally with the dataset.
 
 The developer docs page [Testing](docs/src/dev/testing.md) has every command and the rules for new tests; [test/README.md](test/README.md) maps the files.

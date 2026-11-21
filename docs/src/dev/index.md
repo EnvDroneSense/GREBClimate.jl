@@ -9,9 +9,10 @@ The scripts in `tools/` and the timing harness in `benchmark/` are for maintaine
 | `benchmark/profile.jl` | Find where the time and memory of a run go | [Profiling](profiling.md) |
 | `benchmark/fortran/` | Check the model against the original Fortran and time both | [Fortran comparison](fortran.md) |
 | `tools/diagnostics/` | Measure a property of the model, such as its budgets | [Diagnostics](diagnostics.md) |
-| `tools/experiments/` | Run the model to answer a question, such as its climate sensitivity | [Experiments](experiments.md) |
 | `tools/validation/` | Check that a change leaves the results unchanged | [Validation](validation.md) |
 | `test/` | Run the test suite and write new tests | [Testing](testing.md) |
 | - | Float32, allocation, `@turbo`, formatting and the docs build | [Code conventions](conventions.md) |
+
+Experiments that answer a climate question, such as the effective climate sensitivity, are in the separate repository [GREBExperiments](https://github.com/EnvDroneSense/GREBExperiments), not here.
 
 Scripts that run the model read the local dataset with `greb_data_dir(; allow_download=false)` and never download it.
