@@ -19,6 +19,51 @@ An entry outside "Changes to model results" leaves results unchanged.
 
 ## [Unreleased]
 
+### Breaking changes
+
+These inputs now give an `ArgumentError` at once. Before, they gave a NaN or
+Inf run, a late error, or no error.
+
+- A CO2, solar or run-length value out of range: a negative or NaN `ppm`, a
+  NaN `control_co2`, `SolarCycle` with period 0, `EarthSunDistance(-100)` or
+  less, a negative `RunSpec` length, and a non-finite `SSTOffset`.
+- A `preset` keyword that the preset does not use, such as
+  `preset(:co2_double; percent=5)`.
+- A dataset table of the wrong size, or with NaN or Inf. An ocean-only field
+  (mixed-layer depth, deep-ocean temperature) may hold NaN at land cells.
+- A custom CO2 file that lists a year twice.
+- A dataset file of another version in any loader. Before, only some loaders
+  checked.
+- A missing data directory in `greb_data_dir`: `ArgumentError`, not
+  `ErrorException`.
+- A scenario year that is not in the CO2 table stops `greb_model!` before the
+  spin-up. Before, it stopped at that year, after the control run.
+- `greb_model!` refuses a start with a pressure weight above 1.001 (bathymetry
+  in `z_topo`) or a zero mixed-layer depth at an ocean cell. Pass
+  `allow_uninitialized=true` to skip both checks.
+
+### Fixes
+
+- When a stage of a step throws, `tendencies!` waits for both circulation
+  tasks before it re-throws, so a caller that catches the error can reuse the
+  workspaces.
+- `fields.flux_source` is the same for every spelling of the dataset
+  directory.
+
+### Documentation
+
+- Docstrings and comments are shorter and in Simplified Technical English.
+  Comment blocks above internal functions are docstrings.
+
+### Tools and tests
+
+- The suite has a regression run on a synthetic fixture that runs in CI
+  without the dataset, and `SOURCE_MAP` maps more source files to the tests
+  that check them.
+- Tests for repeated claims were removed or merged.
+- `benchmark/compare_step_parts.jl` times `forcing` and the loop order of
+  `seaice!` in one process.
+
 ## [2.3.0] - 2026-11-07
 
 ### Breaking changes
