@@ -21,8 +21,8 @@ end
     RunSpec(; ctrl=1, scnr=1)
 
 Run lengths in years for [`greb_model!`](@ref): `ctrl` (control run) and
-`scnr` (scenario run). The spin-up length is part of the configuration
-([`SpinUp`](@ref)).
+`scnr` (scenario run), each 0 or more. The spin-up length is part of the
+configuration ([`SpinUp`](@ref)).
 
 ```jldoctest
 julia> RunSpec(ctrl = 10, scnr = 30)
@@ -32,6 +32,11 @@ RunSpec(10, 30)
 Base.@kwdef struct RunSpec
     ctrl::Int = 1
     scnr::Int = 1
+    function RunSpec(ctrl::Integer, scnr::Integer)
+        (ctrl >= 0 && scnr >= 0) ||
+            throw(ArgumentError("RunSpec years must be >= 0, got ctrl = $ctrl, scnr = $scnr"))
+        return new(ctrl, scnr)
+    end
 end
 
 # The scenario of every named experiment. The CO2-table runs (IPCC tables,
@@ -103,7 +108,7 @@ const _PRESET_PHYSICS = Dict{Symbol,NamedTuple}(
 
 """
     preset(name; processes=nothing, hydrology=nothing, corrections=nothing,
-           index=nothing, percent=0, path="") -> Config
+           index=nothing, percent=nothing, path=nothing) -> Config
 
 The [`Config`](@ref) of a named experiment ([`preset_names`](@ref) lists them).
 `processes` and `hydrology` change the preset's physics: a NamedTuple such as
@@ -111,7 +116,8 @@ The [`Config`](@ref) of a named experiment ([`preset_names`](@ref) lists them).
 [`Hydrology`](@ref) replaces them. `index` selects the table row of
 `:obliquity`/`:eccentricity` (default: the row nearest today, see
 [`SolarTable`](@ref)), `percent` the distance change of `:earth_sun_distance`,
-`path` the CO2 file of `:custom_co2`.
+`path` the CO2 file of `:custom_co2`. A keyword that the preset does not use is
+an `ArgumentError`.
 
 Every preset runs the default physics with a 3-year [`SpinUp`](@ref), except
 the two deconstructions, which run the MSCM physics ([`mscm_hydrology`](@ref),
@@ -128,14 +134,19 @@ ConstantCO2(680.0f0)
 """
 function preset(name::Symbol; processes::Union{Processes,NamedTuple,Nothing}=nothing,
         hydrology::Union{Hydrology,NamedTuple,Nothing}=nothing, corrections::Union{Corrections,Nothing}=nothing,
-        index::Union{Integer,Nothing}=nothing, percent::Real=0, path::AbstractString="")
+        index::Union{Integer,Nothing}=nothing, percent::Union{Real,Nothing}=nothing,
+        path::Union{AbstractString,Nothing}=nothing)
     haskey(_PRESET_SCENARIOS, name) ||
         throw(ArgumentError("unknown preset :$name; known: $(join((":$p" for p in preset_names()), ", "))"))
     s = _PRESET_SCENARIOS[name]
-    s.solar isa SolarTable && s.solar.kind !== :paleo && index !== nothing &&
-        (s = _with(s; solar=SolarTable(s.solar.kind, index)))
-    s.solar isa EarthSunDistance && (s = _with(s; solar=EarthSunDistance(percent)))
-    s.co2 isa CO2File && (s = _with(s; co2=CO2File(path)))
+    uses_index = s.solar isa SolarTable && s.solar.kind !== :paleo
+    for (kw, value, used) in ((:index, index, uses_index), (:percent, percent, s.solar isa EarthSunDistance),
+        (:path, path, s.co2 isa CO2File))
+        value === nothing || used || throw(ArgumentError("preset :$name does not use the keyword `$kw`"))
+    end
+    uses_index && index !== nothing && (s = _with(s; solar=SolarTable(s.solar.kind, index)))
+    s.solar isa EarthSunDistance && (s = _with(s; solar=EarthSunDistance(something(percent, 0))))
+    s.co2 isa CO2File && (s = _with(s; co2=CO2File(something(path, ""))))
     defaults = get(_PRESET_PHYSICS, name, (;))
     processes = _change(get(defaults, :processes, Processes()), processes)
     hydrology = _change(get(defaults, :hydrology, Hydrology()), hydrology)

@@ -100,6 +100,9 @@ end
         # A missing path must raise a clear error, not silently default.
         @test_throws ArgumentError greb_model!(RunSpec(ctrl=0, scnr=1),
             preset(:custom_co2); jld2_dir="", allow_uninitialized=true)
+        # A table that lacks a scenario year stops the run at once, before the spin-up and control run
+        @test_throws "No CO2 data for year 1951" greb_model!(RunSpec(ctrl=1, scnr=2),
+            cfg; jld2_dir="", allow_uninitialized=true)
 
         write_solar_scenarios(dir)
         cfg = preset(:obliquity; index=0, corrections=NoCorrections())

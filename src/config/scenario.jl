@@ -10,6 +10,19 @@ The scenario's CO2 concentration over time: [`ConstantCO2`](@ref),
 """
 abstract type CO2Path end
 
+# The emissivity fit takes a logarithm of the CO2 concentration: a negative or
+# non-finite value gives a NaN run without an error
+function _check_ppm(name, ppm)
+    (isfinite(ppm) && ppm >= 0) ||
+        throw(ArgumentError("$name must be a finite CO2 concentration >= 0 ppm, got $ppm"))
+    return ppm
+end
+
+function _check_finite(name, value)
+    isfinite(value) || throw(ArgumentError("$name must be finite, got $value"))
+    return value
+end
+
 """
     ConstantCO2(ppm)
 
@@ -17,6 +30,7 @@ The same CO2 concentration for the whole scenario.
 """
 struct ConstantCO2 <: CO2Path
     ppm::Float32
+    ConstantCO2(ppm::Real) = new(_check_ppm(:ppm, ppm))
 end
 
 """
@@ -64,6 +78,8 @@ struct CO2Step <: CO2Path
     before::Float32
     after::Float32
     year::Int
+    CO2Step(before::Real, after::Real, year::Integer) =
+        new(_check_ppm(:before, before), _check_ppm(:after, after), year)
 end
 
 """
@@ -79,7 +95,7 @@ struct SeasonalCO2 <: CO2Path
     season::Symbol
     function SeasonalCO2(in_season, out_of_season, season::Symbol)
         _check_option(:season, season, (:boreal_winter, :boreal_summer))
-        return new(in_season, out_of_season, season)
+        return new(_check_ppm(:in_season, in_season), _check_ppm(:out_of_season, out_of_season), season)
     end
 end
 
@@ -150,6 +166,7 @@ The solar constant raised from 1365 by `offset` W/m².
 """
 struct SolarConstant <: Solar
     offset::Float32
+    SolarConstant(offset::Real) = new(_check_finite(:offset, offset))
 end
 
 """
@@ -160,6 +177,12 @@ The solar constant varying as `1365 + amplitude sin(2π year / period)` W/m².
 struct SolarCycle <: Solar
     amplitude::Float32
     period::Float32
+    # `period` divides the year in the solar factor
+    function SolarCycle(amplitude::Real, period::Real)
+        (isfinite(period) && period > 0) ||
+            throw(ArgumentError("SolarCycle period must be a finite number of years > 0, got $period"))
+        return new(_check_finite(:amplitude, amplitude), period)
+    end
 end
 
 """
@@ -188,10 +211,15 @@ const _MODERN_ROW = Dict(:obliquity => 95, :eccentricity => 32)
 
 The Earth-Sun distance changed by `percent` percent of today's; positive is
 further away. Insolation scales with the inverse square, so `percent = 1` gives
-about 2 % less sunlight.
+about 2 % less sunlight. `percent` is greater than -100.
 """
 struct EarthSunDistance <: Solar
     percent::Float32
+    function EarthSunDistance(percent::Real)
+        (isfinite(percent) && percent > -100) ||
+            throw(ArgumentError("EarthSunDistance percent must be finite and > -100, got $percent"))
+        return new(percent)
+    end
 end
 
 """
@@ -251,6 +279,8 @@ struct Scenario
     control_co2::Float32
     start_year::Int
     output::Symbol
+    Scenario(co2, co2_mask, solar, surface, control_co2, start_year, output) =
+        new(co2, co2_mask, solar, surface, _check_ppm(:control_co2, control_co2), start_year, output)
 end
 
 function Scenario(; co2=ConstantCO2(340), co2_mask=UniformMask(), solar=ModernSolar(),

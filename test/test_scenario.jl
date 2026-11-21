@@ -18,6 +18,10 @@ end
     @test preset(:obliquity; index=10).scenario.solar == SolarTable(:obliquity, 10)
     @test preset(:earth_sun_distance; percent=2.5).scenario.solar == EarthSunDistance(2.5)
     @test preset(:custom_co2; path="co2.txt").scenario.co2 == CO2File("co2.txt")
+    # A keyword that the preset does not use is an error, not ignored
+    @test_throws "does not use" preset(:co2_double; percent=5)
+    @test_throws "does not use" preset(:obliquity; path="x")
+    @test_throws "does not use" preset(:paleo_231kyr; index=3)
 end
 
 @testset "preset defaults: corrections, and changes to the preset's physics" begin
@@ -60,6 +64,21 @@ end
     r = resolved(Config(scenario=Scenario(co2=SeasonalCO2(1000, 300, :boreal_summer))))
     @test forcing(scenario_time(1950, 1), r).CO2 == 300 && forcing(scenario_time(1950, 300), r).CO2 == 1000
     @test_throws ErrorException forcing(scenario_time(1951, 1), resolved(preset(:rcp45)))    # year not in the table
+end
+
+@testset "scenario parts refuse values that give a NaN or Inf run" begin
+    bad = [() -> ConstantCO2(-1), () -> ConstantCO2(NaN), () -> CO2Step(340, -5, 1980),
+        () -> SeasonalCO2(Inf, 340, :boreal_winter), () -> Scenario(control_co2=NaN),
+        () -> SolarConstant(NaN), () -> SolarCycle(1, 0), () -> SolarCycle(NaN, 11),
+        () -> EarthSunDistance(-100), () -> RunSpec(ctrl=-1), () -> RunSpec(scnr=-1)]
+    refused(f) = try
+        f()
+        false
+    catch err
+        err isa ArgumentError
+    end
+    @test all(refused, bad)
+    @test ConstantCO2(0).ppm == 0 && RunSpec(ctrl=0, scnr=0) == RunSpec(0, 0)
 end
 
 @testset "A1B ramp: 700 ppm in 2100, held afterwards" begin
