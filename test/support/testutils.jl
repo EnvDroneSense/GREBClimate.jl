@@ -2,8 +2,14 @@
 #
 # `allow_download=false` so running the tests can never trigger the 353 MB
 # DataDeps download; data-dependent testsets @test_skip when this is absent.
-const DATA_DIR = something(greb_data_dir(; allow_download=false),
-    joinpath(@__DIR__, "..", "greb_input_data"))
+# A `GREB_DATA` that names no folder skips the data tests like a missing dataset
+# does; `DATA_DIR` is "" then, and `isdir("")` is false.
+const DATA_DIR = try
+    something(greb_data_dir(; allow_download=false), "")
+catch err
+    @warn "No dataset for the tests: $(sprint(showerror, err))"
+    ""
+end
 
 const X, Y, N = xdim, ydim, nstep_yr
 

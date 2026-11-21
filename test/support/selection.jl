@@ -75,15 +75,17 @@ end
 # tier. The first rule whose prefix starts the path wins. A path no rule names
 # runs the full suite, so a new file is safe by default; test_selection.jl fails
 # when a file under src/ or ext/ has no rule, so it gets one on purpose.
+# The thread comparison (test_threading.jl) and the golden run (test_golden.jl)
+# are not mapped: they are slow, so the full suite runs them before a release.
 const SOURCE_MAP = [
     ("src/physics/", ["physics", "budgets", "invariants"]),
     ("src/core/tendencies.jl", ["physics", "budgets", "invariants"]),
     ("src/core/budgets.jl", ["budgets", "invariants"]),
     ("src/config/", ["config", "presets", "processes", "scenario"]),
-    ("src/forcing/", ["config", "presets", "processes", "scenario"]),
-    ("src/core/calendar.jl", ["calendar"]),
-    ("src/core/state.jl", ["state", "output"]),
-    ("src/core/output.jl", ["state", "output"]),
+    ("src/forcing/", ["config", "presets", "processes", "scenario", "model"]),
+    ("src/core/calendar.jl", ["calendar", "output"]),
+    ("src/core/state.jl", ["state", "output", "physics", "invariants", "processes"]),
+    ("src/core/output.jl", ["state", "output", "budgets", "model"]),
     ("src/core/postprocess.jl", ["state", "output"]),
     ("src/io.jl", ["io"]),
     ("src/data.jl", ["io"]),

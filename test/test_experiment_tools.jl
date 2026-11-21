@@ -1,9 +1,9 @@
 # The experiment helpers in tools/experiments/helpers.jl.
 
-const ET = let tools = Module()
-    Base.include(tools, joinpath(@__DIR__, "..", "tools", "experiments", "helpers.jl"))
-    tools.ExperimentTools
-end
+# Two statements: the module's binding does not exist in the world of the include
+const _ET_HOST = Module()
+Base.include(_ET_HOST, joinpath(@__DIR__, "..", "tools", "experiments", "helpers.jl"))
+const ET = _ET_HOST.ExperimentTools
 
 @testset "gregory recovers a straight line" begin
     dT = collect(0.5:0.25:3.0)
