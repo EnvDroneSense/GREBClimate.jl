@@ -55,10 +55,32 @@ function dataset_field_files()
     return names
 end
 
-# Fill the arrays of `fields` named in `files` from the files in `dir`
+# Copy the table `data` read from `source` into `dest`. Broadcasting would fill
+# `dest` from a smaller table without an error, so the size must match. NaN is
+# an error, except at the cells of `nan_ok` (land cells of an ocean-only field).
+function _fill_checked!(dest::AbstractArray, data, source::AbstractString; nan_ok=nothing)
+    size(data) == size(dest) ||
+        throw(ArgumentError("$source holds a $(size(data)) table, expected $(size(dest))"))
+    for i in CartesianIndices(data)
+        v = data[i]
+        isfinite(v) && continue
+        isnan(v) && nan_ok !== nothing && nan_ok[i[1], i[2]] && continue
+        throw(ArgumentError("$source holds NaN or Inf values"))
+    end
+    dest .= data
+    return dest
+end
+
+# The fields that the dataset defines at ocean cells only
+const _OCEAN_ONLY_FIELDS = (:mld_clim, :To_clim)
+
+# Fill the arrays of `fields` named in `files` from the files in `dir`. Land
+# cells (`z_topo` is loaded first) may hold NaN in an ocean-only field.
 function _load_fields!(fields::ClimateFields, dir::AbstractString, files::NamedTuple)
     for (field, name) in pairs(files)
-        getfield(fields, field) .= read_field(joinpath(dir, name * ".jld2")).data
+        path = joinpath(dir, name * ".jld2")
+        land = field in _OCEAN_ONLY_FIELDS ? is_land.(fields.z_topo) : nothing
+        _fill_checked!(getfield(fields, field), read_field(path).data, path; nan_ok=land)
     end
 end
 
@@ -180,8 +202,8 @@ end
 
 Load a `year => CO2` lookup table for the `:custom_co2` experiment from a
 plain-text file, one `year CO2` pair per line. Blank lines
-and lines starting with `#` are skipped. A missing file or a malformed line
-is an `ArgumentError`.
+and lines starting with `#` are skipped. A missing file, a malformed line or a
+year that appears twice is an `ArgumentError`.
 """
 function load_co2_custom(path::AbstractString)
     isfile(path) || throw(ArgumentError("custom CO2 scenario file not found: $path"))
@@ -193,7 +215,10 @@ function load_co2_custom(path::AbstractString)
             cols = split(stripped)
             length(cols) >= 2 ||
                 throw(ArgumentError("malformed line in custom CO2 scenario file $path: \"$line\" (expected \"year CO2\")"))
-            table[parse(Int, cols[1])] = parse(Float32, cols[2])
+            year = parse(Int, cols[1])
+            haskey(table, year) &&
+                throw(ArgumentError("year $year appears twice in custom CO2 scenario file $path"))
+            table[year] = parse(Float32, cols[2])
         end
     end
     return table
@@ -214,7 +239,8 @@ function load_flux_corrections!(fields::ClimateFields, jld2_dir::AbstractString)
     @lock _JLD2_LOCK jldopen(filepath, "r") do file
         for (field, key) in pairs(_FLUX_CORRECTION_KEYS)
             haskey(file, key) || throw(ArgumentError("$key not found in $filepath"))
-            getfield(fields, field) .= file[key]
+            land = field === :To_flux_correction ? is_land.(fields.z_topo) : nothing
+            _fill_checked!(getfield(fields, field), file[key], "$key in $filepath"; nan_ok=land)
             @info "Loaded $key"
         end
     end
@@ -242,7 +268,8 @@ function load_boundary_anomaly!(fields::ClimateFields, jld2_dir::AbstractString,
     fields.boundary_anomaly_source = ("", :none)
     anomaly = something(fields.boundary_anomaly, map(_ -> zeros(Float32, xdim, ydim, nstep_yr), files))
     for (name, file) in pairs(files)
-        anomaly[name] .= read_field(joinpath(jld2_dir, "climatology", file * ".jld2")).data
+        path = joinpath(jld2_dir, "climatology", file * ".jld2")
+        _fill_checked!(anomaly[name], read_field(path).data, path)
     end
     fields.boundary_anomaly = anomaly
     fields.boundary_anomaly_source = (String(jld2_dir), source)
@@ -294,9 +321,7 @@ function load_climatology(jld2_dir::AbstractString; dataset::Symbol=:ncep, corre
     @info "Loading the solar radiation table"
     solar_path = joinpath(jld2_dir, "solar", _SOLAR_FILE * ".jld2")
     solar_result = read_field(solar_path)
-    size(solar_result.data) == (ydim, nstep_yr) ||
-        throw(ArgumentError("$solar_path holds a $(size(solar_result.data)) table, expected ($ydim, $nstep_yr)"))
-    fields.sw_solar .= solar_result.data
+    _fill_checked!(fields.sw_solar, solar_result.data, solar_path)
 
     if corrections
         @info "Loading the flux corrections"

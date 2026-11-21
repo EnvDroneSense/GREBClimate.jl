@@ -53,6 +53,21 @@
         reads = [Threads.@spawn read_field(path).data for _ in 1:8]
         @test all(t -> all(==(10.0), fetch(t)), reads)
 
+        # A table of another shape, or with a NaN, is an error and not a broadcast
+        write_field(path, 10.0, (X, Y, 1))
+        @test_throws "Tocean.clim.jld2" load_climatology(tmpdir; dataset=:ncep)
+        clim("ncep.tsurf.1948-2007.clim.jld2", NaN)
+        @test_throws "NaN" load_climatology(tmpdir; dataset=:ncep)
+        clim("ncep.tsurf.1948-2007.clim.jld2", 3.0)
+
+        # An ocean-only field may hold NaN at land cells (z_topo = 1 here), not at ocean cells
+        clim("Tocean.clim.jld2", NaN)
+        @test isnan(load_climatology(tmpdir; dataset=:ncep).To_clim[1])
+        map2("global.topography.jld2", -1.0)
+        @test_throws "NaN" load_climatology(tmpdir; dataset=:ncep)
+        map2("global.topography.jld2", 1.0)
+        clim("Tocean.clim.jld2", 10.0)
+
         # A solar table of the wrong shape is reported, with the file's name
         solar(0.0, (Y, 2))
         @test_throws "solar_radiation.clim.jld2" load_climatology(tmpdir; dataset=:ncep)
@@ -101,6 +116,8 @@ end
         bad_path = joinpath(dir, "bad_co2.txt")
         write(bad_path, "1950 300.0\n1951\n")
         @test_throws ArgumentError load_co2_custom(bad_path)
+        write(bad_path, "1950 300.0\n1950 301.0\n")
+        @test_throws "1950 appears twice" load_co2_custom(bad_path)
         rm(bad_path)
         @test !isfile(bad_path)
     end
