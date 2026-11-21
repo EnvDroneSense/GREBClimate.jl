@@ -27,6 +27,10 @@ A run of a subset proves only the files it ran. Run the whole suite before you o
 | Break the line a test claims to pin and check that the test fails | A test that cannot fail guards nothing. When you delete a test, check that another one fails too |
 | Use fixtures from `test/support/testutils.jl` | `quiet()`, `with_tempdir()`, `synthetic_fields()`, `constant_fields()`, `uniform_record()`, `at_first_step()`, `DATA_DIR` and the grid constants |
 
+## Optional tests in CI
+
+The workflow `.github/workflows/optional-tests.yml` has two jobs that the main CI does not run: `test_enzyme.jl` (the Enzyme rules in `ext/`) and `test_dataset_tools.jl` (the dataset tools, opt-in by name). It starts when `ext/`, `tools/dataset/`, `src/io.jl` or `src/data.jl` change, every week, and by hand.
+
 ## What CI cannot check
 
 CI has no dataset, so every test behind `isdir(DATA_DIR)` skips there: the golden regression, the MSCM, deconstruction and orbital-table tests, and the threaded-against-serial comparison on the real dataset. A green CI says nothing about them. Run the whole suite locally with the dataset before you open a pull request.

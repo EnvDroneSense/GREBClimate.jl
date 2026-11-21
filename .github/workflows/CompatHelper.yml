@@ -1,6 +1,7 @@
 # Opens a PR when a dependency releases outside the declared [compat] bounds,
-# so maintenance finds you rather than the reverse. Covers docs/ and test/ too,
-# since both carry their own [compat].
+# so maintenance finds you rather than the reverse. Covers docs/ too,
+# since it carries its own [compat]. test/ is left out: its entries are standard
+# libraries and the package itself.
 name: CompatHelper
 
 on:
@@ -23,7 +24,7 @@ jobs:
         run: import Pkg; Pkg.add("CompatHelper")
         shell: julia --color=yes {0}
       - name: Run CompatHelper
-        run: import CompatHelper; CompatHelper.main(; subdirs = ["", "docs", "test"])
+        run: import CompatHelper; CompatHelper.main(; subdirs = ["", "docs"])
         shell: julia --color=yes {0}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

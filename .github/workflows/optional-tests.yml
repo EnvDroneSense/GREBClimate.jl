@@ -1,0 +1,56 @@
+# Tests that the main CI leaves out: the Enzyme rules (Enzyme is not a test
+# dependency, so test_enzyme.jl skips there) and the dataset tools (opt-in, in no
+# shard). They run when their files change, and weekly to catch a new Enzyme or
+# Julia release.
+name: Optional tests
+
+on:
+  pull_request:
+    paths:
+      - 'ext/**'
+      - 'tools/dataset/**'
+      - 'src/io.jl'
+      - 'src/data.jl'
+      - 'test/test_enzyme.jl'
+      - 'test/test_dataset_tools.jl'
+      - '.github/workflows/optional-tests.yml'
+  schedule:
+    - cron: '0 6 * * 2'   # Tuesdays, 06:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  enzyme:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v2
+      - uses: julia-actions/julia-buildpkg@v1
+      # test_enzyme.jl looks for Enzyme in a shared environment named `enzyme`.
+      - name: Install Enzyme into the shared environment
+        run: julia --project=@enzyme -e 'using Pkg; Pkg.add("Enzyme")'
+      - name: Run test_enzyme.jl
+        run: julia --project=. -e 'using Pkg; Pkg.test(test_args=["enzyme"])'
+        env:
+          DATADEPS_DISABLE_DOWNLOAD: 'true'
+
+  dataset-tools:
+    # Needs GNU tar and xz, both on the runner.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v2
+      - uses: julia-actions/julia-buildpkg@v1
+      - name: Run test_dataset_tools.jl
+        run: julia --project=. -e 'using Pkg; Pkg.test(test_args=["dataset_tools"])'
+        env:
+          DATADEPS_DISABLE_DOWNLOAD: 'true'

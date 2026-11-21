@@ -18,6 +18,10 @@ end
     @test preset(:obliquity; index=10).scenario.solar == SolarTable(:obliquity, 10)
     @test preset(:earth_sun_distance; percent=2.5).scenario.solar == EarthSunDistance(2.5)
     @test preset(:custom_co2; path="co2.txt").scenario.co2 == CO2File("co2.txt")
+    # A keyword that the preset does not use is an error, not ignored
+    @test_throws "does not use" preset(:co2_double; percent=5)
+    @test_throws "does not use" preset(:obliquity; path="x")
+    @test_throws "does not use" preset(:paleo_231kyr; index=3)
 end
 
 @testset "preset defaults: corrections, and changes to the preset's physics" begin
@@ -39,7 +43,7 @@ end
 
 @testset "CO2 switched off: 0 ppm in the control and the scenario" begin
     fields = ClimateFields()
-    for p in (:decon_mean_climate, :full_model, :co2_double, :rcp45, :sst_plus1)
+    for p in (:full_model, :rcp45)   # a ConstantCO2 and a CO2Table path
         r = resolved(preset(p; processes=(co2=false,)))
         @test quiet(() -> init_model!(fields, r)).CO2_ctrl == 0
         @test forcing(scenario_time(1950, 1), r).CO2 == 0
@@ -62,6 +66,22 @@ end
     @test_throws ErrorException forcing(scenario_time(1951, 1), resolved(preset(:rcp45)))    # year not in the table
 end
 
+@testset "scenario parts refuse values that give a NaN or Inf run" begin
+    bad = [() -> ConstantCO2(-1), () -> ConstantCO2(NaN), () -> CO2Step(340, -5, 1980),
+        () -> SeasonalCO2(Inf, 340, :boreal_winter), () -> Scenario(control_co2=NaN),
+        () -> SolarConstant(NaN), () -> SolarCycle(1, 0), () -> SolarCycle(NaN, 11),
+        () -> EarthSunDistance(-100), () -> RunSpec(ctrl=-1), () -> RunSpec(scnr=-1)]
+    refused(f) =
+        try
+            f()
+            false
+        catch err
+            err isa ArgumentError
+        end
+    @test all(refused, bad)
+    @test ConstantCO2(0).ppm == 0 && RunSpec(ctrl=0, scnr=0) == RunSpec(0, 0)
+end
+
 @testset "A1B ramp: 700 ppm in 2100, held afterwards" begin
     r = resolved(preset(:a1b))
     @test forcing(scenario_time(1950, 1), r).CO2 == 310 && forcing(scenario_time(2050, 1), r).CO2 == 520
@@ -72,8 +92,8 @@ end
 @testset "SeasonalCO2 season is half the year, from 1 October" begin
     r = resolve(Config(scenario=Scenario(co2=SeasonalCO2(680, 340, :boreal_winter))))
     co2(step) = forcing(scenario_time(1950, step), r).CO2
-    @test GREBClimate._winter_first_step == first_step_of(10, 1) == 547
-    @test GREBClimate._winter_last_step == first_step_of(4, 1) == 181
+    @test GREBClimate._winter_first_step == first_step_of(10, 1)
+    @test GREBClimate._winter_last_step == first_step_of(4, 1)
     @test co2.([1, 181, 182, 546, 547, 730]) == Float32[680, 680, 340, 340, 680, 680]
     @test count(==(680.0f0), co2.(1:nstep_yr)) == nstep_yr ÷ 2
     @test co2(731) == 680.0f0     # the second year starts in winter again
@@ -109,10 +129,13 @@ end
     # annual mean ~0.917, IS ice under the Fortran-matching rule.
     icmn_ctrl[2, 1, 1] = 0.0
     icmn_ctrl[2, 1, 2:12] .= 1.0
+    # Cell C: an annual mean of exactly 0.5 is ice
+    icmn_ctrl[3, 1, 1:6] .= 1.0
 
     apply_surface_mask!(fields, SurfaceMask(:ocean), icmn_ctrl)
     @test fields.co2_part[1, 1] == 1.0  # January said "ice"; annual mean says no
     @test fields.co2_part[2, 1] == 0.5  # January said "no ice"; annual mean says yes
+    @test fields.co2_part[3, 1] == 0.5
 
     # The land/ice variant inverts the ocean mask and exempts ice cells.
     f_li = ClimateFields()

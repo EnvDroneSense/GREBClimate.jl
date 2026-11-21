@@ -12,37 +12,31 @@ function run_julia(script; threads)
     return read(`$exe --startup-file=no --project=$project -t $threads -e $script`, String)
 end
 
-@testset "threaded circulation matches serial (subprocess -t 1 vs -t 2)" begin
+@testset "threaded run matches serial on the rich fixture (subprocess -t 1 vs -t 2)" begin
     # `tendencies!` runs the two circulation! calls concurrently only when
     # `Threads.nthreads() > 1` and `ws_a !== ws_q`. Thread count is fixed at
-    # Julia startup, so both counts are started as subprocesses.
+    # Julia startup, so both counts are started as subprocesses. The fixture has
+    # sunlight, vertical motion and a seasonal mixed layer; the hash covers every record field.
     support = joinpath(@__DIR__, "support")
     script = """
         include(raw"$(joinpath(support, "imports.jl"))")
         include(raw"$(joinpath(support, "testutils.jl"))")
         cfg = preset(:full_model; corrections = NoCorrections())
-        result = run_synthetic(RunSpec(ctrl = 1, scnr = 0), cfg)
-        print(Threads.nthreads())
-        for rec in result.ctrl
-            print(" ", gmean(rec.Ts), " ", gmean(rec.Ta), " ", gmean(rec.q))
-        end
+        result = run_synthetic(RunSpec(ctrl = 1, scnr = 1), cfg; fields = rich_fields())
+        records = vcat(result.ctrl, result.scnr)
+        finite = all(r -> all(f -> all(isfinite, getfield(r, f)), fieldnames(MonthlyRecord)), records)
+        print(Threads.nthreads(), " ", finite, " ",
+              hash([getfield(r, f) for r in records for f in fieldnames(MonthlyRecord)]))
     """
-    function run_at(n)
-        parts = split(strip(run_julia(script; threads=n)))
-        return (nthreads=parse(Int, parts[1]), digest=parse.(Float64, parts[2:end]))
-    end
+    run_at(n) = split(strip(run_julia(script; threads=n)))
 
     serial = run_at(1)
     threaded = run_at(2)
 
     # the subprocesses really did run at the requested thread counts
-    @test serial.nthreads == 1
-    @test threaded.nthreads == 2
-    # 12 months x 3 quantities
-    @test length(serial.digest) == 36
-    @test length(threaded.digest) == length(serial.digest)
-
-    @test isequal(threaded.digest, serial.digest)
+    @test serial[1:2] == ["1", "true"]
+    @test threaded[1:2] == ["2", "true"]
+    @test threaded[3] == serial[3]
 end
 
 @testset "threaded run matches serial on the real dataset (subprocess -t 1 vs -t 2)" begin

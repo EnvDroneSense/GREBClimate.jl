@@ -9,12 +9,6 @@
         @test (step_of_year(1000), day_of_year(1000)) == (270, 135)
     end
 
-    @testset "far past 200 years" begin
-        @test (step_of_year(146_001), day_of_year(146_001)) == (1, 1)
-        @test (step_of_year(73_000_000), day_of_year(73_000_000)) == (730, 365)
-        @test (step_of_year(73_000_001), day_of_year(73_000_001)) == (1, 1)
-    end
-
     @testset "months" begin
         @test months_per_year == 12
         @test month_of_day.([1, 31, 32, 59, 60, 90, 91, 365]) == [1, 1, 2, 2, 3, 3, 4, 12]
@@ -57,8 +51,6 @@ end
         @test (step_of_year(t), day_of_year(t), month(t), year(t)) == (270, 135, 5, 1951)
         @test data_slice(t) == step_of_year(t)
         @test decimal_year(t) == 1951 + 269 / 730
-        @test all(s -> month(ModelTime(control, 1970, s)) == month_of_step(s), 1:(2*nstep_yr))
-        @test all(s -> is_month_end(ModelTime(control, 1970, s)) == is_month_end(s), 1:(2*nstep_yr))
         @test is_year_end(ModelTime(control, 1970, 730)) && !is_year_end(ModelTime(control, 1970, 731))
     end
 

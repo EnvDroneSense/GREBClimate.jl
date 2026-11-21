@@ -17,7 +17,7 @@ const _OVERRIDES = (
 """
     init_model!(fields::ClimateFields, r::ResolvedConfig)
 
-One-time per-run setup: resets the CO2 mask to full CO2, applies the climatologies the
+One-time per-run setup. It resets the CO2 mask to full CO2, applies the climatologies the
 [`Processes`](@ref) options replace (flat topography, cloud cover, humidity,
 mixed layer) and zeroes the flux corrections for `NoCorrections()`, derives
 the fields that follow from them ([`derive_fields!`](@ref)), then computes the
@@ -41,13 +41,32 @@ function init_model!(fields::ClimateFields, r::ResolvedConfig)
     derive_fields!(fields, p)
 
     # Initial conditions from the last time step of the climatology
-    Ts = fields.Ts_clim[:, :, nstep_yr] |> copy
-    surf = SurfaceState(Ts, copy(Ts), fields.To_clim[:, :, nstep_yr] |> copy,
-        fields.q_clim[:, :, nstep_yr] |> copy)
+    Ts = fields.Ts_clim[:, :, nstep_yr]   # a slice is already a copy
+    surf = SurfaceState(Ts, copy(Ts), fields.To_clim[:, :, nstep_yr], fields.q_clim[:, :, nstep_yr])
 
     CO2_ctrl = p.co2 ? c.scenario.control_co2 : 0.0f0
 
     return (surf=surf, CO2_ctrl=CO2_ctrl)
+end
+
+"""
+    _check_run_fields(fields, p::Processes)
+
+Refuse fields the physics cannot use: a pressure weight above 1.001 (a
+`z_topo` that holds bathymetry, not a height near sea level) and a mixed-layer
+depth of 0 or less at an ocean cell of a run with an ocean. Run after `derive_fields!`.
+"""
+function _check_run_fields(fields::ClimateFields, p::Processes)
+    wmax = max(maximum(fields.wz_air), maximum(fields.wz_vapor))
+    wmax > 1.001f0 &&
+        error("z_topo gives a pressure weight of $wmax (above 1.001): the topography must be a height with ocean cells at 0 m or just below, not ocean depth. Pass allow_uninitialized=true to skip this check.")
+    if p.ocean !== :none
+        for k in 1:nstep_yr, j in 1:ydim, i in 1:xdim
+            is_land(fields.z_topo[i, j]) || fields.mld_clim[i, j, k] > 0.0f0 ||
+                error("mixed-layer depth $(fields.mld_clim[i, j, k]) m at ocean cell ($i, $j), step $k: it must be above 0. Pass allow_uninitialized=true to skip this check.")
+        end
+    end
+    return nothing
 end
 
 _add_boundary_anomaly!(::SurfaceForcing, fields::ClimateFields) = fields
@@ -95,7 +114,7 @@ Run `years` years of `tendencies!` to derive the flux corrections of the
 surface temperature, the deep ocean and the humidity
 (`fields.Ts_flux_correction`, `To_flux_correction`, `q_flux_correction`) that
 hold the control climate at the observed climatology. Updates
-`Ts`/`Ta`/`To`/`q` in place as it integrates. `ws_a`/`ws_q` are forwarded to [`tendencies!`](@ref).
+`Ts`/`Ta`/`To`/`q` in place as it integrates. It forwards `ws_a`/`ws_q` to [`tendencies!`](@ref).
 """
 function qflux_correction!(CO2_ctrl, Ts, Ta, To, q, fields::ClimateFields, state::ModelState, r::ResolvedConfig, ws::ModelWorkspace, years;
         ws_a::ModelWorkspace=ws, ws_q::ModelWorkspace=ws)
@@ -132,6 +151,7 @@ function qflux_correction!(CO2_ctrl, Ts, Ta, To, q, fields::ClimateFields, state
         dq_eva = tend.dq_eva
         dq_rain = tend.dq_rain
 
+        # Each correction moves this step's value onto the climatology; `Ta` has none
         @turbo for j in 1:ydim
             for i in 1:xdim
                 ts0 = Ts[i, j] + dT_ocean[i, j] + Δt * @surface_flux(i, j) / cap_surf[i, j]
@@ -174,13 +194,13 @@ end
 # A fresh copy of a state's arrays
 _copy_surface(s::SurfaceState) = SurfaceState(copy(s.Ts), copy(s.Ta), copy(s.To), copy(s.q))
 
-# The corrections of a `Stored` run. With a dataset directory they are read from its file
-# unless `fields` already holds them from that file; without one, the ones in `fields`
-# are used (`load_climatology` loads them)
+"""
+The corrections of a `Stored` run. With a dataset directory they are read from its file
+unless `fields` already holds them from that file; without one, the ones in `fields`
+are used (`load_climatology` loads them).
+"""
 function _use_stored_corrections!(fields::ClimateFields, jld2_dir::AbstractString, in_place::Bool)
     isempty(jld2_dir) && return nothing
-    file = _flux_file(jld2_dir)
-    isfile(file) || throw(ArgumentError("Stored() found no flux corrections at $file"))
     if !in_place
         @info "Loading the stored flux corrections"
         load_flux_corrections!(fields, String(jld2_dir))
@@ -188,8 +208,10 @@ function _use_stored_corrections!(fields::ClimateFields, jld2_dir::AbstractStrin
     return nothing
 end
 
-# The control run: `years` years from a copy of `surf_ini`. Returns the monthly records and
-# their times
+"""
+The control run: `years` years from a copy of `surf_ini`. Returns the monthly records and
+their times.
+"""
 function _control_run!(r::ResolvedConfig, fields::ClimateFields, surf_ini::SurfaceState, CO2_ctrl, years,
         state::ModelState, ws::ModelWorkspace, acc::MonthlyAccumulator;
         ws_a::ModelWorkspace, ws_q::ModelWorkspace, observer)
@@ -209,8 +231,10 @@ function _control_run!(r::ResolvedConfig, fields::ClimateFields, surf_ini::Surfa
     return output, times
 end
 
-# The scenario run: `years` years from a copy of `surf_ini`, after the control run `ctrl_output`
-# has set the ice cover the surface masks need. Returns the monthly records and their times
+"""
+The scenario run: `years` years from a copy of `surf_ini`, after the control run `ctrl_output`
+has set the ice cover the surface masks need. Returns the monthly records and their times.
+"""
 function _scenario_run!(r::ResolvedConfig, fields::ClimateFields, surf_ini::SurfaceState, CO2_ctrl, years,
         ctrl_output, state::ModelState, ws::ModelWorkspace, acc::MonthlyAccumulator;
         ws_a::ModelWorkspace, ws_q::ModelWorkspace, observer)
@@ -298,7 +322,7 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
         jld2_dir::AbstractString="", fields::ClimateFields=ClimateFields(),
         allow_uninitialized::Bool=false, observer=nothing)
     if !fields.loaded && !allow_uninitialized
-        error("""
+        throw(ArgumentError("""
               greb_model! was given an uninitialized ClimateFields (all-zero climatology).
 
               Load the data and pass it through:
@@ -307,12 +331,18 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
 
               If a data-free run is intended (precompilation, config/scenario-plumbing
               tests), opt in explicitly with `allow_uninitialized=true`.
-              """)
+              """))
     end
     config = r.config
     s = config.scenario
     run.ctrl == 0 && run.scnr > 0 && s.co2_mask isa SurfaceMask &&
         throw(ArgumentError("a SurfaceMask is built from the control run's ice cover: use ctrl >= 1"))
+    # Refuse a CO2 table that lacks a scenario year now, not after the spin-up and control run
+    if s.co2 isa Union{CO2Table,CO2File} && config.processes.co2 && run.scnr > 0
+        missing_years = [y for y in s.start_year:(s.start_year+run.scnr-1) if !haskey(r.co2_table, y)]
+        isempty(missing_years) ||
+            error("No CO2 data for year $(first(missing_years)) in the scenario's CO2 table (loaded $(length(r.co2_table)) years)")
+    end
     # The run overwrites these in place; restore them so a reused `fields`
     # does not carry one run's changes into the next. Stored corrections that
     # `fields` already holds from this file are neither reloaded nor saved: a
@@ -333,6 +363,7 @@ function greb_model!(run::RunSpec, r::ResolvedConfig;
         end
 
         ini = init_model!(fields, r)
+        allow_uninitialized || _check_run_fields(fields, config.processes)
         surf_ini, CO2_ctrl = ini.surf, ini.CO2_ctrl
 
         # Workspace and accumulator. `ws_a`/`ws_q` are separate `circulation!`

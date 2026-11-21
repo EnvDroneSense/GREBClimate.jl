@@ -4,8 +4,8 @@ A Julia translation of the **Globally Resolved Energy Balance (GREB)**
 climate model, originally developed by Dietmar Dommenget and colleagues at
 Monash University.
 
-It runs on a fixed 96 × 48 grid with a 12-hour step; the
-[Model overview](@ref) explains its components.
+It runs on a fixed 96 × 48 grid with a 12-hour step.
+The [Model overview](@ref) explains its components.
 
 ## Installation
 

@@ -2,7 +2,7 @@
 
 Contributions are welcome - bug reports, physics questions, performance work,
 documentation fixes. This page covers how to get the package running locally,
-what the test suite expects, and the few conventions that are easy to trip over.
+what the test suite expects, and the few conventions that are easy to get wrong.
 
 ## Getting set up
 
@@ -40,13 +40,13 @@ GREBClimate.jl/
 ├── docs/                       # Documenter site
 ├── examples/                   # user examples: quickstart.jl, feedback_deconstruction.jl
 ├── viz/                        # plotting toolbox + Pluto notebook (notebooks/), own Project.toml
-├── tools/                      # maintainer scripts: dataset/, diagnostics/, experiments/, validation/ (see tools/README.md)
+├── tools/                      # maintainer scripts: dataset/, diagnostics/, validation/ (see tools/README.md)
 ├── DATA_README.md              # raw .bin input inventory (maintainers)
 └── CHANGELOG.md
 ```
 
-`greb_input_data/` (the dataset) and `Data/` (raw `.bin` inputs) are expected
-at runtime or by maintainers but gitignored.
+Git ignores `greb_input_data/` (the dataset) and `Data/` (raw `.bin` inputs).
+The model needs the dataset at runtime. Maintainers need the raw inputs.
 
 ## Input data
 
@@ -63,7 +63,7 @@ Only step 5 touches the network, and it prompts before downloading. See
 [DATA_README.md](DATA_README.md) for the raw-file inventory.
 
 You do **not** need the dataset to contribute. Tests that require it resolve
-with `allow_download=false` and skip when it is absent, which is exactly how
+with `allow_download=false` and skip when it is absent. This is how
 CI runs.
 
 ## Tests
@@ -76,6 +76,7 @@ While developing, run only what a change needs: `julia --project=. test/support/
 
 - A new test file needs a row in the `SHARD` table in [test/support/selection.jl](test/support/selection.jl), or it will not run.
 - A test that calls `greb_data_dir` must pass `allow_download=false`.
+- The workflow `Optional tests` runs `test_enzyme.jl` and `test_dataset_tools.jl` when `ext/`, `tools/dataset/`, `src/io.jl` or `src/data.jl` change. The main CI does not run them.
 - CI has no dataset, so the golden, MSCM, deconstruction and orbital-table tests skip there. Run the whole suite locally with the dataset.
 
 The developer docs page [Testing](docs/src/dev/testing.md) has every command and the rules for new tests; [test/README.md](test/README.md) maps the files.
@@ -105,7 +106,7 @@ depends on it; `physics/volcanic` is frozen, so do not build on it.
 
 - Say what changed and why; if the physics moved, say which numbers moved.
 - Keep the test suite green, including the golden regression.
-- New behaviour needs a test. New exported names need a docstring.
+- New behavior needs a test. New exported names need a docstring.
 - Note user-visible changes in [CHANGELOG.md](CHANGELOG.md).
 
 ## Reporting a bug
@@ -114,15 +115,15 @@ First check that the input data is complete and where `greb_data_dir()`
 expects it, and that your Julia and package versions meet the requirements.
 Then open an issue with the Julia version (`versioninfo()`), the OS, the
 experiment configuration (`preset`/`Config` call and any options you
-changed), and the full error or the unexpected output. A `RunSpec` short enough
-to reproduce quickly helps a lot.
+changed), and the full error or the unexpected output. Use a `RunSpec` short
+enough to reproduce the problem quickly.
 
 ## Roadmap
 
-Contributions towards these are especially welcome:
+We especially welcome contributions to these items:
 
 - **NetCDF output** - optional direct write of monthly means.
-- **Visualisation dashboard** - interactive maps and time series, similar to the
+- **Visualization dashboard** - interactive maps and time series, similar to the
   [MSCM interactive database](https://mscm.dkrz.de/GREB_model.html?locale=EN).
 - **Physics guide** - a derivation-level companion to the
   [Model overview](https://EnvDroneSense.github.io/GREBClimate.jl/stable/model/).

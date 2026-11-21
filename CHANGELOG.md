@@ -19,6 +19,78 @@ An entry outside "Changes to model results" leaves results unchanged.
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-11-21
+
+### Breaking changes
+
+These inputs now give an `ArgumentError` at once. Before, they gave a NaN or
+Inf run, a late error, or no error.
+
+- A CO2, solar or run-length value out of range: a negative or NaN `ppm`, a
+  NaN `control_co2`, `SolarCycle` with period 0, `EarthSunDistance(-100)` or
+  less, a negative `RunSpec` length, and a non-finite `SSTOffset`.
+- A `preset` keyword that the preset does not use, such as
+  `preset(:co2_double; percent=5)`.
+- A dataset table of the wrong size, or with NaN or Inf. An ocean-only field
+  (mixed-layer depth, deep-ocean temperature) may hold NaN at land cells.
+- A custom CO2 file that lists a year twice, or a CO2 value that is NaN, Inf or
+  negative. The message names the file and the line.
+- `load_solar_forcing` refuses a table that is not `48 x 730` or that holds NaN
+  or Inf. Before, a `(1, 730)` table filled every latitude row.
+- `greb_model!` with an uninitialized `ClimateFields`: `ArgumentError`, not
+  `ErrorException`.
+- `resolve` of a `CO2Table` or `SolarTable` scenario with no `jld2_dir` says to
+  pass `jld2_dir`, not to download a pack.
+- A dataset file of another version in any loader. Before, only some loaders
+  checked.
+- A missing data directory in `greb_data_dir`: `ArgumentError`, not
+  `ErrorException`.
+- A scenario year that is not in the CO2 table stops `greb_model!` before the
+  spin-up. Before, it stopped at that year, after the control run.
+- `greb_model!` refuses a start with a pressure weight above 1.001 (bathymetry
+  in `z_topo`) or a zero mixed-layer depth at an ocean cell. Pass
+  `allow_uninitialized=true` to skip both checks.
+
+### Features
+
+- `lat_grid` and `lon_grid` are exported: the latitudes and longitudes of the
+  grid cell centres in degrees, for labelling maps.
+
+### Fixes
+
+- When a stage of a step throws, `tendencies!` waits for both circulation
+  tasks before it re-throws, so a caller that catches the error can reuse the
+  workspaces.
+- `fields.flux_source` is the same for every spelling of the dataset
+  directory.
+- `seaice!` and `deep_ocean!` loop over the latitude index in the outer loop, as
+  the arrays are stored. The results do not change. `seaice!` runs about 3.5 times
+  faster in isolation, about 2 % of a year, and the loop no longer depends on
+  `@turbo` to reorder it.
+
+### Documentation
+
+- Docstrings and comments are shorter and in Simplified Technical English.
+  Comment blocks above internal functions are docstrings.
+- The docs name the `:rcp85_boundary` experiment as the one the `cmip5` pack
+  serves, and list `:paleo_solar_modern_co2` under the `solar` pack.
+
+### Tools and tests
+
+- The suite has a regression run on a synthetic fixture that runs in CI
+  without the dataset, and `SOURCE_MAP` maps more source files to the tests
+  that check them.
+- Tests for repeated claims were removed or merged.
+- `tools/experiments/` (`sensitivity.jl`, `co2_sweep.jl`, `helpers.jl`), its
+  test `test_experiment_tools.jl` and the docs page "Experiments" are removed.
+  The repository GREBExperiments holds these scripts and their helpers.
+- The workflow `Optional tests` runs `test_enzyme.jl` and `test_dataset_tools.jl`.
+  CompatHelper no longer checks `test/`.
+- The benchmark scripts share `check_data_dir` in `benchmark/common.jl`. The
+  dataset-version tests use a `version` keyword of the fixture writers.
+- `benchmark/compare_step_parts.jl` times `forcing` and the loop order of
+  `seaice!` in one process.
+
 ## [2.3.0] - 2026-11-07
 
 ### Breaking changes

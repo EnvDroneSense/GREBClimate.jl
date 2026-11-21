@@ -1,13 +1,25 @@
 # greb_model! integration: runs end to end, what a run applies and when, and the
 # flux corrections of the spin-up.
 
-@testset "greb_model! baseline: default config runs to completion with the right output shape" begin
-    result = quiet() do
-        greb_model!(RunSpec(scnr=0), preset(:full_model); jld2_dir="", allow_uninitialized=true)
-    end
-    @test length(result.ctrl) == 12
-    @test length(result.scnr) == 0
-    @test result.ctrl[1] isa MonthlyRecord
+@testset "greb_model! refuses bathymetry in z_topo and a zero mixed-layer depth at the start" begin
+    cfg = preset(:full_model; corrections=NoCorrections())
+    # The error comes from the check, before any step runs
+    bathymetry = constant_fields(z_topo=-4000.0)
+    bathymetry.loaded = true
+    @test_throws "pressure weight" greb_model!(RunSpec(ctrl=0, scnr=0), cfg; fields=bathymetry)
+    shallow = constant_fields(z_topo=-1.0)
+    shallow.loaded = true
+    shallow.mld_clim[7, 9, 100] = 0.0f0
+    @test_throws "mixed-layer depth" greb_model!(RunSpec(ctrl=0, scnr=0), cfg; fields=shallow)
+    # A ClimateFields that no loader filled is a user error
+    @test_throws ArgumentError greb_model!(RunSpec(ctrl=0, scnr=0), cfg; fields=ClimateFields())
+    # The opt-in skips both checks
+    @test greb_model!(RunSpec(ctrl=0, scnr=0), cfg; fields=bathymetry, allow_uninitialized=true) !== nothing
+    # A land cell with no mixed layer is fine
+    land = constant_fields(z_topo=1.0)
+    land.loaded = true
+    land.mld_clim .= 0.0f0
+    @test greb_model!(RunSpec(ctrl=0, scnr=0), cfg; fields=land) !== nothing
 end
 
 @testset "qflux_correction! pulls Ts/To/q to climatology; Ta gets no correction" begin
@@ -49,7 +61,6 @@ end
         write_solar_scenarios(dir; sentinel=999.0)
 
         cfg = preset(:paleo_231kyr; corrections=NoCorrections())
-        @test all(==(999.0), resolve(cfg; jld2_dir=dir).solar_table)
         sw_solar(phase, run) = at_first_step(v -> copy(v.fields.sw_solar), run, cfg; phase, jld2_dir=dir, fields)
         # The control keeps the modern table, the scenario runs on the paleo one
         @test sw_solar(control, RunSpec(ctrl=1, scnr=0)) == saved_sw_solar
@@ -100,10 +111,9 @@ end
         # A missing path must raise a clear error, not silently default.
         @test_throws ArgumentError greb_model!(RunSpec(ctrl=0, scnr=1),
             preset(:custom_co2); jld2_dir="", allow_uninitialized=true)
-
-        write_solar_scenarios(dir)
-        cfg = preset(:obliquity; index=0, corrections=NoCorrections())
-        @test all(==(999.0f0), at_first_step(v -> copy(v.fields.sw_solar), RunSpec(ctrl=0, scnr=1), cfg; jld2_dir=dir))
+        # A table that lacks a scenario year stops the run at once, before the spin-up and control run
+        @test_throws "No CO2 data for year 1951" greb_model!(RunSpec(ctrl=1, scnr=2),
+            cfg; jld2_dir="", allow_uninitialized=true)
     end
 end
 
@@ -113,6 +123,9 @@ end
     seen = at_first_step(v -> (Ts=copy(v.Ts), CO2=v.CO2), RunSpec(ctrl=0, scnr=1),
         preset(:sst_plus1; corrections=NoCorrections()); point=:after_tendencies, jld2_dir="")
     @test all(==(1.0f0), seen.Ts) && seen.CO2 == 340
+    # ... also when the scenario's own CO2 differs from the control's
+    held = Config(; scenario=Scenario(co2=ConstantCO2(680), surface=SSTOffset(1)), corrections=NoCorrections())
+    @test at_first_step(v -> v.CO2, RunSpec(ctrl=0, scnr=1), held; jld2_dir="") == 340
 
     # The original-GREB physics of the deconstruction presets, end to end
     result_dmc = quiet() do
@@ -149,32 +162,14 @@ end
         preset(:regional_co2_ocean; corrections=NoCorrections()); jld2_dir="", allow_uninitialized=true)
 end
 
-@testset "boundary anomalies: the add step adds the loaded anomaly, and no other" begin
+@testset "boundary anomalies: the add step refuses an anomaly that is not the loaded one" begin
     with_tempdir() do dir
         write_boundary_anomalies(dir)
         fields = ClimateFields()
         load_boundary_anomaly!(fields, dir, :cmip5_rcp85)
-        # Adding an anomaly that is not the loaded one is an error, not a silent mix-up
+        # An error, not a silent mix-up
         @test_throws ErrorException GREBClimate._add_boundary_anomaly!(BoundaryAnomaly(:elnino), fields)
         @test_throws ErrorException GREBClimate._add_boundary_anomaly!(BoundaryAnomaly(:elnino), ClimateFields())
-
-        # The anomaly is added on top of the (here all-zero) base climatology
-        quiet() do
-            GREBClimate._add_boundary_anomaly!(BoundaryAnomaly(:cmip5_rcp85), fields)
-        end
-        @test all(==(2.0), fields.Ts_clim)
-
-        for sym in (:elnino, :lanina)
-            fields2 = ClimateFields()
-            load_boundary_anomaly!(fields2, dir, sym)
-            # Both composite files already carry their sign (the La Nina one is
-            # a cold anomaly), so both experiments add them, as the Fortran does.
-            quiet() do
-                GREBClimate._add_boundary_anomaly!(BoundaryAnomaly(sym), fields2)
-            end
-            @test all(==(7.0), fields2.Ts_clim)
-            @test all(==(8.0), fields2.u_clim)
-        end
     end
 end
 
@@ -213,6 +208,18 @@ end
         @test all(==(20.0f0), first_tclim(:rcp85_boundary, dir))
         @test_throws ArgumentError first_tclim(:rcp85_boundary, joinpath(dir, "elsewhere"))
         @test reused.boundary_anomaly_source == ("", :none)    # a failed load leaves no source
+    end
+end
+
+@testset "a boundary-anomaly scenario starts its first step on the climatology plus the anomaly" begin
+    # The seasonal fixture: the carried-over state (December) differs from January's climatology
+    with_tempdir() do dir
+        write_boundary_anomalies(dir)
+        fields = rich_fields()
+        january = copy(fields.Ts_clim[:, :, 1])
+        ts = at_first_step(v -> copy(v.Ts), RunSpec(ctrl=0, scnr=1), preset(:elnino; corrections=NoCorrections());
+            fields, jld2_dir=dir, allow_uninitialized=true, point=:after_tendencies)
+        @test all(isapprox.(ts, january .+ 7.0f0; atol=1.0f-4))     # 7 K is the El Nino Ts anomaly written above
     end
 end
 

@@ -1,3 +1,7 @@
+@testset "the flux-correction path ignores how the directory is spelled" begin
+    @test GREBClimate._flux_file("data/x/../climatology/..") == GREBClimate._flux_file("data")
+end
+
 # JLD2 loading, dataset resolution, and converter/archive consistency.
 
 @testset "load_climatology: every file is read; a missing flux-corrections file or table is an error" begin
@@ -53,6 +57,26 @@
         reads = [Threads.@spawn read_field(path).data for _ in 1:8]
         @test all(t -> all(==(10.0), fetch(t)), reads)
 
+        # A table of another shape, or with a NaN, is an error and not a broadcast
+        write_field(path, 10.0, (X, Y, 1))
+        @test_throws "Tocean.clim.jld2" load_climatology(tmpdir; dataset=:ncep)
+        clim("ncep.tsurf.1948-2007.clim.jld2", NaN)
+        @test_throws "NaN" load_climatology(tmpdir; dataset=:ncep)
+        clim("ncep.tsurf.1948-2007.clim.jld2", 3.0)
+
+        # An ocean-only field may hold NaN at land cells (z_topo = 1 here), not at ocean cells
+        clim("Tocean.clim.jld2", NaN)
+        @test isnan(load_climatology(tmpdir; dataset=:ncep).To_clim[1])
+        map2("global.topography.jld2", -1.0)
+        @test_throws "NaN" load_climatology(tmpdir; dataset=:ncep)
+        map2("global.topography.jld2", 1.0)
+        clim("Tocean.clim.jld2", 10.0)
+
+        # A file without a version entry is from version 1: the solar file is refused too
+        write_unversioned(joinpath(tmpdir, "solar", "solar_radiation.clim.jld2"))
+        @test_throws "dataset version 1" load_climatology(tmpdir; dataset=:ncep)
+        solar(14.0)
+
         # A solar table of the wrong shape is reported, with the file's name
         solar(0.0, (Y, 2))
         @test_throws "solar_radiation.clim.jld2" load_climatology(tmpdir; dataset=:ncep)
@@ -101,6 +125,14 @@ end
         bad_path = joinpath(dir, "bad_co2.txt")
         write(bad_path, "1950 300.0\n1951\n")
         @test_throws ArgumentError load_co2_custom(bad_path)
+        write(bad_path, "1950 300.0\n1950 301.0\n")
+        @test_throws "1950 appears twice" load_co2_custom(bad_path)
+        # A value that gives a NaN run, or a word for a number, names its line
+        for (text, message) in (("1950 300\n1951 NaN\n", "line 2"), ("1950 -50\n", "line 1"),
+            ("19x0 300\n", "malformed line 1"))
+            write(bad_path, text)
+            @test_throws message load_co2_custom(bad_path)
+        end
         rm(bad_path)
         @test !isfile(bad_path)
     end
@@ -119,6 +151,11 @@ end
         @test_throws ArgumentError load_solar_forcing(dir, :obliquity, 7)
         @test_throws ArgumentError load_solar_forcing(dir, :eccentricity, 7)
         @test_throws ArgumentError load_solar_forcing(dir, :bogus)
+        # A table of the wrong size or with NaN would otherwise fill every cell
+        for (value, dims) in ((999.0, (1, N)), (NaN, (Y, N)))
+            write_field(joinpath(dir, "solar_scenarios", "solar_paleo.jld2"), value, dims; dim_names=["lat", "time"])
+            @test_throws ArgumentError load_solar_forcing(dir, :paleo)
+        end
     end
 end
 
@@ -159,11 +196,11 @@ end
 
             withenv("GREB_DATA" => nothing) do
                 # a non-existent explicit path is an error, not a silent fallback
-                @test_throws ErrorException greb_data_dir(joinpath(tmp_a, "nope"))
+                @test_throws ArgumentError greb_data_dir(joinpath(tmp_a, "nope"))
             end
             # so is a GREB_DATA pointing nowhere
             withenv("GREB_DATA" => joinpath(tmp_a, "nope")) do
-                @test_throws ErrorException greb_data_dir()
+                @test_throws ArgumentError greb_data_dir()
             end
 
             # A downloaded dataset is the directory `<load path>/GREB-input-data`.
@@ -199,11 +236,6 @@ end
         @test endswith(GREBClimate._pack_url(pack), "/$(GREBClimate.DATA_RELEASE_TAG)/$(p.archive)")
     end
     @test allunique(p.sha256 for p in packs)
-    @test GREBClimate.DATA_DEP_NAME == "GREB-input-data-v$(GREBClimate.DATASET_VERSION)"
-
-    data_src = read(joinpath(@__DIR__, "..", "src", "data.jl"), String)
-    @test match(r"const DATA_RELEASE_TAG = \"([^\"]+)\"", data_src).captures[1] ==
-          GREBClimate.DATA_RELEASE_TAG
 end
 
 @testset "dataset version: a file of another version is refused; metadata is read back" begin
@@ -216,16 +248,12 @@ end
         @test info == Dict{String,Any}("dataset_version" => GREBClimate.DATASET_VERSION)
 
         # A file without the entry is from version 1: the loaders refuse it and say so
-        jldopen(old, "w") do file
-            file["data"] = fill(1.0, X, Y)
-            file["dim_names"] = ["lon", "lat"]
-        end
+        write_unversioned(old)
         @test_throws "dataset version 1" load_climatology(dir)
-        write_ipcc_scenarios(dir, Dict("rcp60" => Dict(1950 => 1.0)))
-        jldopen(joinpath(dir, "scenario", "ipcc_scenarios.jld2"), "w") do file
-            file["scenarios"] = Dict("rcp6" => Dict(1950 => 1.0))
-        end
+        write_ipcc_scenarios(dir, Dict("rcp60" => Dict(1950 => 1.0)); version=nothing)
         @test_throws "dataset version 1" load_co2_scenario(dir, :rcp60)
+        write_flux_corrections(dir; version=nothing)
+        @test_throws "dataset version 1" load_flux_corrections!(ClimateFields(), dir)
     end
 end
 

@@ -21,7 +21,7 @@ config = preset(:co2_double; processes = (clouds = :uniform,))  # with one proce
 config = Config(scenario = Scenario(co2 = ConstantCO2(500)))    # from parts
 ```
 
-Every part validates its options when it is built, so a misspelt option fails
+Every part validates its options when it is built, so a misspelled option fails
 at once instead of being ignored. The option tables below are the types' own
 documentation.
 

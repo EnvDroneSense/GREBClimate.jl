@@ -19,7 +19,8 @@ end
 
 @testset "tests_for: mapped, full and no-test changes" begin
     @test tests_for(["test/test_state.jl"]) == (["test_state.jl"], "mapped")
-    @test tests_for(["src/core/calendar.jl"]) == (["test_calendar.jl"], "mapped")
+    @test tests_for(["src/core/calendar.jl"]) == (["test_calendar.jl", "test_output.jl"], "mapped")
+    @test issubset(["test_budgets.jl", "test_model.jl"], tests_for(["src/core/output.jl"])[1])
     @test tests_for(["docs/src/index.md", "CHANGELOG.md"]) == (String[], "mapped")
     # The model files run their own files and the standard tier
     model, _ = tests_for(["src/core/model.jl"])
@@ -32,5 +33,5 @@ end
     # A runner script has no test of its own beyond this file
     @test tests_for(["test/support/parallel.jl"]) == (["test_selection.jl"], "mapped")
     # Several paths: the union, in SHARD order
-    @test tests_for(["src/io.jl", "src/core/calendar.jl"])[1] == ["test_calendar.jl", "test_io.jl"]
+    @test tests_for(["src/io.jl", "src/core/calendar.jl"])[1] == ["test_calendar.jl", "test_output.jl", "test_io.jl"]
 end

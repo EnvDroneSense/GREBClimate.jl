@@ -2,8 +2,14 @@
 #
 # `allow_download=false` so running the tests can never trigger the 353 MB
 # DataDeps download; data-dependent testsets @test_skip when this is absent.
-const DATA_DIR = something(greb_data_dir(; allow_download=false),
-    joinpath(@__DIR__, "..", "greb_input_data"))
+# A `GREB_DATA` that names no folder skips the data tests like a missing dataset
+# does; `DATA_DIR` is "" then, and `isdir("")` is false.
+const DATA_DIR = try
+    something(greb_data_dir(; allow_download=false), "")
+catch err
+    @warn "No dataset for the tests: $(sprint(showerror, err))"
+    ""
+end
 
 const X, Y, N = xdim, ydim, nstep_yr
 
@@ -43,17 +49,28 @@ function write_field(path, value, dims=(X, Y, N); dim_names=["lon", "lat", "time
     return path
 end
 
+"A dataset file with no `dataset_version` entry: the loaders read it as version 1."
+function write_unversioned(path)
+    mkpath(dirname(path))
+    jldopen(path, "w") do file
+        file["data"] = fill(1.0f0, X, Y, N)
+        file["dim_names"] = ["lon", "lat", "time"]
+    end
+    return path
+end
+
 """
 Write `climatology/flux_corrections.jld2` into `dir`, each table filled with
-its value. A table given as `nothing` is left out of the file.
+its value. A table given as `nothing` is left out of the file; `version=nothing` leaves out
+the dataset version (a version 1 file).
 """
-function write_flux_corrections(dir; Ts=0.0f0, q=0.0f0, To=0.0f0)
+function write_flux_corrections(dir; Ts=0.0f0, q=0.0f0, To=0.0f0, version=GREBClimate.DATASET_VERSION)
     mkpath(joinpath(dir, "climatology"))
     jldopen(joinpath(dir, "climatology", "flux_corrections.jld2"), "w") do file
         for (key, value) in (("Tsurf_flux_correction", Ts), ("vapour_flux_correction", q), ("Tocean_flux_correction", To))
             value === nothing || (file[key] = fill(value, X, Y, N))
         end
-        file["dataset_version"] = GREBClimate.DATASET_VERSION
+        version === nothing || (file["dataset_version"] = version)
     end
     return dir
 end
@@ -62,13 +79,14 @@ end
 Write a minimal `scenario/ipcc_scenarios.jld2` into `dir`. `table` maps the
 scenario key to a year=>ppm Dict; the label of each table is `co2_equivalent`
 for an `rcp` key and `co2` for any other.
+`version=nothing` leaves out the dataset version (a version 1 file).
 """
-function write_ipcc_scenarios(dir, table)
+function write_ipcc_scenarios(dir, table; version=GREBClimate.DATASET_VERSION)
     mkpath(joinpath(dir, "scenario"))
     jldopen(joinpath(dir, "scenario", "ipcc_scenarios.jld2"), "w") do file
         file["scenarios"] = table
         file["labels"] = Dict(key => startswith(key, "rcp") ? "co2_equivalent" : "co2" for key in keys(table))
-        file["dataset_version"] = GREBClimate.DATASET_VERSION
+        version === nothing || (file["dataset_version"] = version)
     end
     return dir
 end
@@ -84,6 +102,7 @@ function write_solar_scenarios(dir; sentinel=999.0)
             file["data"] = fill(sentinel, 1, Y, N)
             file["dim_names"] = ["index", "lat", "time"]
             file["coords"] = Dict(1 => [0.0])
+            file["dataset_version"] = GREBClimate.DATASET_VERSION
         end
     end
     return dir
@@ -129,6 +148,40 @@ function synthetic_fields()
     f.cloud_clim .= 0.5f0
     f.soil_wetness_clim .= 0.4f0
     GREBClimate.split_winds!(f)
+    return f
+end
+
+"""
+A `ClimateFields` with sunlight, vertical motion, varying humidity, a seasonal
+mixed layer, mountains and glacier cells, for a run that exercises every kernel
+term without the dataset. The land is the western 40 columns; the rest is ocean at -0.1 m.
+"""
+function rich_fields()
+    f = ClimateFields()
+    for k in 1:N, j in 1:Y, i in 1:X
+        lat = lat_grid[j]
+        season = cospi(2 * k / N)
+        f.Ts_clim[i, j, k] = 288.0f0 - 45.0f0 * sind(lat)^2 + 5.0f0 * season * sind(lat) + 2.0f0 * sinpi(2 * i / X)
+        f.u_clim[i, j, k] = 8.0f0 * sind(2 * lat) + 3.0f0 * cospi(4 * i / X)
+        f.v_clim[i, j, k] = 2.0f0 * cospi(2 * i / X) * cosd(lat)
+        f.q_clim[i, j, k] = 0.012f0 * cosd(lat)^2 + 0.001f0 + 0.002f0 * sinpi(2 * i / X)^2
+        f.omega_clim[i, j, k] = 0.005f0 * sinpi(6 * j / Y) * cospi(2 * i / X)
+        f.omega_std_clim[i, j, k] = 0.01f0
+        f.wind_speed_clim[i, j, k] = 6.0f0 + 2.0f0 * abs(sind(lat))
+        f.mld_clim[i, j, k] = 60.0f0 + 30.0f0 * season * sind(lat)
+        f.cloud_clim[i, j, k] = 0.5f0 + 0.2f0 * sinpi(2 * j / Y)
+        f.soil_wetness_clim[i, j, k] = 0.4f0
+        f.To_clim[i, j, k] = 283.0f0 - 10.0f0 * sind(lat)^2
+    end
+    for k in 1:N, j in 1:Y
+
+        f.sw_solar[j, k] = max(0.0f0, 340.0f0 * cosd(lat_grid[j]) * (1.0f0 + 0.3f0 * cospi(2 * k / N) * sind(lat_grid[j])))
+    end
+    for j in 1:Y, i in 1:X
+
+        f.z_topo[i, j] = i <= 40 ? 300.0f0 + 1500.0f0 * sinpi(i / 40)^2 : -0.1f0
+        f.glacier[i, j] = (i <= 40 && j >= Y - 3) ? 1.0f0 : 0.0f0
+    end
     return f
 end
 

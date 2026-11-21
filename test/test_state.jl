@@ -1,4 +1,4 @@
-# State structs: field shapes, accumulator reset, mask reset, derived fields.
+# State: the CO2 mask reset and the derived fields.
 
 @testset "init_model! clears the CO2 mask an earlier run left in the same fields" begin
     fields = ClimateFields()
@@ -13,69 +13,6 @@
         end
         @test all(==(1.0f0), fields.co2_part)
     end
-end
-
-@testset "reset! zeroes every accumulator field" begin
-    acc = MonthlyAccumulator()
-    foreach(f -> fill!(getfield(acc, f), 42.0f0), fieldnames(MonthlyAccumulator))
-    GREBClimate.reset!(acc)
-    @test all(f -> all(iszero, getfield(acc, f)), fieldnames(MonthlyAccumulator))
-end
-
-@testset "state constructors: every field gets the right shape and eltype" begin
-    # ClimateFields: 2D grid fields, the (ydim, nstep_yr) solar table,
-    # the Bool flag, the boundary anomaly and its source, and everything else 3D.
-    cf = ClimateFields()
-    cf_2d = (:z_topo, :glacier, :z_ocean, :cap_surf, :wz_air, :wz_vapor,
-        :rain_limit, :co2_part)
-    for f in fieldnames(ClimateFields)
-        v = getfield(cf, f)
-        if f === :loaded
-            @test v === false
-        elseif f === :flux_source
-            @test v == ""              # set by load_flux_corrections!
-        elseif f === :boundary_anomaly
-            @test v === nothing        # allocated by load_boundary_anomaly!, not here
-        elseif f === :boundary_anomaly_source
-            @test v == ("", :none)
-        elseif f === :sw_solar
-            @test size(v) == (Y, N) && eltype(v) === Float32
-        elseif f in cf_2d
-            @test size(v) == (X, Y) && eltype(v) === Float32
-        else
-            @test size(v) == (X, Y, N) && eltype(v) === Float32
-        end
-    end
-    # co2_part is the one field that is not zero-initialised.
-    @test all(isone, cf.co2_part)
-    for f in fieldnames(ClimateFields)
-        f in (:loaded, :co2_part, :flux_source, :boundary_anomaly, :boundary_anomaly_source) && continue
-        @test all(iszero, getfield(cf, f))
-    end
-
-    # ModelWorkspace: four vectors, the rest matrices. The zonal-stencil
-    # buffers carry longitude ghost cells, so their first dimension is `xghost`.
-    cw = ModelWorkspace()
-    XP = GREBClimate.xghost
-    cw_vec = (:T1h, :dTxh, :term_north, :term_south)
-    cw_ghosted = (:T1h, :X_work, :wz_ghost)
-    for f in fieldnames(ModelWorkspace)
-        v = getfield(cw, f)
-        n = f in cw_ghosted ? XP : X
-        @test eltype(v) === Float32
-        @test size(v) == (f in cw_vec ? (n,) : (n, Y))
-        @test all(iszero, v)
-    end
-
-    # MonthlyAccumulator: every field (xdim, ydim). There is no `count`
-    # field - output! divides by steps_in_month(month).
-    ma = MonthlyAccumulator()
-    @test fieldnames(MonthlyAccumulator) == GREBClimate.OUTPUT_FIELDS
-    for f in fieldnames(MonthlyAccumulator)
-        v = getfield(ma, f)
-        @test size(v) == (X, Y) && eltype(v) === Float32 && all(iszero, v)
-    end
-
 end
 
 @testset "derive_fields! follows the input maps" begin

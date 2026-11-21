@@ -1,8 +1,8 @@
 """
     ModelWorkspace
 
-Pre-allocated buffers for diffusion, advection, and circulation calculations.
-Reused across all time steps to eliminate allocations.
+Pre-allocated buffers for the diffusion, advection and circulation calculations.
+The model reuses them in every time step, so the time loop does not allocate.
 """
 Base.@kwdef struct ModelWorkspace
     # Polar sub-stepping buffers. `T1h` carries ghost cells (see `nghost`).
@@ -66,8 +66,8 @@ end
 A run's current surface/atmosphere state - `Ts`, `Ta`, `To`, `q` - passed as
 one argument to [`diagnostics!`](@ref), [`output!`](@ref), [`time_loop!`](@ref),
 and [`qflux_correction!`](@ref). A thin reference wrapper around
-already-allocated arrays; construct once per run/call (like `ws`/`acc`),
-never inside the per-timestep loop.
+arrays that already exist. Construct it once per run or call (like `ws` and
+`acc`), never inside the per-timestep loop.
 """
 struct SurfaceState
     Ts::Matrix{Float32}
@@ -228,7 +228,7 @@ start of each run.
 `ClimateFields()` builds an all-zero instance with `loaded = false`;
 `load_climatology` sets `loaded = true`. [`greb_model!`](@ref) refuses unloaded
 fields unless `allow_uninitialized=true`: an all-zero climatology raises no
-error, it runs and returns NaN in every output field.
+error: the run finishes and returns NaN in every output field.
 
 `boundary_anomaly` is `nothing` until [`load_boundary_anomaly!`](@ref) loads
 the anomalies of a [`BoundaryAnomaly`](@ref) scenario; it then holds the

@@ -56,7 +56,7 @@ end
 """
     LWradiation!(ws::ModelWorkspace, Ts, Ta, q, CO2, fields::ClimateFields, slice, p::Processes)
 
-Compute the atmospheric emissivity from the CO2, water-vapour and cloud
+Compute the atmospheric emissivity from the CO2, water-vapor and cloud
 columns, then the surface, upward and downward longwave fluxes. Returns
 `(LW_surf, LW_up, LW_down, em)`.
 

@@ -47,9 +47,9 @@ or a folder of your own is never extended automatically.
 |:-----|------:|---------:|:-----------|
 | `core` | 17 | 103 MB | every run |
 | `era` | 4 | 38 MB | `load_climatology(dir; dataset = :era)` |
-| `cmip5` | 5 | 54 MB | the `:rcp85` experiment |
+| `cmip5` | 5 | 54 MB | the `:rcp85_boundary` experiment |
 | `enso` | 10 | 121 MB | the `:elnino` and `:lanina` experiments |
-| `solar` | 3 | 4 MB | the `:paleo_231kyr`, `:eccentricity` and `:obliquity` experiments |
+| `solar` | 3 | 4 MB | the `:paleo_231kyr`, `:paleo_solar_modern_co2`, `:eccentricity` and `:obliquity` experiments |
 
 Two environment variables matter:
 
@@ -75,6 +75,18 @@ can hold several independent instances in one session, e.g. for parameter
 sweeps.
 
 A bare `ClimateFields()` is all zeros, so `greb_model!` refuses it; runs that need no data opt in explicitly (see [Data-free runs](@ref)).
+
+## Input checks
+
+A loader refuses an input that would give a wrong result without an error. It raises an `ArgumentError` that names the file. Each loader opens its files through one helper, so the checks are the same everywhere.
+
+| Check | Refused input |
+|:------|:--------------|
+| Dataset version | A file of another `dataset_version` |
+| Table size | A table of the wrong size, or with NaN or Inf. An ocean-only field may hold NaN at land cells |
+| CO2 file | A repeated year, or a value that is NaN, Inf or negative. The message gives the line |
+| Solar table | A table that is not `48 x 730`, or one with NaN or Inf |
+| Data directory | A directory that does not exist |
 
 ## Directory structure
 

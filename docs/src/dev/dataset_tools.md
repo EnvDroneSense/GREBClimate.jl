@@ -20,9 +20,9 @@ Data/ (raw .bin, .ctl, .txt)  --convert-->  greb_input_data/ (39 .jld2)  --packa
 |:-----|------:|--------:|:------|:----------|
 | `core` | 17 | 103 MB | static fields, NCEP climatology, common fields, flux corrections, solar radiation, CO2 tables | every run |
 | `era` | 4 | 38 MB | ERA-Interim climatology | `dataset = :era` |
-| `cmip5` | 5 | 54 MB | CMIP5 RCP8.5 anomalies | the `:rcp85` experiment |
+| `cmip5` | 5 | 54 MB | CMIP5 RCP8.5 anomalies | the `:rcp85_boundary` experiment |
 | `enso` | 10 | 121 MB | El Nino and La Nina anomalies | `:elnino`, `:lanina` |
-| `solar` | 3 | 4 MB | paleo and orbital solar tables | `:paleo_231kyr`, `:eccentricity`, `:obliquity` |
+| `solar` | 3 | 4 MB | paleo and orbital solar tables | `:paleo_231kyr`, `:paleo_solar_modern_co2`, `:eccentricity`, `:obliquity` |
 
 A file belongs to the pack named on its line in `fields.toml`. When a file is missing, the loaders take the pack to suggest from `_OPTIONAL_PACK_FILES` in `src/data.jl`. The dataset tools test checks that the two lists agree.
 

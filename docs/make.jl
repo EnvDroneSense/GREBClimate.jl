@@ -44,7 +44,6 @@ makedocs(
             "Profiling" => "dev/profiling.md",
             "Fortran comparison" => "dev/fortran.md",
             "Diagnostics" => "dev/diagnostics.md",
-            "Experiments" => "dev/experiments.md",
             "Validation" => "dev/validation.md",
             "Testing" => "dev/testing.md",
             "Code conventions" => "dev/conventions.md",

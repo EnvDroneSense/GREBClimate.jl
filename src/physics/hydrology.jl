@@ -1,6 +1,8 @@
+# Saturation humidity: 3.75e-3 exp(a T / (T + b)) times the pressure weight, T in °C
 const _qsat_scale = 3.75f-3
 const _qsat_a = 17.08085f0
 const _qsat_b = 234.175f0
+# Squared gust speeds [m²/s²] of the :original scheme, and drag terms
 const _hydro_gust_land = 4.0f0
 const _hydro_gust_ocean = 9.0f0
 const _hydro_ce_land = 0.25f0 * ce

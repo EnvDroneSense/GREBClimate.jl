@@ -19,8 +19,8 @@ worked out from it.
 
 Step 1 is the first half of 1 January. Every input climatology is one
 repeating year of 730 slices, and the model reads slice `step_of_year` at each
-step. Real dates are converted to this calendar before they reach the model;
-the model itself never converts a date.
+step. Real dates are converted to this calendar before they reach the model.
+The model itself never converts a date.
 
 ```jldoctest time
 julia> t = ModelTime(GREBClimate.scenario, 1950, 1000);

@@ -94,7 +94,18 @@ const emissivity_fit = Float32[9.0721, 106.7252, 61.5562, 0.0179, 0.0028,
 # ── Transport geometry [m, degrees] ───────────────────────────────
 const deg_grid = 2.0f0 * pi_f32 * 6.371f6 / 360.0f0
 const dyy_grid = dlat * deg_grid
+"""
+Latitudes of the grid cell centres [degrees north], south to north: a `Vector{Float32}`
+of length `ydim` (48), from -88.125 to 88.125. Row `j` of a field is at `lat_grid[j]`.
+"""
 const lat_grid = Float32[dlat * k - dlat / 2.0f0 - 90.0f0 for k in 1:ydim]
+
+"""
+Longitudes of the grid cell centres [degrees east], eastward from the prime meridian: a
+`Vector{Float32}` of length `xdim` (96), from 1.875 to 358.125. Column `i` of a field is at
+`lon_grid[i]`.
+"""
+const lon_grid = Float32[(i - 0.5f0) * dlon for i in 1:xdim]
 const dxlat_grid = Float32[dlon * deg_grid * cos(2.0f0 * pi_f32 / 360.0f0 * lat_grid[k]) for k in 1:ydim]
 
 # ── Diffusion coefficients ──────────────────────────────────────
@@ -120,8 +131,8 @@ the other:
 
 So `A[j-1, k]` is `P[j+2, k]`.
 
-`nghost` is the zonal stencils' reach, so it is 3 and they spell their offsets
-out literally (`j` … `j+6`); widening the stencil means widening both.
+The zonal stencils reach 3 cells, so `nghost` is 3. They write their offsets
+as literals (`j` … `j+6`); to widen the stencil, change both.
 """
 const nghost = 3
 "Row count of a ghosted circulation buffer (`xdim + 2nghost`)."
@@ -134,7 +145,7 @@ const xghost = xdim + 2 * nghost
 const polar_threshold = 2.5f5  # 250 km in meters
 const is_polar = [dxlat_grid[k] <= polar_threshold for k in 1:ydim]
 
-# Sub-steps per timestep for a row whose longest stable sub-step is `dt_max`
+"Sub-steps per timestep for a row whose longest stable sub-step is `dt_max`."
 _polar_substeps(dt_max) = max(1, round(Int, Δt_crcl / dt_max))
 
 function _polar_diff_step(k)

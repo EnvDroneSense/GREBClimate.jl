@@ -10,6 +10,8 @@
 | `years` | `--ctrl=N` control and `--scnr=N` scenario years of `--experiment=<preset>` |
 | `compare` | Two variants of a kernel in one process, interleaved, with a self-check |
 
+`benchmark/compare_step_parts.jl` is a separate script. It times `forcing`, and `seaice!` against a copy with the latitude loop outside, in one process.
+
 ## In the REPL
 
 Start Julia in the `benchmark` environment (set up once, see `benchmark/README.md`), load the file and call `main`. Loading defines `main` and runs no mode. From a shell the same run is `julia --project=benchmark -t 2,0 benchmark/run_benchmarks.jl year`.

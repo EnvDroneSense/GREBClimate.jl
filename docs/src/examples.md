@@ -1,6 +1,6 @@
 # Examples
 
-Two scripts in `examples/` run the steps of the [Tutorial](tutorial.md) end to end. Run each from the repository root. Both read the dataset the way [`greb_data_dir`](@ref) does, and take an optional dataset directory as the last argument.
+Two scripts in `examples/` show the steps of the [Tutorial](tutorial.md) in full. Run each from the repository root. Both read the dataset the way [`greb_data_dir`](@ref) does, and take an optional dataset directory as the last argument.
 
 | Script | Question | Command |
 |:-------|:---------|:--------|
@@ -58,4 +58,3 @@ It takes about a minute with 4 threads. Members with different physics get their
 | [Tutorial](tutorial.md) | The steps of a run, configuration switches, experiment keywords, results, ensembles |
 | [Configuration](configuration.md) | Every `Config` part and its options |
 | [Plots and notebook](viz/index.md) | The `viz/` toolbox that draws a result |
-| [Experiments](dev/experiments.md) | The maintainer scripts that measure climate sensitivity and sweep the CO2 level |
