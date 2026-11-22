@@ -32,7 +32,7 @@ const PROFILES_DIR = joinpath(REPO, "benchmark", "profiles")
 # moment. A fixed loop is timed before and after the benchmark and compared
 # with the best time this machine has ever given for it.
 
-const CALIBRATION_FILE = joinpath(REPO, "benchmark", "profiles", "calibration.txt")
+const CALIBRATION_FILE = joinpath(REPO, "benchmark", "results", "calibration.txt")
 const NOISE_LIMIT = 1.05   # a ratio above this marks the run as noisy
 
 @noinline function calibration_work()

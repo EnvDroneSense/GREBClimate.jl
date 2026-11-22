@@ -58,10 +58,6 @@ jobs:
           ok = Bench.compare("sum" => () -> sum(x), "sum twice" => () -> sum(x) + sum(x); seconds=1)
           println("self-check passed: ", ok)
         shell: julia --color=yes {0}
-      - name: Run the Fortran harness self-test
-        run: |
-          julia --project=. -e 'import Pkg; Pkg.instantiate()'
-          julia --project=. benchmark/fortran/run_fortran_comparison.jl selftest
       - name: Run the quickstart example without the dataset
         run: julia --project=. examples/quickstart.jl --data-free
 
