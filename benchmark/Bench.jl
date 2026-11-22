@@ -146,6 +146,7 @@ ratio or `nothing`; `calm` is what `machine_footer` returned.
 """
 function record_result(mode::AbstractString, name::AbstractString, times::Vector{Float64}, calm::Bool;
         ratios=nothing, selfcheck=nothing, threads::Int=Threads.nthreads())
+    haskey(ENV, "GREB_BENCH_NO_RECORD") && return nothing   # an `ab` child; the parent records
     commit, dirty = repo_state()
     fields = (Dates.format(now(), "yyyy-mm-ddTHH:MM:SS"), commit * (dirty ? "-dirty" : ""), mode, name,
         threads, length(times), minimum(times), median(times),
@@ -414,6 +415,70 @@ function sweep_threads(dir::AbstractString; thread_counts=(1, 2, 3, 4), experime
             " s  (", round(base / median(r), digits=2), "x)")
     end
     return results
+end
+
+"""
+A copy of the benchmark environment whose `GREBClimate` is the checkout `src_dir`.
+The base must load with the same dependencies as this checkout.
+"""
+function env_for(src_dir::AbstractString)
+    env = mktempdir()
+    here = dirname(Base.active_project())
+    cp(joinpath(here, "Project.toml"), joinpath(env, "Project.toml"))
+    lines = readlines(joinpath(here, "Manifest.toml"))
+    start = findfirst(==("[[deps.GREBClimate]]"), lines)
+    stop = start === nothing ? nothing : findnext(l -> startswith(l, "[["), lines, start + 1)
+    at = start === nothing ? nothing : findnext(l -> startswith(l, "path = "), lines, start)
+    (at === nothing || (stop !== nothing && at > stop)) && error("the benchmark Manifest.toml has no path entry for GREBClimate")
+    lines[at] = "path = " * repr(replace(src_dir, '\\' => '/'))
+    write(joinpath(env, "Manifest.toml"), join(lines, "\n") * "\n")
+    return env
+end
+
+"""
+Time the `time` mode of the commit `base` against this checkout, in `rounds` pairs of
+fresh processes whose order alternates. Returns `(ratio, ok)`: the median of this
+checkout's per-process medians over the base's, and whether the base processes agree
+within 5 %. A run whose base processes disagree is not trustworthy.
+"""
+function ab(dir::AbstractString, base::AbstractString; experiment::Symbol=:full_model, ctrl::Int=1, scnr::Int=0,
+        reps::Int=3, rounds::Int=3)
+    sha = readchomp(`git -C $REPO rev-parse --short --verify $(base * "^{commit}")`)
+    tree = joinpath(mktempdir(), "base")
+    run(pipeline(`git -C $REPO worktree add --detach $tree $sha`; stdout=devnull, stderr=devnull))
+    commit, dirty = repo_state()
+    labels = ("base $sha", "head $commit" * (dirty ? "-dirty" : ""))
+    medians = (Float64[], Float64[])
+    try
+        envs = (env_for(tree), dirname(Base.active_project()))
+        script = joinpath(@__DIR__, "run.jl")
+        println("ctrl=$ctrl scnr=$scnr, reps=$reps per process, $rounds rounds, preset=$experiment, -t $(Threads.nthreads()),0")
+        calibration = machine_header()
+        order = [(r, side) for r in 1:rounds for side in (isodd(r) ? (1, 2) : (2, 1))]
+        for (r, side) in order
+            out = tempname()
+            cmd = `$JULIA_BIN --project=$(envs[side]) -t $(Threads.nthreads()),0 $script time --data=$dir
+                --preset=$experiment --ctrl=$ctrl --scnr=$scnr --reps=$reps --out=$out`
+            run(pipeline(addenv(cmd, "GREB_BENCH_NO_RECORD" => "1"); stdout=devnull))
+            push!(medians[side], median(parse.(Float64, readlines(out))))
+            rm(out)
+            println("  round $r ", rpad(labels[side], 22), "median ", round(medians[side][end], digits=3), " s")
+        end
+        calm = machine_footer(calibration)
+        ratio = median(medians[2]) / median(medians[1])
+        spread = maximum(medians[1]) / minimum(medians[1])
+        ok = spread <= NOISE_LIMIT
+        println(labels[2], " / ", labels[1], " (median of the process medians): ", round(ratio, digits=3))
+        println("self-check (base processes, max / min): ", round(spread, digits=3),
+            ok ? "  OK" : "  NOT OK - do not quote this ratio")
+        for side in 1:2
+            record_result("ab", labels[side], medians[side], calm; ratios=side == 2 ? (ratio, ratio) : nothing,
+                selfcheck=side == 1 ? spread : nothing)
+        end
+        return ratio, ok
+    finally
+        run(pipeline(`git -C $REPO worktree remove --force $tree`; stdout=devnull, stderr=devnull))
+    end
 end
 
 # ----- Profiling -----

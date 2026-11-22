@@ -10,6 +10,7 @@ julia --project=benchmark -t 2,0 benchmark/run.jl <mode> [--flag=value ...]
 |:-----|:---------|
 | `time` (default) | `--ctrl=N` control and `--scnr=N` scenario years, `--reps=N` times (1, 0 and 3) |
 | `threads` | The same run in a fresh process at `-t 1` to `4` |
+| `ab` | The `time` run of commit `--base=REV` against this checkout, in alternating fresh processes, with a self-check |
 | `kernels` | Each kernel of one step, about 0.5 s each, and `step!` as a whole |
 | `compare` | Two or more kernels (`--only=A,B`) in one process, interleaved, with a self-check |
 
@@ -105,5 +106,5 @@ ERROR: the time mode takes no --secnds flag
 |:-----|:----|
 | Use `-t 2,0` | Two compute threads and no interactive thread |
 | Do not compare timings between sessions | An untouched kernel has measured 0.45 us in one session and 1.28 us in another |
-| Show a speed-up only with `compare` | One process, shuffled order, and a control copy of the baseline |
+| Show a speed-up only with `compare` or `ab` | `compare`: one process, shuffled order, and a control copy of the baseline. `ab`: whole runs of two commits in alternating processes |
 | Do not record test-suite timings as benchmark results | Wall-clock times are not stable |

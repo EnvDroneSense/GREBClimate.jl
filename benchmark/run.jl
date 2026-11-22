@@ -5,6 +5,9 @@
 #   time      time control (+ scenario) runs: --ctrl=N (1), --scnr=N (0), --reps=N (3),
 #             --out=FILE (run times, one per line)
 #   threads   the same run at -t 1, 2, 3, 4 in subprocesses; --threads=1,2 sets the list
+#   ab        the time mode of commit --base=REV against this checkout, in --rounds=N (3)
+#             pairs of fresh processes in alternating order, from a temporary git worktree;
+#             exits 1 when the base processes differ by more than 5 %
 #   kernels   time the kernels of one step (the kernel table of Bench.jl, `step!` is a
 #             whole step): --only=hydro!,seaice! (all), --seconds=S per kernel (0.5)
 #   compare   time two or more kernels of the table interleaved, with a self-check,
@@ -27,6 +30,7 @@ include(joinpath(@__DIR__, "Bench.jl"))
 const FLAGS = Dict(
     "time" => ("preset", "data", "ctrl", "scnr", "reps", "out"),
     "threads" => ("preset", "data", "ctrl", "scnr", "reps", "threads"),
+    "ab" => ("preset", "data", "ctrl", "scnr", "reps", "base", "rounds"),
     "kernels" => ("preset", "data", "only", "seconds"),
     "compare" => ("preset", "data", "only", "seconds", "counters"),
     "profile" => ("preset", "data", "years", "samples", "out"),
@@ -61,6 +65,9 @@ function main(args::Vector{String})
     elseif mode == "threads"
         counts = Tuple(parse.(Int, haskey(o, "threads") ? list(o, "threads") : ["1", "2", "3", "4"]))
         Bench.sweep_threads(dir; thread_counts=counts, experiment, ctrl, scnr, reps)
+    elseif mode == "ab"
+        haskey(o, "base") || error("ab needs --base=REV, the commit to time this checkout against")
+        last(Bench.ab(dir, o["base"]; experiment, ctrl, scnr, reps, rounds=intflag(o, "rounds", 3; min=1))) || return 1
     elseif mode == "kernels"
         Bench.time_kernels(dir; experiment, only=list(o, "only"), seconds=floatflag(o, "seconds", 0.5))
     elseif mode == "compare"

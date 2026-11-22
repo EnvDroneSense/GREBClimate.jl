@@ -18,6 +18,7 @@ julia --project=benchmark -t 2,0 benchmark/run.jl <mode> [--flag=value ...]
 |:-----|:-----|:----------------|
 | `time` (default) | Times control (and scenario) runs; prints each run, the min and median, and seconds per simulated year | `--ctrl` (1), `--scnr` (0), `--reps` (3), `--out=FILE` (run times, one per line) |
 | `threads` | The same run at `-t 1`, 2, 3, 4, each in its own process; prints the speedup against `-t 1` | `--threads=1,2`, `--ctrl`, `--scnr`, `--reps` |
+| `ab` | The `time` mode of an older commit against this checkout, in pairs of fresh processes in alternating order; the older commit is a temporary git worktree. Prints the ratio of the medians and a self-check; exits 1 when the base processes differ by more than 5 % | `--base=REV` (required), `--rounds` (3), `--ctrl`, `--scnr`, `--reps` per process |
 | `kernels` | Times each kernel of one step, and `step!` (a whole step), with the share of `step!` | `--only=A,B` (all), `--seconds` per kernel (0.5) |
 | `compare` | Times two or more kernels interleaved, with a self-check; the first is the baseline. Exits 1 when the self-check fails | `--only=A,B[,C]` (required), `--seconds` per variant (5), `--counters` |
 | `profile` | Samples control runs | `--years` (25), `--samples` (10000), `--out=DIR` |
@@ -104,7 +105,7 @@ effects below about 5 % at the scale of a year cannot be resolved there.
 
 ## Results
 
-Every run of `time`, `threads`, `compare` and the Fortran comparison appends a line per variant
+Every run of `time`, `threads`, `ab`, `compare` and the Fortran comparison appends a line per variant
 to `benchmark/results/<date>.csv` (gitignored): `date,commit,mode,name,threads,samples,min_s,median_s,ratio_min,ratio_median,selfcheck,state`.
 The ratio columns are empty outside `compare`, `selfcheck` is filled on the
 baseline-copy row, and `state` is `quiet` or `NOISY`. The commit carries
