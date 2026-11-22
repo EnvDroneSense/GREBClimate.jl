@@ -12,7 +12,7 @@ isdefined(@__MODULE__, :ToolBox) || include(joinpath(@__DIR__, "..", "tools", "T
 module Bench
 
 using GREBClimate
-using GREBClimate: SWradiation!, LWradiation!, hydro!, deep_ocean!, circulation!
+using GREBClimate: SWradiation!, LWradiation!, hydro!, deep_ocean!, circulation!, seaice!
 using Chairmarks: @b
 using Dates
 using Printf
@@ -186,7 +186,7 @@ is within 1 % of 1.000. When it is not, the run is not trustworthy.
 With `counters=true` it also prints instructions and cycles per call (Linux
 only, see `counters.jl`); where they cannot be read it says why and goes on.
 """
-function compare_kernels(pairs::Pair{String}...; seconds::Real=5, rounds::Int=ROUNDS, counters::Bool=false)
+function compare(pairs::Pair{String}...; seconds::Real=5, rounds::Int=ROUNDS, counters::Bool=false)
     names = String[first(p) for p in pairs]
     fs = Any[last(p) for p in pairs]
     insert!(names, 2, names[1] * " (copy)")
@@ -242,7 +242,7 @@ end
 
 # ----- Workloads -----
 
-"The climatology, workspace and slice-1 state that the single-stage modes and the dispatch check call the kernels with."
+"The climatology, workspace and slice-1 state that the kernel table calls the kernels with."
 function stage_inputs(dir::AbstractString, cfg)
     fields = load_climatology(dir; dataset=:ncep)
     r = resolve(cfg; jld2_dir=dir)
@@ -260,46 +260,72 @@ run_model(spec, cfg, dir, fields) =
     end
 
 "What a report says is run."
-workload_text(experiment::Symbol) = "$experiment control, stored corrections"
+workload_text(experiment::Symbol, ctrl::Int=1, scnr::Int=0) = "$experiment, $ctrl control + $scnr scenario year(s), stored corrections"
 
 """
-The configuration and fields a run uses, after one warm-up year so compilation is
-not timed. `greb_model!` restores `fields`, so every run can reuse them.
+A closure that runs `ctrl` control years and `scnr` scenario years of the preset
+`experiment` on the stored flux corrections (no spin-up). One warm-up year runs
+first, so compilation is not timed. `greb_model!` restores `fields`, so every call
+reuses them.
 """
-function workload(dir::AbstractString, experiment::Symbol)
+function workload(dir::AbstractString, experiment::Symbol; ctrl::Int=1, scnr::Int=0)
     cfg = preset(experiment; corrections=Stored())
     fields = load_climatology(dir; dataset=:ncep)
+    spec = RunSpec(ctrl=ctrl, scnr=scnr)
     run_model(RunSpec(ctrl=1, scnr=0), cfg, dir, fields)
     GC.gc()
-    return cfg, fields
+    return () -> run_model(spec, cfg, dir, fields)
 end
 
 """
-The six physics calls of one timestep as `name => call`, in the order the
-`kernels` mode prints them. `circulation!(q)` holds `convergence!`.
+The kernels of one timestep as `name => call` on the slice-1 state of the preset
+`experiment`, in the order the `kernels` mode prints them. `step!` is one whole
+`time_loop!` step on its own copy of the state. `circulation!(q)` holds
+`convergence!`. A name is what `--only` takes.
 """
-function stage_calls(inp)
-    (; fields, r, CO2, state, ws, slice, Ts, Ta, To, q) = inp
+function kernel_table(dir::AbstractString, experiment::Symbol=:full_model)
+    (; fields, r, CO2, state, ws, slice, Ts, Ta, To, q) = stage_inputs(dir, preset(experiment))
     p = r.config.processes
+    # `step!` advances its own copy, so it does not change what the kernels are called with.
+    s = (; Ts=copy(Ts), Ta=copy(Ta), To=copy(To), q=copy(q), state=ModelState(), ws=ModelWorkspace(),
+        acc=GREBClimate.MonthlyAccumulator(), records=GREBClimate.MonthlyRecord[],
+        times=GREBClimate.RecordTime[], time=ModelTime(GREBClimate.control, 1970, 1))
+    step = function ()
+        empty!(s.records)   # a year of records would otherwise pile up while it is timed
+        empty!(s.times)
+        GREBClimate.time_loop!(s.time, CO2, s.Ts, s.Ta, s.To, s.q, s.records, s.times, fields, s.state, s.ws, s.acc, r)
+    end
     return Pair{String,Function}[
         "circulation!(Ta)"=>()->circulation!(ws.dTa_crcl, Ta, GREBClimate.z_air, fields, ws, slice, p),
         "circulation!(q)"=>()->circulation!(ws.dq_crcl, q, GREBClimate.z_vapor, fields, ws, slice, p),
         "SWradiation!"=>()->SWradiation!(ws, Ts, fields, state, slice, p),
         "LWradiation!"=>()->LWradiation!(ws, Ts, Ta, q, CO2, fields, slice, p),
         "hydro!"=>()->hydro!(ws, Ts, q, fields, slice, p, r.hydrology),
-        "deep_ocean!"=>()->deep_ocean!(ws, Ts, To, fields, slice, p)
+        "deep_ocean!"=>()->deep_ocean!(ws, Ts, To, fields, slice, p),
+        "seaice!"=>()->seaice!(fields, Ts, slice, p),
+        "step!"=>step
     ]
+end
+
+"The entries of `table` named in `names`, in that order; all of them when `names` is empty."
+function pick(table, names)
+    isempty(names) && return table
+    byname = Dict(table)
+    for n in names
+        haskey(byname, n) || error("unknown kernel $(repr(n)); expected one of ", join(first.(table), ", "))
+    end
+    return Pair{String,Function}[n => byname[n] for n in names]
 end
 
 # ----- Timing -----
 
 """
-Time a `ctrl`-year control run followed by a `scnr`-year scenario run, `reps`
-times on the stored flux corrections (no spin-up); returns seconds per run.
-`out` is a file that receives the run times, one per line.
+Time `reps` runs of `ctrl` control years and `scnr` scenario years of the preset
+`experiment`; returns seconds per run. `out` is a file that receives the run
+times, one per line.
 
-`experiment` is a preset name. `:full_model` holds CO2 constant across the whole
-scenario regardless of `scnr`; for a forced change, pass a preset with a real CO2 path.
+`:full_model` holds CO2 constant across the whole scenario regardless of `scnr`;
+for a forced change, pass a preset with a real CO2 path.
 """
 function time_years(dir::AbstractString; experiment::Symbol=:full_model, ctrl::Int=1, scnr::Int=0, reps::Int=3,
         out=nothing)
@@ -311,12 +337,11 @@ function time_years(dir::AbstractString; experiment::Symbol=:full_model, ctrl::I
     println("Threads.nthreads() = ", Threads.nthreads())
     println("ctrl=$ctrl scnr=$scnr ($total_years simulated years/rep), preset=$experiment")
     calibration = machine_header()
-    cfg, fields = workload(dir, experiment)
-    spec = RunSpec(ctrl=ctrl, scnr=scnr)
+    run! = workload(dir, experiment; ctrl, scnr)
 
     times = Float64[]
     for r in 1:reps
-        push!(times, @elapsed run_model(spec, cfg, dir, fields))
+        push!(times, @elapsed run!())
         println("  run $r: ", round(times[end], digits=3), " s  (",
             round(times[end] / total_years, digits=3), " s/simulated year)")
     end
@@ -335,35 +360,34 @@ function _fixed(x::Real, digits::Int, width::Int)
 end
 
 """
-Time each physics stage of one timestep for about `seconds` each; returns
-`(name, fastest seconds per call)`. The stage is timed in `ROUNDS` chunks; the
-fastest call of each chunk is kept, and the minimum and median of those are printed.
+Time the kernels of the table named in `only` (all when empty) for about `seconds`
+each; returns `(name, fastest seconds per call)`. A kernel is timed in `ROUNDS`
+chunks; the fastest call of each chunk is kept, and the minimum and median of those
+are printed. With `step!` in the list, each row also shows its share of one step.
 """
-function time_stages(dir::AbstractString; experiment::Symbol=:full_model, seconds::Real=0.5)
+function time_kernels(dir::AbstractString; experiment::Symbol=:full_model, only=String[], seconds::Real=0.5)
     seconds > 0 || throw(ArgumentError("seconds must be positive, got $seconds"))
-    stages = stage_calls(stage_inputs(dir, preset(experiment)))
-    for (_, f) in stages
+    kernels = pick(kernel_table(dir, experiment), only)
+    for (_, f) in kernels
         f()
     end
     calibration = machine_header()
 
-    println("Per-stage timing (about ", seconds, " s each, single workspace, ",
+    println("Kernel timing (about ", seconds, " s each, single workspace, ",
         Threads.nthreads(), " thread(s) available but unused here):")
-    samples = [[chunk_time(f, seconds / ROUNDS) for _ in 1:ROUNDS] for (_, f) in stages]
-    results = [(name, minimum(t)) for ((name, _), t) in zip(stages, samples)]
+    samples = [[chunk_time(f, seconds / ROUNDS) for _ in 1:ROUNDS] for (_, f) in kernels]
+    results = [(name, minimum(t)) for ((name, _), t) in zip(kernels, samples)]
 
-    total = sum(last(r) for r in results)
+    step = findfirst(r -> first(r) == "step!", results)
     for ((name, per_call), t) in zip(results, samples)
-        share = 100 * per_call / total
+        share = step === nothing ? "" : "   (" * _fixed(100 * per_call / last(results[step]), 1, 5) * "% of step!)"
         println("  ", rpad(name, 18), "min ", _fixed(per_call * 1e6, 2, 7), " µs   median ",
-            _fixed(median(t) * 1e6, 2, 7), " µs   (", _fixed(share, 1, 5), "% of measured total)")
+            _fixed(median(t) * 1e6, 2, 7), " µs", share)
     end
-    println("  measured total (sum of stage minima): ", round(total * 1e6, digits=1), " µs")
-    println("  (convergence! is inside circulation!(q). The shares are of these six calls, not of")
-    println("   a step: seaice!, the update loop, output! and diagnostics! are not timed. For shares")
-    println("   of a whole run use the profile mode)")
+    println("  (convergence! is inside circulation!(q); step! also holds the update loop, output! and")
+    println("   diagnostics!. For shares of a whole run use the profile mode)")
     calm = machine_footer(calibration)
-    for ((name, _), t) in zip(stages, samples)
+    for ((name, _), t) in zip(kernels, samples)
         record_result("kernels", name, t, calm)
     end
     return results
@@ -393,17 +417,6 @@ function sweep_threads(dir::AbstractString; thread_counts=(1, 2, 3, 4), experime
             " s  (", round(base / median(r), digits=2), "x)")
     end
     return results
-end
-
-"""
-Compare `circulation!(Ta)` with `circulation!(q)` (the baseline is the first);
-returns whether the self-check passed. A template for `compare_kernels`.
-"""
-function compare_circulation(dir::AbstractString; seconds::Real=5, counters::Bool=false)
-    calls = Dict(stage_calls(stage_inputs(dir, preset(:full_model))))
-    return compare_kernels(
-        "circulation!(Ta)" => calls["circulation!(Ta)"], "circulation!(q)" => calls["circulation!(q)"];
-        seconds, counters)
 end
 
 # ----- Profiling -----
@@ -480,12 +493,6 @@ function trim_to_package(data::Vector{UInt64}, samples, frames_at::AbstractDict)
         append!(trimmed, view(data, meta))
     end
     return trimmed
-end
-
-"`lidict` with the inlined frames outside the outermost package frame cut, as `trim_to_package` does for the samples."
-function trim_lidict(lidict::AbstractDict, frames_at::AbstractDict)
-    return Dict(ip => (i = findlast(fr -> fr.owned, frames_at[ip]); i === nothing ? frames : frames[1:i])
-    for (ip, frames) in lidict)
 end
 
 "The distinct stacks as `frames => samples` pairs, innermost first, inlined frames included, cut at the outermost package frame."
@@ -663,7 +670,7 @@ end
 
 # ----- Runs -----
 
-"An optional package from the default environment (PProf, JET); not a dependency of this script."
+"An optional package from the default environment (JET); not a dependency of this script."
 function load_optional(name::AbstractString, uuid::AbstractString)
     try
         Base.require(Base.PkgId(Base.UUID(uuid), name))
@@ -706,27 +713,31 @@ function close_report(body, dir::AbstractString, title::AbstractString, info)
 end
 
 
-"Sample `years`-year control runs until `target` samples or the run limit. Returns the report directory."
-function profile_cpu(dir::AbstractString; experiment::Symbol=:full_model, years::Int=25,
-        target::Int=TARGET_SAMPLES, out_dir=nothing, viewer=nothing)
-    years >= 1 || throw(ArgumentError("years must be at least 1, got $years"))
-    viewer in (nothing, "pprof") || throw(ArgumentError("unknown viewer $(repr(viewer)); expected pprof"))
-    PProf = viewer === nothing ? nothing : load_optional("PProf", "e4faabce-9ead-11e9-39d9-4379958e3056")   # before the run, so a missing package fails early
+"""
+Sample calls of `f` with the profiler until `target` samples or `max_runs` calls;
+one call is one run of the workload. Returns the report directory. `description`
+and `info` (`item => value` pairs) go in the report header. `warmup` calls `f` once
+unprofiled first, so compilation is not sampled; leave it off when `f` is warm.
+
+Run at `-t 1`: on Windows the sampler records the first thread only.
+"""
+function profile(f; description::AbstractString="a closure", info=Pair{String,String}[],
+        target::Int=TARGET_SAMPLES, max_runs::Int=50, out_dir=nothing, warmup::Bool=true)
     if Threads.nthreads() > 1
         @warn "Profiling with $(Threads.nthreads()) threads: on Windows only the first thread is sampled. Use -t 1."
     end
-    cfg, fields = workload(dir, experiment)
+    warmup && f()
+    GC.gc()
 
     Profile.clear()
     Profile.init(n=PROFILE_BUFFER, delay=0.001)
     elapsed = 0.0
     runs = 0
-    max_runs = max(8, 400 ÷ years)   # a short run gives few samples
     while runs < max_runs &&
         (runs == 0 || length(split_samples(Profile.fetch(include_meta=true))) < target)
-        elapsed += @elapsed @profile run_model(RunSpec(ctrl=years, scnr=0), cfg, dir, fields)
+        elapsed += @elapsed @profile f()
         runs += 1
-        Profile.is_buffer_full() && error("the profile buffer filled up; lower --years or --samples")
+        Profile.is_buffer_full() && error("the profile buffer filled up; lower the run length or --samples")
     end
 
     data, lidict = Profile.retrieve(include_meta=true)
@@ -736,27 +747,22 @@ function profile_cpu(dir::AbstractString; experiment::Symbol=:full_model, years:
     threads_seen = sort!(unique(Int(data[first(meta)]) for (_, meta) in samples))
     ms_per_run = 1000 * elapsed / runs
 
-    report, info = open_report("profile", workload_text(experiment), out_dir)
-    push!(info, "preset" => String(experiment), "threads" => "$(Threads.nthreads()) (sampled: $(join(threads_seen, ", ")))",
-        "runs" => "$runs of $years simulated year(s)",
+    report, header = open_report("profile", description, out_dir)
+    push!(header, info..., "threads" => "$(Threads.nthreads()) (sampled: $(join(threads_seen, ", ")))",
+        "runs" => string(runs),
         "elapsed" => "$(round(elapsed, digits=2)) s ($(round(ms_per_run, digits=1)) ms per run)",
         "samples" => "$n ($(round(1000 * elapsed / n, digits=2)) ms per sample)")
 
     frames_at = Dict(ip => Frame.(frames) for (ip, frames) in lidict)
     trimmed = trim_to_package(data, samples, frames_at)
-    trimmed_lidict = trim_lidict(lidict, frames_at)
     stacks = distinct_stacks(data, samples, frames_at)
     t = tally(stacks)
     mincount = max(2, n ÷ 1000)   # rows below 0.1 percent are noise
-    write_counts(joinpath(report, "counts.tsv"), t, last(info[2]))
-    # Sorted by self time, largest last.
-    write_report(joinpath(report, "flat.txt"), trimmed, trimmed_lidict; format=:flat, sortedby=:overhead, mincount)
-    write_report(joinpath(report, "tree.txt"), trimmed, trimmed_lidict; format=:tree, mincount, noisefloor=2)
+    write_counts(joinpath(report, "counts.tsv"), t, last(header[2]))
+    write_report(joinpath(report, "tree.txt"), trimmed, lidict; format=:tree, mincount, noisefloor=2)
     write_folded(joinpath(report, "stacks.folded"), stacks)
-    PProf === nothing || Base.invokelatest(PProf.pprof, trimmed, trimmed_lidict; web=false,
-        out=joinpath(report, "profile.pb.gz"), full_signatures=false)
 
-    close_report(report, "Profile", info) do io, top
+    close_report(report, "Profile", header) do io, top
         write_sampled(io, t; mincount, ms_per_run, top)
     end
     n >= MIN_SAMPLES ||
@@ -779,24 +785,24 @@ function add!(row::AllocRow, type::AbstractString, bytes::Int)
     bump!(row.types, type, bytes)
 end
 
-"Record every allocation of one `years`-year run; returns the report directory."
-function profile_allocs(dir::AbstractString; experiment::Symbol=:full_model, years::Int=1, out_dir=nothing)
-    years >= 1 || throw(ArgumentError("years must be at least 1, got $years"))
-    cfg, fields = workload(dir, experiment)
 
+"""
+Record every allocation of one call of `f`; returns the report directory.
+`description`, `info` and `warmup` are as for `profile`.
+"""
+function allocs(f; description::AbstractString="a closure", info=Pair{String,String}[], out_dir=nothing,
+        warmup::Bool=true)
+    warmup && f()
     Profile.Allocs.clear()
-    quiet() do
-        Profile.Allocs.@profile sample_rate=1 greb_model!(RunSpec(ctrl=years, scnr=0), cfg;
-            jld2_dir=dir, fields=fields)
-    end
-    allocs = Profile.Allocs.fetch().allocs
-    isempty(allocs) && error("the allocation profiler recorded nothing")
+    Profile.Allocs.@profile sample_rate=1 f()
+    recorded = Profile.Allocs.fetch().allocs
+    isempty(recorded) && error("the allocation profiler recorded nothing")
 
     frame_of = Dict{Base.StackTraces.StackFrame,Frame}()
     by_func = Dict{String,AllocRow}()
     by_line = Dict{String,AllocRow}()
     total, in_loop = AllocRow(), AllocRow()
-    for a in allocs
+    for a in recorded
         stack = [get!(() -> Frame(fr), frame_of, fr) for fr in a.stacktrace]
         type = first(string(a.type), 60)
         o = owner(stack)
@@ -811,15 +817,14 @@ function profile_allocs(dir::AbstractString; experiment::Symbol=:full_model, yea
     largest_first(rows) = sort!(collect(rows); by=kv -> (-last(kv).bytes, first(kv)))
     pct(row) = @sprintf("%.2f", 100*row.bytes/total.bytes)
 
-    report, info = open_report("allocs", workload_text(experiment), out_dir)
-    push!(info, "runs" => "1 of $years simulated year(s)",
-        "allocations" => amount(total),
+    report, header = open_report("allocs", description, out_dir)
+    push!(header, info..., "allocations" => amount(total),
         "in loop" => amount(in_loop) * " (with `time_loop!` on the stack)")
 
-    close_report(report, "Allocations", info) do io, top
+    close_report(report, "Allocations", header) do io, top
         rows_of(items) = top === nothing ? items : first(items, top)
         println(io, "## By function\n")
-        println(io, "Every allocation of one run, charged to the innermost package frame of its stack.\n")
+        println(io, "Every allocation of one call, charged to the innermost package frame of its stack.\n")
         md_table(io, ["Function", "Bytes", "Share %", "Count"],
             ([code(name), format_bytes(row.bytes), pct(row), string(row.count)] for (name, row) in rows_of(largest_first(by_func))))
         println(io, "## By line\n")
@@ -831,23 +836,19 @@ function profile_allocs(dir::AbstractString; experiment::Symbol=:full_model, yea
     return report
 end
 
-"Check one model step for runtime dispatch with JET (static, nothing is timed); returns the report directory."
-function profile_dispatch(dir::AbstractString; out_dir=nothing)
-    JET = load_optional("JET", "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b")   # before the set-up, so a missing package fails early
-    (; fields, r, CO2, state, ws, Ts, Ta, To, q) = stage_inputs(dir, preset(:full_model))
-    acc = GREBClimate.MonthlyAccumulator()
-    records = GREBClimate.MonthlyRecord[]
-    times = GREBClimate.RecordTime[]
-    time = ModelTime(GREBClimate.control, 1970, 1)
-
-    step = () -> GREBClimate.time_loop!(time, CO2, Ts, Ta, To, q, records, times, fields, state, ws, acc, r)
-    result = Base.invokelatest(JET.report_opt, step, (); target_modules=(GREBClimate,))
+"""
+Check `f` for runtime dispatch with JET (needs JET.jl in the default environment;
+static, nothing is timed); returns the report directory. Only calls in the package are reported.
+"""
+function dispatch(f; description::AbstractString="a closure", info=Pair{String,String}[], out_dir=nothing)
+    JET = load_optional("JET", "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b")   # before the analysis, so a missing package fails early
+    result = Base.invokelatest(JET.report_opt, f, (); target_modules=(GREBClimate,))
     n = length(Base.invokelatest(JET.get_reports, result))
 
-    report, info = open_report("dispatch", "one time_loop! step of full_model", out_dir)
-    push!(info, "reports" => string(n))
-    close_report(report, "Runtime dispatch", info) do io, _
-        println(io, "JET optimization analysis of one `time_loop!` step, reports from the package only. ",
+    report, header = open_report("dispatch", description, out_dir)
+    push!(header, info..., "reports" => string(n))
+    close_report(report, "Runtime dispatch", header) do io, _
+        println(io, "JET optimization analysis of ", description, ", reports from the package only. ",
             "A report is a call that is dispatched at run time; none is the expected state.\n")
         if n > 0
             println(io, "```")

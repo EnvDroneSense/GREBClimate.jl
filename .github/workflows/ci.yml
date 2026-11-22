@@ -52,19 +52,15 @@ jobs:
           Pkg.activate("benchmark")
           Pkg.develop(path=".")
           Pkg.instantiate()
-          include(joinpath(pwd(), "benchmark", "common.jl"))
-          include(joinpath(pwd(), "benchmark", "compare.jl"))
+          # Loads the command line and Bench without running a mode, so a renamed internal name breaks here.
+          include(joinpath(pwd(), "benchmark", "run.jl"))
           x = rand(1000)
-          ok = compare_kernels("sum" => () -> sum(x), "sum twice" => () -> sum(x) + sum(x); seconds=1)
+          ok = Bench.compare("sum" => () -> sum(x), "sum twice" => () -> sum(x) + sum(x); seconds=1)
           println("self-check passed: ", ok)
-          # Loads the harness without running a mode, so a renamed internal name breaks here.
-          include(joinpath(pwd(), "benchmark", "run_benchmarks.jl"))
         shell: julia --color=yes {0}
-      # Separate process: profile.jl and run_benchmarks.jl both define main.
-      - name: Load the profiler and run the Fortran harness self-test
+      - name: Run the Fortran harness self-test
         run: |
           julia --project=. -e 'import Pkg; Pkg.instantiate()'
-          julia --project=. -e 'include("benchmark/profile.jl")'
           julia --project=. benchmark/fortran/run_fortran_comparison.jl selftest
       - name: Run the quickstart example without the dataset
         run: julia --project=. examples/quickstart.jl --data-free

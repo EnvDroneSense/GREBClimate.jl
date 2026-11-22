@@ -16,10 +16,10 @@ era5_raw/
 /dataset_packs/
 /greb_input_data-*.tar.gz
 
-# Profiler reports (benchmark/profile.jl)
+# Profiler reports (benchmark/run.jl profile)
 /benchmark/profiles/
 
-# Benchmark result records (benchmark/run_benchmarks.jl)
+# Benchmark result records (benchmark/run.jl)
 /benchmark/results/
 
 # Generated plots
