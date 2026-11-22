@@ -12,9 +12,10 @@ module ToolBox
 using GREBClimate
 using Logging: with_logger, NullLogger
 
-export data_dir, quiet, cell_mean, per_phase, both, TermMeans, means
+export data_dir, quiet, repo_state, parse_args, intflag, floatflag, cell_mean, per_phase, both, TermMeans, means
 
 const G = GREBClimate
+const REPO = normpath(joinpath(@__DIR__, ".."))
 
 "The local dataset folder; an error when there is none. Never downloads."
 function data_dir()
@@ -25,6 +26,60 @@ end
 
 "Run `f()` with log messages thrown away."
 quiet(f) = with_logger(f, NullLogger())
+
+"Short commit hash of the repository and whether tracked files are modified."
+function repo_state()
+    try
+        commit = readchomp(`git -C $REPO rev-parse --short HEAD`)
+        dirty = !isempty(readchomp(`git -C $REPO status --porcelain --untracked-files=no`))
+        return commit, dirty
+    catch
+        return "unknown", false
+    end
+end
+
+"""
+    parse_args(args, flags, default) -> (mode, opts, positional)
+
+Split a command line `[mode] [--name=value ...] [positional ...]`. `flags` maps each
+mode to the flag names it takes; a first argument that is not a mode, or is a flag,
+selects `default`. A bare `--name` gets the value `"true"`. A flag the mode does not
+take, or an unknown mode, is an error.
+"""
+function parse_args(args::Vector{String}, flags::AbstractDict{String}, default::String)
+    has_mode = !(isempty(args) || startswith(args[1], "--"))
+    mode = has_mode ? args[1] : default
+    haskey(flags, mode) || error("unknown mode $(repr(mode)); expected one of $(join(sort!(collect(keys(flags))), ", "))")
+    opts = Dict{String,String}()
+    positional = String[]
+    for a in (has_mode ? args[2:end] : args)
+        m = match(r"^--([\w-]+)(?:=(.*))?$", a)
+        if m === nothing
+            push!(positional, a)
+        else
+            m.captures[1] in flags[mode] || error("the $mode mode takes no --$(m.captures[1]) flag")
+            opts[m.captures[1]] = something(m.captures[2], "true")
+        end
+    end
+    return mode, opts, positional
+end
+
+"The integer flag `name` of at least `min`, or `default` when it is absent."
+function intflag(opts::AbstractDict, name::AbstractString, default; min::Int=0)
+    haskey(opts, name) || return default
+    n = tryparse(Int, opts[name])
+    n === nothing && error("--$name must be an integer, got $(repr(opts[name]))")
+    n >= min || error("--$name must be at least $min, got $n")
+    return n
+end
+
+"The positive number flag `name`, or `default` when it is absent."
+function floatflag(opts::AbstractDict, name::AbstractString, default)
+    haskey(opts, name) || return default
+    x = tryparse(Float64, opts[name])
+    (x === nothing || x <= 0) && error("--$name must be a positive number, got $(repr(opts[name]))")
+    return x
+end
 
 const WEIGHT = [G.dxlat_grid[j] for _ in 1:G.xdim, j in 1:G.ydim] ./ (G.xdim * sum(G.dxlat_grid))
 
