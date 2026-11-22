@@ -22,6 +22,6 @@ The full reference (packs, reproducibility, failure table) is `docs/src/dev/data
      --title "GREB input dataset v2" --notes "JLD2 input dataset, version 2: five packs."
    ```
 
-4. Verify: `Pkg.test(test_args=["io", "dataset_tools"])` (the dataset tools test is not in the full suite; run it by name), a `curl -sIL` that returns 200 for each `_pack_url(pack)`, and a download on a machine without a local dataset (`GREB_DATA` unset, `DATADEPS_ALWAYS_ACCEPT=true`).
+4. Verify: `Pkg.test(test_args=["io"])` (it also checks that the tool file list agrees with the loaders), a `curl -sIL` that returns 200 for each `_pack_url(pack)`, and a download on a machine without a local dataset (`GREB_DATA` unset, `DATADEPS_ALWAYS_ACCEPT=true`).
 
 An incompatible format change needs a new tag (`data-v3`) and a raised `DATASET_VERSION` in `src/data.jl` and `tools/dataset/fields.jl`. Never replace assets older installs may have cached, and never move `greb_input_data/` aside to test the download.

@@ -31,10 +31,9 @@ julia --project=. tools/dataset/package_dataset.jl greb_input_data dataset_packs
 
 The packs are the unit of release: edit `DATA_PACKS` in `src/data.jl` with the printed block,
 upload all five archives to the release tag in `DATA_RELEASE_TAG`, and raise `DATASET_VERSION`
-(in `src/data.jl` and in `fields.jl`) whenever the format of the files changes. Tests of the
-scripts, and of the agreement between the file list, the packs and the loaders, are in
-`test/test_dataset_tools.jl`. They are not part of the full suite; run them by name with
-`Pkg.test(test_args=["dataset_tools"])` after changing the tools, `fields.toml` or the loaders.
+(in `src/data.jl` and in `fields.jl`) whenever the format of the files changes. The scripts have
+no tests; run them by hand at a release. `test/test_io.jl` checks that the file list, the packs
+and the version agree with the loaders.
 
 Where a new script goes:
 

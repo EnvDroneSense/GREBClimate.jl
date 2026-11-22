@@ -63,7 +63,7 @@ When the file format changes, raise `DATASET_VERSION` in `src/data.jl` and in `t
 The dataset tools test does not run with the full suite. Run it by name after you change the tools, `fields.toml` or the loaders in `src/io.jl` and `src/data.jl`.
 
 ```bash
-julia --project=. -e 'using Pkg; Pkg.test(test_args=["io", "dataset_tools"])'
+julia --project=. -e 'using Pkg; Pkg.test(test_args=["io"])'
 for p in core era cmip5 enso solar; do
   curl -sIL -o /dev/null -w "$p %{http_code}\n" "$(julia --project=. -e "using GREBClimate; print(GREBClimate._pack_url(:$p))")"
 done
