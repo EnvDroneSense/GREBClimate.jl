@@ -14,11 +14,11 @@ The model runs many simulated years, so its kernels are written around that. The
 A refactor or an optimization is checked with exact equality, not with tolerances. With the dataset present, save a snapshot on the commit before the change and compare after it, once at one thread and once at two:
 
 ```bash
-julia --project=. -t 1 tools/validation/bit_identity.jl save snap_t1.jld2
-julia --project=. -t 1 tools/validation/bit_identity.jl compare snap_t1.jld2
+julia --project=. -t 1 tools/checks/bit_identity.jl save snap_t1.jld2
+julia --project=. -t 1 tools/checks/bit_identity.jl compare snap_t1.jld2
 ```
 
-Repeat both with `-t 2,0` and a second snapshot. Snapshots depend on the CPU and the Julia version, so they are not committed. For a change to the flux sums or the humidity limiters, `tools/diagnostics/budget.jl <preset>` prints how well each store closes. See [Validation](validation.md) and [Diagnostics](diagnostics.md).
+Repeat both with `-t 2,0` and a second snapshot. Snapshots depend on the CPU and the Julia version, so they are not committed. For a change to the flux sums or the humidity limiters, `tools/checks/budget.jl <preset>` prints how well each store closes. See [Validation](validation.md) and [Diagnostics](diagnostics.md).
 
 ## Speed
 

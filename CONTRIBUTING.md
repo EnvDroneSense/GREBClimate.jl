@@ -40,7 +40,7 @@ GREBClimate.jl/
 ├── docs/                       # Documenter site
 ├── examples/                   # user examples: quickstart.jl, feedback_deconstruction.jl
 ├── viz/                        # plotting toolbox + Pluto notebook (notebooks/), own Project.toml
-├── tools/                      # maintainer scripts: dataset/, diagnostics/, validation/ (see tools/README.md)
+├── tools/                      # maintainer scripts: dataset/, checks/ (see tools/README.md)
 ├── DATA_README.md              # raw .bin input inventory (maintainers)
 └── CHANGELOG.md
 ```
@@ -83,7 +83,7 @@ The developer docs page [Testing](docs/src/dev/testing.md) has every command and
 
 ## Conventions
 
-Fields are `Float32`, kernels do not allocate, and four kernels stay free of `@turbo`. A change that must not alter results is checked with `tools/validation/bit_identity.jl`. Source folders follow `.JuliaFormatter.toml`, and a CI job fails on unformatted files. See [Code conventions](docs/src/dev/conventions.md) for the details, the formatting command and the docs build.
+Fields are `Float32`, kernels do not allocate, and four kernels stay free of `@turbo`. A change that must not alter results is checked with `tools/checks/bit_identity.jl`. Source folders follow `.JuliaFormatter.toml`, and a CI job fails on unformatted files. See [Code conventions](docs/src/dev/conventions.md) for the details, the formatting command and the docs build.
 
 ## Branches
 

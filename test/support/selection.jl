@@ -100,7 +100,7 @@ const FULL_PATHS = ["src/GREBClimate.jl", "src/core/constants.jl", "Project.toml
 const RUNNER_PATHS = ["test/support/parallel.jl", "test/support/live.jl", "test/support/changed.jl"]
 
 # Paths no test can fail on
-const NO_TEST_PATHS = ["docs/", "benchmark/", "viz/", ".claude/", "tools/diagnostics/", "tools/validation/", "tools/README", "README", "test/README", "CHANGELOG", "CONTRIBUTING",
+const NO_TEST_PATHS = ["docs/", "benchmark/", "viz/", ".claude/", "tools/checks/", "tools/ToolBox", "tools/README", "README", "test/README", "CHANGELOG", "CONTRIBUTING",
     "DATA_README", "LICENSE", ".gitignore", ".JuliaFormatter", "CITATION", "codecov"]
 
 """

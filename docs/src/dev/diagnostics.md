@@ -1,9 +1,9 @@
 # Diagnostics
 
-`tools/diagnostics/budget.jl` checks the model's bookkeeping. For one preset it runs a control and a scenario phase with an observer attached. It reports, per phase, whether each store changes by the sum of its flows, how often a limiter held a cell, and the global-mean flows. It needs the local dataset.
+`tools/checks/budget.jl` checks the model's bookkeeping. For one preset it runs a control and a scenario phase with an observer attached. It reports, per phase, whether each store changes by the sum of its flows, how often a limiter held a cell, and the global-mean flows. It needs the local dataset.
 
 ```bash
-julia --project=. -t 2,0 tools/diagnostics/budget.jl [preset] [years]
+julia --project=. -t 2,0 tools/checks/budget.jl [preset] [years]
 ```
 
 The defaults are `full_model` and 1 year of control and 1 year of scenario, on the stored flux corrections. The observer is `GREBClimate.BudgetCheck` (not exported), which recomputes each step's expected `Ts`, `Ta`, `To` and `q` from the step's flows, limiters included, and compares them with what the model stored.

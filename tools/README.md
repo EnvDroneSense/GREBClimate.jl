@@ -10,8 +10,8 @@ from the repository root with `julia --project=. tools/<folder>/<script>.jl`
 | | | `convert_greb_to_jld2.jl` | Converts GREB `.bin` files and the CO2 text tables into `greb_input_data/` | |
 | | | `package_dataset.jl` | Builds one `tar.xz` per pack and prints the `DATA_PACKS` block | |
 | | | `fields.toml`, `fields.jl` | Not run: the file list, pack and metadata of each field, and the reader of that list | |
-| `diagnostics/` | Measure a property of the model | `budget.jl` | Reports whether each store closes, how often a limiter held a cell, and the global-mean flows | [Diagnostics](../docs/src/dev/diagnostics.md) |
-| `validation/` | Check the model against a reference | `bit_identity.jl` | Saves every record field of every preset, then compares a later build with exact equality | [Validation](../docs/src/dev/validation.md) |
+| `checks/` | Measure the model, or check it against a reference | `budget.jl` | Reports whether each store closes, how often a limiter held a cell, and the global-mean flows | [Diagnostics](../docs/src/dev/diagnostics.md) |
+| | | `bit_identity.jl` | Saves every record field of every preset, then compares a later build with exact equality | [Validation](../docs/src/dev/validation.md) |
 
 Two maintainer scripts live next to what they serve, not here:
 
@@ -40,8 +40,11 @@ Where a new script goes:
 | If it... | Folder |
 |:---------|:-------|
 | produces or publishes `greb_input_data/` | `dataset/` |
-| runs the model to measure a property of the model | `diagnostics/` |
-| compares the model with a reference: observations, a saved snapshot or a stored table | `validation/` |
+| runs the model to measure a property, or compares it with a reference such as a saved snapshot | `checks/` |
+
+`ToolBox.jl` holds what several scripts share: the local dataset lookup, a quiet run, and observers that keep
+one result per phase or sum area-weighted terms. Load it with
+`include(joinpath(@__DIR__, "..", "ToolBox.jl")); using .ToolBox`.
 
 Scripts that run the model should read the local dataset with
 `greb_data_dir(; allow_download=false)` and never download it.
