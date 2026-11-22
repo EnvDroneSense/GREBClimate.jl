@@ -5,8 +5,8 @@ The scripts in `tools/` and the timing harness in `benchmark/` are for maintaine
 | Folder | Purpose | Page |
 |:-------|:--------|:-----|
 | `tools/dataset/` | Build and publish the input dataset | [Dataset tools](dataset_tools.md) |
-| `benchmark/` | Time the model and compare kernel variants | [Benchmarks](benchmarks.md) |
-| `benchmark/profile.jl` | Find where the time and memory of a run go | [Profiling](profiling.md) |
+| `benchmark/run.jl` | Time the model and compare kernel variants | [Benchmarks](benchmarks.md) |
+| `benchmark/run.jl` (profile modes) | Find where the time and memory of a run go | [Profiling](profiling.md) |
 | `benchmark/fortran/` | Check the model against the original Fortran and time both | [Fortran comparison](fortran.md) |
 | `tools/checks/budget.jl` | Measure a property of the model, such as its budgets | [Diagnostics](diagnostics.md) |
 | `tools/checks/bit_identity.jl` | Check that a change leaves the results unchanged | [Validation](validation.md) |

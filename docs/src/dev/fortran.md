@@ -4,20 +4,18 @@
 
 | Mode | Does |
 |:-----|:-----|
-| `compare` (default) | Runs `verify`, then times `official`, `native`, `control` and Julia in shuffled trials (`[reps]`, default 3) |
+| `compare` (default) | Runs `verify`, then times `official`, `native`, `control` and Julia in shuffled trials (`--reps=N`, default 3) |
 | `verify` | The gate: do both models give the same scenario temperatures (about 1 minute) |
-| `memory` | Peak memory of each build and Julia (Windows only, 1 rep) |
 | `io` | The cost of the Fortran's output writes |
 | `build` | Compiles the three Fortran builds |
-| `selftest` | The script's own logic; needs no compiler |
 | `driver` | The Julia run, started by the other modes in a child process |
 
 ## Set-up
 
-It runs in the package environment, from the repository root:
+It runs in the `benchmark` environment (set-up in `benchmark/README.md`), from the repository root:
 
 ```bash
-julia --project=. benchmark/fortran/run_fortran_comparison.jl [mode] [reps]
+julia --project=benchmark benchmark/fortran/run_fortran_comparison.jl [mode] [--reps=N]
 ```
 
 | Variable | Meaning | Default |
@@ -28,7 +26,7 @@ julia --project=. benchmark/fortran/run_fortran_comparison.jl [mode] [reps]
 | `GREB_BENCH_DIR` | Build and run tree | `greb_fortran_bench` in the temp folder |
 | `GREB_DATA` | Julia input data | The repository dataset |
 
-Missing gfortran or source tree stops every mode except `selftest` with exit code 1 and a line naming what is missing.
+Missing gfortran or source tree stops every mode with exit code 1 and a line naming what is missing.
 
 ## The gate
 
@@ -70,7 +68,7 @@ Fortran : Julia (min of trials)
 Self-check (control / official, identical builds): 0.986x  ok
 ```
 
-The figures come from a noisy machine (the run printed `NOISY`) and show the layout, not results. `compare` prints the machine state before and after, like the other harnesses, and appends one row per variant to `benchmark/results/<date>.csv` with mode `fortran`.
+`compare` also prints the peak memory of the Julia process (`Sys.maxrss`, in MiB; it includes the runtime, the garbage-collected heap and the packages). The figures come from a noisy machine (the run printed `NOISY`) and show the layout, not results. `compare` prints the machine state before and after, like the other harnesses, and appends one row per variant to `benchmark/results/<date>.csv` with mode `fortran`.
 
 | Build | Flags |
 |:------|:------|
