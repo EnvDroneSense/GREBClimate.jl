@@ -21,13 +21,11 @@ The README's quick-start once ran the model on an all-zero climatology and repor
 | 1 | Run the documented snippets | See below |
 | 2 | Local Markdown links resolve, relative to the linking file | `julia .claude/skills/docs-check/check_docs.jl` |
 | 3 | Julia version claims agree across `README.md`, `docs/src/index.md` and the `Project.toml` compat bound | same |
-| 4 | Names in `[`name`](@ref)` are exported | same |
-| 5 | No dead `.jld2` file (a NOTE, not a failure; the check expands `$suffix` in the ENSO file names) | same |
-| 6 | Documenter cross-references, docstrings of exports, doctests | `julia --project=docs docs/make.jl` |
+| 4 | Documenter cross-references, exported names, docstrings of exports, doctests | `julia --project=docs docs/make.jl` |
 
-The static script uses only the standard library, does not load the package, runs in seconds and exits nonzero on failure. The files it checks are listed in `DOC_FILES`; add a new page there. Do not replace it with an ad-hoc `grep`: that resolves every path from the repository root and gives about 70 false positives.
+The static script uses only the standard library, does not load the package, runs in seconds and exits nonzero on failure. CI runs it. It finds every `*.md` file by itself, except under `viz/` and build or worktree folders. Do not replace it with an ad-hoc `grep`: that resolves every path from the repository root and gives about 70 false positives.
 
-Check 6 is set to `checkdocs = :exports`, so an exported name without a docstring fails. A clean build prints only "could not auto-detect the building environment. Skipping deployment." and a size warning for `api.md`. If `Pkg.develop` says the UUID already exists, delete the gitignored `docs/Manifest.toml`; it regenerates.
+Check 4 is set to `checkdocs = :exports`, so an exported name without a docstring fails. A clean build prints only "could not auto-detect the building environment. Skipping deployment." and a size warning for `api.md`. If `Pkg.develop` says the UUID already exists, delete the gitignored `docs/Manifest.toml`; it regenerates.
 
 ## Running the snippets
 

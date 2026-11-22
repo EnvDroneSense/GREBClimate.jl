@@ -39,6 +39,6 @@ julia --project=docs -e 'using Pkg; Pkg.develop(path="."); Pkg.instantiate()'
 julia --project=docs docs/make.jl
 ```
 
-Docstring examples in ```` ```jldoctest ```` blocks run during the docs build, and a mismatch fails the build. If you change the behavior or signature of an exported function, check whether an example needs updating. `julia .claude/skills/docs-check/check_docs.jl` checks links, version claims and exported names in seconds.
+Docstring examples in ```` ```jldoctest ```` blocks run during the docs build, and a mismatch fails the build. If you change the behavior or signature of an exported function, check whether an example needs updating. `julia .claude/skills/docs-check/check_docs.jl` checks local links and version claims in seconds, and CI runs it.
 
 The site has two live versions: [stable](https://EnvDroneSense.github.io/GREBClimate.jl/stable/) is the latest release, built when the release tag is created, and [dev](https://EnvDroneSense.github.io/GREBClimate.jl/dev/) follows the `dev` branch. Pull requests build the docs and run the doctests but deploy nothing.
