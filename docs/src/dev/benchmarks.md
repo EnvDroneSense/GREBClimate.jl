@@ -23,15 +23,17 @@ Start Julia in the `benchmark` environment (set up once, see `benchmark/README.m
 julia> include("benchmark/run.jl")
 
 julia> main(["time"])
-machine: processor load 21 %, mains, background: OneDrive,SearchIndexer
-calibration loop: 26.76 ms, 1.07x the best seen here (25.07 ms)
-  run 1: 0.507 s  (0.507 s/simulated year)
-  run 2: 0.549 s  (0.549 s/simulated year)
-  run 3: 0.512 s  (0.512 s/simulated year)
-min: 0.507 s  median: 0.512 s  = 0.512 s/simulated year (median) over 1 years
-median / minimum of the runs: 1.01
-calibration loop after: 30.87 ms, 1.23x the best
-machine state: NOISY (calibration 1.23x the best) - do not quote these timings
+Threads.nthreads() = 2
+ctrl=1 scnr=0 (1 simulated years/rep), preset=full_model
+machine: processor load 22 %, mains, background: OneDrive,SearchIndexer
+calibration loop: 28.21 ms, 1.13x the best seen here (25.07 ms)
+  run 1: 0.47 s  (0.47 s/simulated year)
+  run 2: 0.632 s  (0.632 s/simulated year)
+  run 3: 0.557 s  (0.557 s/simulated year)
+min: 0.47 s  median: 0.557 s  = 0.557 s/simulated year (median) over 1 years
+median / minimum of the runs: 1.18
+calibration loop after: 50.56 ms, 2.02x the best
+machine state: NOISY (calibration 2.02x the best; runs spread 1.18x) - do not quote these timings
 0
 ```
 
@@ -54,20 +56,24 @@ Every run also appends one line per variant to `benchmark/results/<date>.csv` (g
 
 ```julia
 julia> main(["kernels"])
+machine: processor load 90 %, mains, background: OneDrive,SearchIndexer
+calibration loop: 41.57 ms, 1.66x the best seen here (25.07 ms)
 Kernel timing (about 0.5 s each, single workspace, 2 thread(s) available but unused here):
-  circulation!(Ta)  min  159.20 µs   median  160.10 µs   ( 45.3% of step!)
-  circulation!(q)   min  165.90 µs   median  167.05 µs   ( 47.2% of step!)
-  SWradiation!      min    1.90 µs   median    1.91 µs   (  0.5% of step!)
-  LWradiation!      min    8.60 µs   median    8.80 µs   (  2.4% of step!)
-  hydro!            min    4.60 µs   median    4.68 µs   (  1.3% of step!)
-  deep_ocean!       min    1.50 µs   median    1.56 µs   (  0.4% of step!)
-  seaice!           min    2.30 µs   median    2.37 µs   (  0.7% of step!)
-  step!             min  351.50 µs   median  412.20 µs   (100.0% of step!)
+  circulation!(Ta)  min  215.40 µs   median  219.65 µs   ( 44.6% of step!)
+  circulation!(q)   min  226.60 µs   median  231.00 µs   ( 46.9% of step!)
+  SWradiation!      min    2.76 µs   median    2.77 µs   (  0.6% of step!)
+  LWradiation!      min   11.25 µs   median   12.20 µs   (  2.3% of step!)
+  hydro!            min    5.88 µs   median    6.05 µs   (  1.2% of step!)
+  deep_ocean!       min    1.95 µs   median    2.02 µs   (  0.4% of step!)
+  seaice!           min    3.10 µs   median    3.21 µs   (  0.6% of step!)
+  step!             min  483.40 µs   median  530.15 µs   (100.0% of step!)
   (convergence! is inside circulation!(q); step! also holds the update loop, output! and
    diagnostics!. For shares of a whole run use the profile mode)
+calibration loop after: 40.38 ms, 1.61x the best
+machine state: NOISY (calibration 1.66x the best) - do not quote these timings
 ```
 
-`compare` times the variants in a shuffled order each round and a second copy of the baseline as a control. It exits with 1 when that control is more than 1 % off:
+`compare` times the variants in a shuffled order each round and a second copy of the baseline as a control. It exits with 1 when that control is more than 1 % off. The sample below leaves out the machine lines, which are the same as in `kernels`:
 
 ```julia
 julia> main(["compare", "--only=circulation!(Ta),circulation!(q)", "--seconds=2"])

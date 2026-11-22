@@ -32,6 +32,8 @@ Repeat both with `-t 2,0` and a second snapshot. Snapshots depend on the CPU and
 julia -e 'using JuliaFormatter; foreach(format, ("src", "test", "benchmark", "tools", "ext", "examples", "viz"))'
 ```
 
+On a Windows checkout with CRLF line endings, `format(d; overwrite=false)` reports every file as unformatted. `format` rewrites the files with LF, and Git stores them unchanged. JuliaFormatter 1 formats some lines differently from 2, so CI can fail on a file that version 1 accepts.
+
 ## Documentation
 
 ```bash

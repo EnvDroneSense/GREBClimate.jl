@@ -244,7 +244,7 @@ end
 
 "The climatology, workspace and slice-1 state that the kernel table calls the kernels with."
 function stage_inputs(dir::AbstractString, cfg)
-    fields = load_climatology(dir; dataset=:ncep)
+    fields = quiet(() -> load_climatology(dir; dataset=:ncep))
     r = resolve(cfg; jld2_dir=dir)
     CO2 = GREBClimate.init_model!(fields, r).CO2_ctrl
     slice = 1
@@ -254,10 +254,7 @@ function stage_inputs(dir::AbstractString, cfg)
 end
 
 "Run `greb_model!` without its log output."
-run_model(spec, cfg, dir, fields) =
-    quiet() do
-        greb_model!(spec, cfg; jld2_dir=dir, fields=fields)
-    end
+run_model(spec, cfg, dir, fields) = quiet(() -> greb_model!(spec, cfg; jld2_dir=dir, fields=fields))
 
 "What a report says is run."
 workload_text(experiment::Symbol, ctrl::Int=1, scnr::Int=0) = "$experiment, $ctrl control + $scnr scenario year(s), stored corrections"
@@ -270,7 +267,7 @@ reuses them.
 """
 function workload(dir::AbstractString, experiment::Symbol; ctrl::Int=1, scnr::Int=0)
     cfg = preset(experiment; corrections=Stored())
-    fields = load_climatology(dir; dataset=:ncep)
+    fields = quiet(() -> load_climatology(dir; dataset=:ncep))
     spec = RunSpec(ctrl=ctrl, scnr=scnr)
     run_model(RunSpec(ctrl=1, scnr=0), cfg, dir, fields)
     GC.gc()
@@ -456,7 +453,7 @@ end
 label(fr::Frame) = string(fr.func, " ", basename(fr.file), ":", fr.line)
 
 "Add `by` to the count of `key`."
-bump!(counts::AbstractDict, key, by::Int=1) = (counts[key] = get(counts, key, 0) + by; nothing)
+bump!(counts::AbstractDict, key, by::Int=1) = (counts[key]=get(counts, key, 0) + by; nothing)
 
 "The entries of `counts`, largest first; equal counts in the order of their keys, so a report is reproducible."
 ranked(counts::AbstractDict) = sort!(collect(counts); by=kv -> (-last(kv), first(kv)))
@@ -601,7 +598,7 @@ function tally(stacks)
     return (; samples=n, classes, class_frames, class_owners, self, onstack, lines)
 end
 
-"Write `counts.tsv` (`table`, `row`, `value`), which `compare` reads."
+"Write `counts.tsv` (`table`, `row`, `value`), which `diff` reads."
 function write_counts(path::AbstractString, t, commit::AbstractString)
     open(path, "w") do io
         println(io, "table\trow\tvalue")
@@ -734,7 +731,7 @@ function profile(f; description::AbstractString="a closure", info=Pair{String,St
     elapsed = 0.0
     runs = 0
     while runs < max_runs &&
-        (runs == 0 || length(split_samples(Profile.fetch(include_meta=true))) < target)
+          (runs == 0 || length(split_samples(Profile.fetch(include_meta=true))) < target)
         elapsed += @elapsed @profile f()
         runs += 1
         Profile.is_buffer_full() && error("the profile buffer filled up; lower the run length or --samples")
@@ -883,7 +880,7 @@ function read_run(dir::AbstractString)
         functions=counts("function"), lines=counts("line"), classes=counts("class"))
 end
 
-"Write one table of `compare`: each row's share in runs `a` and `b`, the difference and its standard error."
+"Write one table of `compare_runs`: each row's share in runs `a` and `b`, the difference and its standard error."
 function write_changes(io::IO, title::AbstractString, a::Dict{String,Int}, na::Int, b::Dict{String,Int}, nb::Int;
         top::Int=25)
     rows = map(collect(union(keys(a), keys(b)))) do name
