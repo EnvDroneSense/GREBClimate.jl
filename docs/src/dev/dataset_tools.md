@@ -12,7 +12,7 @@ Data/ (raw .bin, .ctl, .txt)  --convert-->  greb_input_data/ (39 .jld2)  --packa
 | `tools/dataset/fields.jl` | Reads `fields.toml` and answers which files exist and which pack each belongs to. |
 | `tools/dataset/convert_greb_to_jld2.jl` | Converts the raw files to `.jld2`. Each file gets its metadata and `dataset_version`. |
 | `tools/dataset/package_dataset.jl` | Checks the converted tree, builds one `tar.xz` per pack and prints the `DATA_PACKS` block. |
-| `tools/dataset/fetch_era5_data.py` | Work in progress. It fetches ERA5 fields, but nothing in the dataset uses its output yet. |
+| `tools/dataset/fetch_era5_data.py` | Experimental, not in use. It fetches ERA5 fields, but nothing in the dataset uses its output. |
 
 ## Packs
 

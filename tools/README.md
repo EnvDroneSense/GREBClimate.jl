@@ -6,12 +6,19 @@ from the repository root with `julia --project=. tools/<folder>/<script>.jl`
 
 | Folder | Purpose | Script | What it does | Page |
 |:-------|:--------|:-------|:-------------|:-----|
-| `dataset/` | Build and publish the model's input dataset | `fetch_era5_data.py` | Fetches an ERA5 climatology and writes GREB `.bin` files | [Dataset tools](../docs/src/dev/dataset_tools.md) |
+| `dataset/` | Build and publish the model's input dataset | `fetch_era5_data.py` | Experimental, not in use. Fetches an ERA5 climatology and writes GREB `.bin` files | [Dataset tools](../docs/src/dev/dataset_tools.md) |
 | | | `convert_greb_to_jld2.jl` | Converts GREB `.bin` files and the CO2 text tables into `greb_input_data/` | |
 | | | `package_dataset.jl` | Builds one `tar.xz` per pack and prints the `DATA_PACKS` block | |
 | | | `fields.toml`, `fields.jl` | Not run: the file list, pack and metadata of each field, and the reader of that list | |
 | `diagnostics/` | Measure a property of the model | `budget.jl` | Reports whether each store closes, how often a limiter held a cell, and the global-mean flows | [Diagnostics](../docs/src/dev/diagnostics.md) |
 | `validation/` | Check the model against a reference | `bit_identity.jl` | Saves every record field of every preset, then compares a later build with exact equality | [Validation](../docs/src/dev/validation.md) |
+
+Two maintainer scripts live next to what they serve, not here:
+
+| Script | What it does | Page |
+|:-------|:-------------|:-----|
+| `test/support/preset_reference.jl` | Regenerates `test/support/data/preset_reference.jl` after a preset is changed on purpose | [Testing](../docs/src/dev/testing.md) |
+| `.claude/skills/docs-check/check_docs.jl` | Static checks of the Markdown docs: local links and Julia version claims | [Code conventions](../docs/src/dev/conventions.md) |
 
 The experiment scripts (climate sensitivity, CO2 sweep) and their helpers are not here. They are in the separate repository [GREBExperiments](https://github.com/EnvDroneSense/GREBExperiments).
 

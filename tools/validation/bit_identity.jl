@@ -5,8 +5,7 @@
 # Saves every monthly record field of the control and scenario runs of every
 # experiment preset, plus two cases with switches off, then compares a later
 # run with exact equality (NaN equals NaN). A refactor that claims "no change
-# to results" must report 0 differing values. A snapshot is about 250 MB; a run
-# takes a few minutes.
+# to results" must report 0 differing values. A run takes a few minutes.
 #
 # Snapshots compare only on the same machine, Julia version and thread count
 # (`@turbo` differs between CPUs and releases; a thread mismatch is refused).
