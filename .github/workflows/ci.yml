@@ -59,7 +59,9 @@ jobs:
           println("self-check passed: ", ok)
         shell: julia --color=yes {0}
       - name: Run the quickstart example without the dataset
-        run: julia --project=. examples/quickstart.jl --data-free
+        run: |
+          julia --project=. -e 'import Pkg; Pkg.instantiate()'
+          julia --project=. examples/quickstart.jl --data-free
 
   viz:
     runs-on: ubuntu-latest
