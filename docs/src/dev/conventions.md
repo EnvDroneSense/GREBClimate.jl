@@ -14,11 +14,11 @@ The model runs many simulated years, so its kernels are written around that. The
 A refactor or an optimization is checked with exact equality, not with tolerances. With the dataset present, save a snapshot on the commit before the change and compare after it, once at one thread and once at two:
 
 ```bash
-julia --project=. -t 1 tools/validation/bit_identity.jl save snap_t1.jld2
-julia --project=. -t 1 tools/validation/bit_identity.jl compare snap_t1.jld2
+julia --project=. -t 1 tools/checks/bit_identity.jl save snap_t1.jld2
+julia --project=. -t 1 tools/checks/bit_identity.jl compare snap_t1.jld2
 ```
 
-Repeat both with `-t 2,0` and a second snapshot. Snapshots depend on the CPU and the Julia version, so they are not committed. For a change to the flux sums or the humidity limiters, `tools/diagnostics/budget.jl <preset>` prints how well each store closes. See [Validation](validation.md) and [Diagnostics](diagnostics.md).
+Repeat both with `-t 2,0` and a second snapshot. Snapshots depend on the CPU and the Julia version, so they are not committed. For a change to the flux sums or the humidity limiters, `tools/checks/budget.jl <preset>` prints how well each store closes. See [Validation](validation.md) and [Diagnostics](diagnostics.md).
 
 ## Speed
 
@@ -32,6 +32,8 @@ Repeat both with `-t 2,0` and a second snapshot. Snapshots depend on the CPU and
 julia -e 'using JuliaFormatter; foreach(format, ("src", "test", "benchmark", "tools", "ext", "examples", "viz"))'
 ```
 
+On a Windows checkout with CRLF line endings, `format(d; overwrite=false)` reports every file as unformatted. `format` rewrites the files with LF, and Git stores them unchanged. JuliaFormatter 1 formats some lines differently from 2, so CI can fail on a file that version 1 accepts.
+
 ## Documentation
 
 ```bash
@@ -39,6 +41,6 @@ julia --project=docs -e 'using Pkg; Pkg.develop(path="."); Pkg.instantiate()'
 julia --project=docs docs/make.jl
 ```
 
-Docstring examples in ```` ```jldoctest ```` blocks run during the docs build, and a mismatch fails the build. If you change the behavior or signature of an exported function, check whether an example needs updating. `julia .claude/skills/docs-check/check_docs.jl` checks links, version claims and exported names in seconds.
+Docstring examples in ```` ```jldoctest ```` blocks run during the docs build, and a mismatch fails the build. If you change the behavior or signature of an exported function, check whether an example needs updating. `julia .claude/skills/docs-check/check_docs.jl` checks local links and version claims in seconds, and CI runs it.
 
 The site has two live versions: [stable](https://EnvDroneSense.github.io/GREBClimate.jl/stable/) is the latest release, built when the release tag is created, and [dev](https://EnvDroneSense.github.io/GREBClimate.jl/dev/) follows the `dev` branch. Pull requests build the docs and run the doctests but deploy nothing.

@@ -5,8 +5,7 @@
 # Saves every monthly record field of the control and scenario runs of every
 # experiment preset, plus two cases with switches off, then compares a later
 # run with exact equality (NaN equals NaN). A refactor that claims "no change
-# to results" must report 0 differing values. A snapshot is about 250 MB; a run
-# takes a few minutes.
+# to results" must report 0 differing values. A run takes a few minutes.
 #
 # Snapshots compare only on the same machine, Julia version and thread count
 # (`@turbo` differs between CPUs and releases; a thread mismatch is refused).
@@ -14,17 +13,12 @@
 # `-t 1` and once with `-t 2,0`.
 #
 # Usage:
-#   julia --project=. tools/validation/bit_identity.jl save    <snapshot.jld2>
-#   julia --project=. tools/validation/bit_identity.jl compare <snapshot.jld2>
+#   julia --project=. tools/checks/bit_identity.jl save    <snapshot.jld2>
+#   julia --project=. tools/checks/bit_identity.jl compare <snapshot.jld2>
 
 using GREBClimate
-using Logging: with_logger, NullLogger
-
-function data_dir()
-    dir = greb_data_dir(; allow_download=false)
-    dir === nothing && error("no local dataset found")
-    return dir
-end
+include(joinpath(@__DIR__, "..", "ToolBox.jl"))
+using .ToolBox
 
 # One spin-up year (exercises the flux-correction loop), one control and one
 # scenario year. A snapshot must hold every case of the run: retake it when a
@@ -57,7 +51,7 @@ function run_cases()
     fields = load_climatology(dir; dataset=:ncep)
     snap = Dict{String,Array{Float32,3}}()
     for (name, mkcfg) in _cases()
-        result = with_logger(NullLogger()) do
+        result = quiet() do
             greb_model!(RUN, mkcfg(); jld2_dir=dir, fields=fields)
         end
         for phase in (:ctrl, :scnr), var in fieldnames(MonthlyRecord)

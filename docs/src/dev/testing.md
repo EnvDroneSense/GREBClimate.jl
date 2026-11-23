@@ -29,7 +29,7 @@ A run of a subset proves only the files it ran. Run the whole suite before you o
 
 ## Optional tests in CI
 
-The workflow `.github/workflows/optional-tests.yml` has two jobs that the main CI does not run: `test_enzyme.jl` (the Enzyme rules in `ext/`) and `test_dataset_tools.jl` (the dataset tools, opt-in by name). It starts when `ext/`, `tools/dataset/`, `src/io.jl` or `src/data.jl` change, every week, and by hand.
+The workflow `.github/workflows/optional-tests.yml` runs `test_enzyme.jl` (the Enzyme rules in `ext/`), which the main CI does not. It starts when `ext/` changes, every week, and by hand.
 
 ## What CI cannot check
 

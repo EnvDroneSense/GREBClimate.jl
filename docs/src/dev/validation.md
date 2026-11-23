@@ -1,10 +1,10 @@
 # Validation
 
-`tools/validation/bit_identity.jl` answers one question: did a change alter any number the model returns? It is for refactors and optimisations that claim "no change to results". It needs the local dataset.
+`tools/checks/bit_identity.jl` answers one question: did a change alter any number the model returns? It is for refactors and optimisations that claim "no change to results". It needs the local dataset.
 
 ```bash
-julia --project=. -t 2,0 tools/validation/bit_identity.jl save    <snapshot.jld2>
-julia --project=. -t 2,0 tools/validation/bit_identity.jl compare <snapshot.jld2>
+julia --project=. -t 2,0 tools/checks/bit_identity.jl save    <snapshot.jld2>
+julia --project=. -t 2,0 tools/checks/bit_identity.jl compare <snapshot.jld2>
 ```
 
 `save` runs every experiment preset plus two cases with switches off (44 cases) for one year of spin-up, one control year and one scenario year, and stores every monthly record field. `compare` runs the same cases again and compares with exact equality, where `NaN` equals `NaN`. A snapshot is about 290 MB and a run takes a few minutes.

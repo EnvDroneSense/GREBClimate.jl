@@ -32,11 +32,6 @@ const SHARD = [
     ("test_aqua.jl", "heavy", "full", 13)
 ]
 
-# Run only by name (`Pkg.test(test_args = ["dataset_tools"])`), never as part of a
-# tier, a shard or the full suite: the dataset tools change rarely, and their
-# tests are needed only when they or the dataset loaders do.
-const OPT_IN = ["test_dataset_tools.jl"]
-
 const TIERS = ["smoke", "standard", "full"]
 
 """
@@ -47,8 +42,8 @@ function resolve_test_file(name)
     base = replace(strip(name), r"\.jl$" => "")
     startswith(base, "test_") || (base = "test_" * base)
     file = base * ".jl"
-    file in OPT_IN || any(row -> row[1] == file, SHARD) ||
-        error("no test file `$name` in SHARD; known: ", join(vcat([r[1] for r in SHARD], OPT_IN), ", "))
+    any(row -> row[1] == file, SHARD) ||
+        error("no test file `$name` in SHARD; known: ", join([r[1] for r in SHARD], ", "))
     return file
 end
 
@@ -60,7 +55,7 @@ The files to run, in `SHARD` order. `names` (from `GREB_TEST_FILES` or the
 function select_tests(; names=String[], tier="", shard="all")
     if !isempty(names)
         wanted = Set(resolve_test_file.(names))
-        return [f for f in vcat([row[1] for row in SHARD], OPT_IN) if f in wanted]
+        return [row[1] for row in SHARD if row[1] in wanted]
     elseif !isempty(tier)
         rank = findfirst(==(tier), TIERS)
         rank === nothing && error("GREB_TEST_TIER must be one of ", join(TIERS, ", "), ", got `$tier`")
@@ -92,8 +87,7 @@ const SOURCE_MAP = [
     ("src/core/model.jl", ["model", "ensemble", "@standard"]),
     ("src/core/ensemble.jl", ["model", "ensemble", "@standard"]),
     ("ext/", ["enzyme"]),
-    ("tools/dataset/", ["dataset_tools", "io"]),
-    ("tools/", ["dataset_tools"])
+    ("tools/dataset/", ["io"])
 ]
 
 # Paths that run the full suite although they are named: the package module,
@@ -106,7 +100,7 @@ const FULL_PATHS = ["src/GREBClimate.jl", "src/core/constants.jl", "Project.toml
 const RUNNER_PATHS = ["test/support/parallel.jl", "test/support/live.jl", "test/support/changed.jl"]
 
 # Paths no test can fail on
-const NO_TEST_PATHS = ["docs/", "benchmark/", "viz/", ".claude/", "README", "test/README", "CHANGELOG", "CONTRIBUTING",
+const NO_TEST_PATHS = ["docs/", "benchmark/", "viz/", ".claude/", "tools/checks/", "tools/ToolBox", "tools/README", "README", "test/README", "CHANGELOG", "CONTRIBUTING",
     "DATA_README", "LICENSE", ".gitignore", ".JuliaFormatter", "CITATION", "codecov"]
 
 """
@@ -134,5 +128,5 @@ function tests_for(paths)
             end
         end
     end
-    return ([f for f in vcat([row[1] for row in SHARD], OPT_IN) if f in wanted], "mapped")
+    return ([row[1] for row in SHARD if row[1] in wanted], "mapped")
 end

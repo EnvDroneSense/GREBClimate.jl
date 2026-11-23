@@ -313,3 +313,28 @@ end
         @test greb_data_dir(dir; packs=:core) == dir
     end
 end
+
+@testset "the dataset tools' file list, packs and version agree with the loaders" begin
+    names = GREBClimate.dataset_field_files()
+
+    # The tools keep their own list: it may hold more, never less
+    tools = Module()
+    Base.include(tools, joinpath(@__DIR__, "..", "tools", "dataset", "fields.jl"))
+    @test issubset(names, tools.MODEL_FIELD_NAMES)
+    @test issubset(GREBClimate._COMBINED_FILES, tools.COMBINED_FILE_NAMES)
+    @test Set(tools.FLUX_CORRECTION_NAMES) == Set(values(GREBClimate._FLUX_CORRECTION_KEYS))
+
+    # The tools write the version the loaders read
+    @test tools.DATASET_VERSION == GREBClimate.DATASET_VERSION
+    # The tools put a file in the pack the loaders name for it, and nothing else in an optional pack
+    @test Tuple(tools.PACK_NAMES) == keys(GREBClimate.DATA_PACKS)
+    optional = GREBClimate._OPTIONAL_PACK_FILES
+    for pack in GREBClimate._OPTIONAL_PACKS, file in getfield(optional, pack)
+
+        @test tools.pack_of(file) === pack
+    end
+    in_core = ("static/global.topography.jld2", "solar/solar_radiation.clim.jld2",
+        "climatology/ncep.tsurf.1948-2007.clim.jld2", "climatology/flux_corrections.jld2",
+        "climatology/erainterim.omega.vertmean.clim.jld2", "scenario/ipcc_scenarios.jld2")
+    @test all(f -> tools.pack_of(f) === :core, in_core)
+end

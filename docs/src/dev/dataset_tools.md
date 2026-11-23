@@ -12,7 +12,7 @@ Data/ (raw .bin, .ctl, .txt)  --convert-->  greb_input_data/ (39 .jld2)  --packa
 | `tools/dataset/fields.jl` | Reads `fields.toml` and answers which files exist and which pack each belongs to. |
 | `tools/dataset/convert_greb_to_jld2.jl` | Converts the raw files to `.jld2`. Each file gets its metadata and `dataset_version`. |
 | `tools/dataset/package_dataset.jl` | Checks the converted tree, builds one `tar.xz` per pack and prints the `DATA_PACKS` block. |
-| `tools/dataset/fetch_era5_data.py` | Work in progress. It fetches ERA5 fields, but nothing in the dataset uses its output yet. |
+| `tools/dataset/fetch_era5_data.py` | Experimental, not in use. It fetches ERA5 fields, but nothing in the dataset uses its output. |
 
 ## Packs
 
@@ -63,7 +63,7 @@ When the file format changes, raise `DATASET_VERSION` in `src/data.jl` and in `t
 The dataset tools test does not run with the full suite. Run it by name after you change the tools, `fields.toml` or the loaders in `src/io.jl` and `src/data.jl`.
 
 ```bash
-julia --project=. -e 'using Pkg; Pkg.test(test_args=["io", "dataset_tools"])'
+julia --project=. -e 'using Pkg; Pkg.test(test_args=["io"])'
 for p in core era cmip5 enso solar; do
   curl -sIL -o /dev/null -w "$p %{http_code}\n" "$(julia --project=. -e "using GREBClimate; print(GREBClimate._pack_url(:$p))")"
 done

@@ -1,5 +1,7 @@
 """Fetch an ERA5 monthly climatology and write GREB .bin files.
 
+EXPERIMENTAL, not in use: the released dataset is not built from this script.
+
 Writes flat 32-bit little-endian, no-header, Fortran-order (lon x lat x time)
 binaries in the layout tools/dataset/convert_greb_to_jld2.jl reads. Field/level choices
 were validated against the repo's existing erainterim.*.clim climatology.
@@ -15,8 +17,7 @@ Usage:
     julia --project=. tools/dataset/convert_greb_to_jld2.jl era5_greb greb_input_data_era5
 
 With --diagnostics, the diagnostic fields (cloud_cover, t700, t1000, rh700) are
-also fetched as raw netCDF. They are not converted or written as GREB inputs;
-they are for a separate cloud-feedback experiment.
+also fetched as raw netCDF. They are not converted or written as GREB inputs.
 """
 
 import argparse
@@ -43,7 +44,7 @@ GREB_FIELDS = {
     "omega": ("vertical_velocity", "w", "pressure-levels", [850, 700, 600, 500]),
 }
 
-# Fetched only with --diagnostics, for a separate cloud-feedback experiment; not written as GREB inputs.
+# Fetched only with --diagnostics; not written as GREB inputs.
 DIAGNOSTIC_FIELDS = {
     "cloud_cover": ("total_cloud_cover", "tcc", "single-levels", None),
     "t700": ("temperature", "t", "pressure-levels", 700),

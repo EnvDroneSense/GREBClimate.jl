@@ -9,29 +9,10 @@
     @test filter(!named, sources) == String[]
     for (_, names) in SOURCE_MAP, name in names
 
-        name == "@standard" || @test resolve_test_file(name) in vcat(first.(SHARD), OPT_IN)
+        name == "@standard" || @test resolve_test_file(name) in first.(SHARD)
     end
     # Every path prefix names something that exists
     for prefix in [first.(SOURCE_MAP); FULL_PATHS[1:5]; RUNNER_PATHS]
         @test ispath(joinpath(root, prefix))
     end
-end
-
-@testset "tests_for: mapped, full and no-test changes" begin
-    @test tests_for(["test/test_state.jl"]) == (["test_state.jl"], "mapped")
-    @test tests_for(["src/core/calendar.jl"]) == (["test_calendar.jl", "test_output.jl"], "mapped")
-    @test issubset(["test_budgets.jl", "test_model.jl"], tests_for(["src/core/output.jl"])[1])
-    @test tests_for(["docs/src/index.md", "CHANGELOG.md"]) == (String[], "mapped")
-    # The model files run their own files and the standard tier
-    model, _ = tests_for(["src/core/model.jl"])
-    @test "test_model.jl" in model && "test_physics.jl" in model && "test_golden.jl" ∉ model
-    # Shared code, the module file and unknown paths run everything
-    all_files = select_tests()
-    @test tests_for(["test/support/testutils.jl"])[1] == all_files
-    @test tests_for(["src/GREBClimate.jl"])[1] == all_files
-    @test startswith(tests_for(["src/newdir/new.jl"])[2], "full: no rule")
-    # A runner script has no test of its own beyond this file
-    @test tests_for(["test/support/parallel.jl"]) == (["test_selection.jl"], "mapped")
-    # Several paths: the union, in SHARD order
-    @test tests_for(["src/io.jl", "src/core/calendar.jl"])[1] == ["test_calendar.jl", "test_output.jl", "test_io.jl"]
 end

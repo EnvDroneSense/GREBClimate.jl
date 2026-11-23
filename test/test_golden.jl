@@ -16,7 +16,7 @@ end
     # A 1-year control and 1-year scenario on the NCEP dataset, stored as
     # monthly global-mean Ts/Ta/q, plus a control year after a one-year spin-up.
     # The tolerances (1e-3 K, 1e-6 kg/kg) are about 30 times the drift measured
-    # between runs; exact equality is checked by tools/validation/bit_identity.jl.
+    # between runs; exact equality is checked by tools/checks/bit_identity.jl.
     # RUN_GOLDEN=0 skips it locally. CI has no dataset and always skips it, so
     # a golden break is local-red and CI-green.
     with_dataset() do

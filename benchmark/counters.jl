@@ -1,4 +1,4 @@
-# Hardware counters through LinuxPerf (Linux only). Included by `compare.jl` at
+# Hardware counters through LinuxPerf (Linux only). Included by `Bench.jl` at
 # run time, after it has checked that counters can be read.
 
 using LinuxPerf

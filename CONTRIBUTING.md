@@ -36,11 +36,11 @@ GREBClimate.jl/
 ├── ext/                        # GREBEnzymeExt.jl: Enzyme rules, loaded only with Enzyme
 ├── test/                       # one file per subject; SHARD in support/selection.jl lists them
 │   └── data/                   # golden and preset references (see below)
-├── benchmark/                  # timing harness (run_benchmarks.jl, README.md)
+├── benchmark/                  # timing harness (run.jl, README.md)
 ├── docs/                       # Documenter site
 ├── examples/                   # user examples: quickstart.jl, feedback_deconstruction.jl
 ├── viz/                        # plotting toolbox + Pluto notebook (notebooks/), own Project.toml
-├── tools/                      # maintainer scripts: dataset/, diagnostics/, validation/ (see tools/README.md)
+├── tools/                      # maintainer scripts: dataset/, checks/ (see tools/README.md)
 ├── DATA_README.md              # raw .bin input inventory (maintainers)
 └── CHANGELOG.md
 ```
@@ -76,14 +76,14 @@ While developing, run only what a change needs: `julia --project=. test/support/
 
 - A new test file needs a row in the `SHARD` table in [test/support/selection.jl](test/support/selection.jl), or it will not run.
 - A test that calls `greb_data_dir` must pass `allow_download=false`.
-- The workflow `Optional tests` runs `test_enzyme.jl` and `test_dataset_tools.jl` when `ext/`, `tools/dataset/`, `src/io.jl` or `src/data.jl` change. The main CI does not run them.
+- The workflow `Optional tests` runs `test_enzyme.jl` when `ext/` changes, every week and by hand. The main CI does not run it.
 - CI has no dataset, so the golden, MSCM, deconstruction and orbital-table tests skip there. Run the whole suite locally with the dataset.
 
 The developer docs page [Testing](docs/src/dev/testing.md) has every command and the rules for new tests; [test/README.md](test/README.md) maps the files.
 
 ## Conventions
 
-Fields are `Float32`, kernels do not allocate, and four kernels stay free of `@turbo`. A change that must not alter results is checked with `tools/validation/bit_identity.jl`. Source folders follow `.JuliaFormatter.toml`, and a CI job fails on unformatted files. See [Code conventions](docs/src/dev/conventions.md) for the details, the formatting command and the docs build.
+Fields are `Float32`, kernels do not allocate, and four kernels stay free of `@turbo`. A change that must not alter results is checked with `tools/checks/bit_identity.jl`. Source folders follow `.JuliaFormatter.toml`, and a CI job fails on unformatted files. See [Code conventions](docs/src/dev/conventions.md) for the details, the formatting command and the docs build.
 
 ## Branches
 

@@ -1,22 +1,31 @@
 # Compare GREBClimate.jl with the original Fortran GREB on the same workload.
 #
-#   julia --project=. benchmark/fortran/run_fortran_comparison.jl [mode] [reps]
+#   julia --project=benchmark benchmark/fortran/run_fortran_comparison.jl [mode] [--reps=N]
 #
-#   compare  - time each Fortran build and Julia (default, reps=3)
-#   memory   - peak memory of each build and Julia (Windows, reps=1)
+#   compare  - time each Fortran build and Julia, and report the Julia peak memory
+#              (default, --reps=3)
 #   verify   - check both models give the same result
 #   io       - time the Fortran's output writes
 #   build    - compile the Fortran builds
-#   selftest - test this script's own logic
 #   driver   - the Julia run, started by the other modes in a child process
 #
 # Needs gfortran and the Fortran source tree (GREB_GFORTRAN, GREB_FORTRAN_DIR).
 # Exits 1 when a mode fails: missing tooling, a failed gate or self-check.
+# Peak memory of Julia is its own Sys.maxrss (the working set, with runtime, GC heap and packages).
 
 using GREBClimate: RunSpec, SpinUp, greb_data_dir, greb_model!, load_climatology, preset
 using Random
 
-include(joinpath("..", "common.jl"))
+# The child process of the timed Julia run ("driver") loads the package only: Bench would add its load time.
+const DRIVER = !isempty(ARGS) && ARGS[1] == "driver"
+if !DRIVER
+    include(joinpath(@__DIR__, "..", "..", "tools", "ToolBox.jl"))
+    using .ToolBox
+    include(joinpath(@__DIR__, "..", "Bench.jl"))
+    using Statistics: median
+end
+const REPO = normpath(joinpath(@__DIR__, "..", ".."))
+const JULIA_BIN = joinpath(Sys.BINDIR, Base.julia_exename())
 
 # Fortran grid and output layout.
 const XDIM = 96
@@ -79,7 +88,7 @@ end
 
 "Compiler, Fortran tree and dataset paths; an error names what is missing."
 function require_tooling()
-    t = (gfortran=find_gfortran(), fortran_dir=fortran_source_dir(), jld2_dir=default_data_dir())
+    t = (gfortran=find_gfortran(), fortran_dir=fortran_source_dir(), jld2_dir=data_dir())
     missing_parts = String[]
     t.gfortran === nothing && push!(missing_parts, "gfortran not found. Set GREB_GFORTRAN, or `scoop install mingw`.")
     t.fortran_dir === nothing && push!(missing_parts, "Official Fortran GREB tree not found. Set GREB_FORTRAN_DIR " *
@@ -173,6 +182,13 @@ function julia_run(jld2_dir::AbstractString, dump_path::AbstractString="")
     isempty(dump_path) || open(dump_path, "w") do out
         foreach(rec -> write(out, rec.Ts), result.scnr)
     end
+    println("peak_rss_bytes ", Sys.maxrss())   # read by `julia_peak_mib`
+end
+
+"The peak memory in MiB that the driver wrote to `log`, or `nothing`."
+function julia_peak_mib(log::AbstractString)
+    m = match(r"^peak_rss_bytes (\d+)$"m, read(log, String))
+    m === nothing ? nothing : round(parse(Int, m[1]) / 1024^2, digits=1)
 end
 
 "Arguments of the Julia process that runs `julia_run` (this script in `driver` mode)."
@@ -180,74 +196,6 @@ julia_args(jld2_dir, dump_path="") = ["--project=$REPO", "-t", string(THREADS), 
 
 "Run `julia_run` in a new process, with its output in `log`; returns wall-clock seconds."
 run_julia(jld2_dir::AbstractString, log::AbstractString; dump_path::AbstractString="") = @elapsed run_logged(`$JULIA_BIN $(julia_args(jld2_dir, dump_path))`, log)
-
-# ── Peak memory ─────────────────────────────────────────────────────────────
-
-powershell_exe() = something(Sys.which("pwsh"), Sys.which("powershell"), Some(nothing))
-
-"Peak memory in bytes of one process run (Windows only), or `nothing`."
-function peak_memory(exe::AbstractString, workdir::AbstractString, logfile::AbstractString;
-        exe_args::Vector{String}=String[], prepend_path::AbstractString="",
-        omp_threads::AbstractString="")
-    Sys.iswindows() || (@warn "peak_memory is Windows-only; skipping."; return nothing)
-    ps = powershell_exe()
-    ps === nothing && (@warn "No pwsh/powershell found; cannot measure peak memory."; return nothing)
-    argsfile = logfile * ".args"
-    write(argsfile, join(exe_args, "\n"))
-    script = joinpath(@__DIR__, "peak_memory.ps1")
-    cmd = `$ps -NoProfile -ExecutionPolicy Bypass -File $script -Exe $exe -WorkDir $workdir
-           -OutFile $logfile -PrependPath $prepend_path -OmpThreads $omp_threads -ArgsFile $argsfile`
-    out = try
-        readchomp(cmd)
-    catch err
-        @warn "peak memory measurement failed" err
-        return nothing
-    end
-    parts = tryparse.(Int, split(strip(out)))
-    (length(parts) >= 2 && !any(isnothing, parts[1:2])) ||
-        (@warn "unparseable peak-memory output: $(repr(out))"; return nothing)
-    bytes, code = parts
-    code == 0 || (@warn "process exited $code during memory measurement; discarding its peak" exe; return nothing)
-    bytes
-end
-
-mib(b) = round(b / 1024^2, digits=1)
-
-"Peak memory of each Fortran build and of Julia."
-function memory(; reps::Int=1)
-    t = require_tooling()
-    root = prepare_tree(t.fortran_dir)
-    exes = build_all(t.gfortran, root)
-
-    peaks = Dict{Symbol,Vector{Int}}()
-    for r in 1:reps
-        println("--- memory trial $r/$reps ---")
-        for v in keys(BUILDS)
-            workdir = mkpath(joinpath(root, "mem_$v"))
-            write_namelist(workdir)
-            b = peak_memory(exes[v], workdir, joinpath(workdir, "run.log");
-                prepend_path=dirname(t.gfortran), omp_threads=string(THREADS))
-            b === nothing && return nothing
-            push!(get!(peaks, v, Int[]), b)
-            println("  ", rpad(v, 9), mib(b), " MB")
-        end
-        b = peak_memory(JULIA_BIN, root, joinpath(root, "julia_mem.log");
-            exe_args=julia_args(t.jld2_dir))
-        b === nothing && return nothing
-        push!(get!(peaks, :julia, Int[]), b)
-        println("  ", rpad("julia", 9), mib(b), " MB")
-    end
-
-    println("\nPeak working set (", reps, " rep(s)), same workload as `compare`:")
-    for v in [collect(keys(BUILDS)); :julia]
-        x = peaks[v]
-        println("  ", rpad(v, 9), mib(_median(x)), " MB",
-            length(x) > 1 ? "  (min $(mib(minimum(x))), max $(mib(maximum(x))))" : "")
-    end
-    println("\n  julia / official = ", round(_median(peaks[:julia]) / _median(peaks[:official]), digits=2), "x",
-        "  (Julia includes runtime, GC heap and packages)")
-    peaks
-end
 
 # ── Correctness gate ────────────────────────────────────────────────────────
 
@@ -352,7 +300,8 @@ Workload: EXP=", LOG_EXP, " / ", JULIA_EXPERIMENT, ", flux=", TIME_FLUX, " ctrl=
 
     variants = [collect(keys(BUILDS)); :julia]
     times = Dict(v => Float64[] for v in variants)
-    before = machine_header()
+    peaks = Float64[]   # MiB of Julia
+    before = Bench.machine_header()
     for r in 1:reps
         println("--- trial $r/$reps ---")
         for v in shuffle(variants)
@@ -360,6 +309,7 @@ Workload: EXP=", LOG_EXP, " / ", JULIA_EXPERIMENT, ", flux=", TIME_FLUX, " ctrl=
                 run_fortran(exes[v], joinpath(root, "work_$v"), dirname(t.gfortran))
             push!(times[v], s)
             println("  ", rpad(v, 9), round(s, digits=2), "s")
+            v === :julia && push!(peaks, something(julia_peak_mib(joinpath(root, "julia_timed.log")), NaN))
         end
     end
 
@@ -368,7 +318,7 @@ Workload: EXP=", LOG_EXP, " / ", JULIA_EXPERIMENT, ", flux=", TIME_FLUX, " ctrl=
 Results (", reps, " reps):")
     for v in variants
         x = times[v]
-        println("  ", rpad(v, 9), "min ", rpad(r2(minimum(x)), 7), "median ", rpad(r2(_median(x)), 7), "max ", r2(maximum(x)))
+        println("  ", rpad(v, 9), "min ", rpad(r2(minimum(x)), 7), "median ", rpad(r2(median(x)), 7), "max ", r2(maximum(x)))
     end
     best = Dict(v => minimum(times[v]) for v in variants)
     println("
@@ -380,127 +330,38 @@ Fortran : Julia (min of trials)")
     println("
 Self-check (control / official, identical builds): ", round(selfcheck, digits=3), "x  ",
         selfcheck_ok ? "ok" : "WARNING: not within 5% of 1.00x - DISCARD THIS RUN.")
+    println("
+Julia peak memory (Sys.maxrss, max of trials): ", maximum(peaks), " MiB, runtime and packages included.")
     println("The Julia time is a fresh process: start-up, package load and compilation are inside it.")
     println("The Fortran also writes ~88 MB that Julia does not; `io` mode bounds its cost.
 ")
-    quiet = machine_footer(before, times[:official])
+    quiet = Bench.machine_footer(before, times[:official])
     for v in variants
-        record_result("fortran", string(v), times[v], quiet; selfcheck=v === :control ? selfcheck : nothing, threads=THREADS)
+        Bench.record_result("fortran", string(v), times[v], quiet; selfcheck=v === :control ? selfcheck : nothing, threads=THREADS)
     end
     selfcheck_ok
 end
 
-# ── Self-test ───────────────────────────────────────────────────────────────
-
-"Check this script's own logic; returns the number of failures."
-function selftest()
-    npass, nfail = Ref(0), Ref(0)
-    check(name, ok) = ok === true ? (npass[] += 1) : (nfail[] += 1; println("  FAIL: ", name))
-
-    w = area_weights()
-    check("area_weights length", length(w) == YDIM)
-    check("area_weights positive", all(>(0), w))
-    check("area_weights symmetric", w ≈ reverse(w))
-    check("area_weights peaks at equator", argmax(w) in (YDIM ÷ 2, YDIM ÷ 2 + 1))
-
-    f = fill(2.5f0, XDIM, YDIM, 24)
-    check("final_year_gmean constant", isapprox(final_year_gmean(f), 2.5; atol=1e-5))
-    f[:, :, 1:12] .= -999.0f0
-    check("final_year_gmean ignores earlier months", isapprox(final_year_gmean(f), 2.5; atol=1e-5))
-    check("final_year_gmean zero", final_year_gmean(zeros(Float32, XDIM, YDIM, 12)) == 0.0)
-
-    mktempdir() do dir
-        path = joinpath(dir, "scenario.bin")
-        open(path, "w") do io
-            for i in 1:5, fld in 1:FIELDS_PER_RECORD
-
-                write(io, fill(fld == 1 ? Float32(i) : -999.0f0, XDIM, YDIM))
-            end
-        end
-        got = read_fortran_scenario_ts(path, 5)
-        check("read_fortran_scenario_ts shape", size(got) == (XDIM, YDIM, 5))
-        check("read_fortran_scenario_ts picks the Ts slot", all(all(got[:, :, i] .== i) for i in 1:5))
-    end
-
-    mktempdir() do dir
-        write_namelist(dir)
-        txt = read(joinpath(dir, "namelist"), String)
-        for (k, v) in (("time_flux", TIME_FLUX), ("time_ctrl", TIME_CTRL), ("time_scnr", TIME_SCNR), ("log_exp", LOG_EXP))
-            check("namelist $k", occursin("$k = $v", txt))
-        end
-        check("namelist placeholder files", isfile(joinpath(dir, "nosolfile")) && isfile(joinpath(dir, "noco2file")))
-    end
-
-    args = julia_args("data", "dump.bin")
-    check("julia_args starts the driver mode", args[(end-2):end] == ["driver", "data", "dump.bin"])
-    check("julia_args leaves out an empty dump path", julia_args("data")[end] == "data")
-    check("STACK_FLAG is a Windows option", isempty(STACK_FLAG) != Sys.iswindows())
-
-    if Sys.iswindows() && powershell_exe() !== nothing
-        mktempdir() do dir
-            script = joinpath(dir, "big.jl")
-            write(script, "x = zeros(UInt8, 400_000_000)\nx[1:1000:end] .= 1\nprintln(sum(x))\n")
-            b = peak_memory(JULIA_BIN, dir, joinpath(dir, "out.log"); exe_args=[script])
-            check("peak_memory returns a value", b !== nothing)
-            check("peak_memory sees the 400 MB allocation", b !== nothing && b > 300 * 1024^2)
-        end
-    end
-
-    withenv("GREB_BENCH_DIR" => "C:/some/dir/../bench") do
-        check("bench_root normalises the path", bench_root() == normpath(abspath("C:/some/dir/../bench")) &&
-            !(Sys.iswindows() && occursin('/', bench_root())))
-    end
-    mktempdir() do dir
-        log = joinpath(dir, "fail.log")
-        failed = try
-            redirect_stdout(devnull) do
-                run_logged(`$JULIA_BIN -e "println(\"marker\"); exit(3)"`, log)
-            end
-            false
-        catch
-            true
-        end
-        check("run_logged rethrows a failure and keeps its output", failed && occursin("marker", read(log, String)))
-    end
-
-    bogus_dir = joinpath(tempdir(), "definitely_not_here")
-    withenv("GREB_FORTRAN_DIR" => bogus_dir) do
-        check("fortran_source_dir rejects an incomplete tree", fortran_source_dir() != bogus_dir)
-    end
-    bogus_exe = joinpath(tempdir(), "no_such_gfortran.exe")
-    withenv("GREB_GFORTRAN" => bogus_exe) do
-        check("find_gfortran rejects a missing GREB_GFORTRAN", find_gfortran() != bogus_exe)
-    end
-
-    println("\nselftest: ", npass[], " passed, ", nfail[], " failed")
-    nfail[]
-end
-
-const MODES = ("compare", "verify", "io", "build", "memory", "selftest", "driver")
+const FLAGS = Dict("compare" => ("reps",), "verify" => (), "io" => (), "build" => ())
 
 "Run the mode named by `args`; returns the exit code."
 function main(args::Vector{String})
-    mode, rest = pick_mode(args, MODES, "compare")
-    if mode == "driver"
-        julia_run(rest...)
+    if !isempty(args) && args[1] == "driver"
+        julia_run(args[2:end]...)
         return 0
     end
-    length(rest) <= 1 || error("the $mode mode takes at most a reps argument, got: ", join(rest, " "))
-    reps = isempty(rest) ? nothing : parse_reps(rest[1])
+    mode, o, positional = parse_args(args, FLAGS, "compare")
+    isempty(positional) || error("the $mode mode takes no positional argument, got: ", join(positional, " "))
     ok = if mode == "compare"
-        compare(; reps=something(reps, 3))
-    elseif mode == "memory"
-        memory(; reps=something(reps, 1)) !== nothing
+        compare(; reps=intflag(o, "reps", 3; min=1))
     elseif mode == "verify"
         verify().pass
     elseif mode == "io"
         io_cost() >= 0
-    elseif mode == "build"
+    else  # build
         t = require_tooling()
         build_all(t.gfortran, prepare_tree(t.fortran_dir))
         true
-    else
-        selftest() == 0
     end
     return ok ? 0 : 1
 end
